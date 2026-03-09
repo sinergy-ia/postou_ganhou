@@ -4,18 +4,28 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { establishmentApi } from '@/services/establishment-api';
-import { Search, Filter, Download, Ticket, Ban, RefreshCw, Eye, Loader2 } from 'lucide-react';
+import { Search, Filter, Download, Ticket, Ban, RefreshCw, Eye, Loader2, X } from 'lucide-react';
 
 export default function CuponsPage() {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('Todos');
   const filters = ['Todos', 'Ativos', 'Usados', 'Expirados'];
   const [search, setSearch] = useState('');
+  const [selectedCoupon, setSelectedCoupon] = useState<Record<string, any> | null>(null);
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
     queryFn: establishmentApi.getMe,
   });
   const canManageCoupons = (me?.currentUser?.role || 'owner') !== 'viewer';
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) {
+      return 'Nao informado';
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Nao informado' : date.toLocaleString('pt-BR');
+  };
 
   const getStatus = (filter: string) => {
     switch (filter) {
@@ -222,7 +232,11 @@ export default function CuponsPage() {
                         </button>
                       )}
 
-                      <button className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors" title="Ver detalhes">
+                      <button
+                        onClick={() => setSelectedCoupon(coupon)}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                        title="Ver detalhes"
+                      >
                          <Eye className="w-4 h-4" />
                       </button>
                     </div>
@@ -233,6 +247,68 @@ export default function CuponsPage() {
           </table>
         </div>
       </div>
+
+      {selectedCoupon ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-primary-600">
+                  Detalhes do cupom
+                </div>
+                <h2 className="mt-1 font-heading text-2xl font-bold text-slate-900">
+                  {selectedCoupon.code}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedCoupon.campaignName} • {selectedCoupon.userName}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCoupon(null)}
+                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar detalhes do cupom"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
+              {[
+                { label: 'Codigo', value: selectedCoupon.code || 'Nao informado' },
+                { label: 'Status', value: selectedCoupon.status || 'Nao informado' },
+                { label: 'Cliente', value: selectedCoupon.userName || 'Nao informado' },
+                { label: 'Instagram', value: selectedCoupon.client?.instagramHandle || selectedCoupon.participation?.userHandle || 'Nao informado' },
+                { label: 'Campanha', value: selectedCoupon.campaignName || 'Nao informado' },
+                { label: 'Beneficio', value: selectedCoupon.benefit || 'Nao informado' },
+                { label: 'Valido ate', value: selectedCoupon.validUntil || 'Nao informado' },
+                { label: 'Utilizado em', value: formatDateTime(selectedCoupon.usedAt) },
+                { label: 'Criado em', value: formatDateTime(selectedCoupon.createdAt) },
+                { label: 'Participacao', value: selectedCoupon.participation?.id || 'Nao informado' },
+                { label: 'Cliente ID', value: selectedCoupon.client?.id || 'Nao informado' },
+                { label: 'Cupom ID', value: selectedCoupon.id || 'Nao informado' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 break-words text-sm font-medium text-slate-900">
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 px-6 py-4">
+              <button
+                onClick={() => setSelectedCoupon(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
     </div>
   );
