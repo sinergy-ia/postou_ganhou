@@ -75,6 +75,14 @@ export interface PublicPricingPayload {
   trustPoints: string[];
 }
 
+export interface PublicPartnerContactPayload {
+  responsibleName: string;
+  establishmentName: string;
+  segment: string;
+  whatsapp: string;
+  instagram: string;
+}
+
 export const publicApi = {
   getEstablishments: async (params?: {
     lat?: number;
@@ -135,5 +143,29 @@ export const publicApi = {
   getPricing: async () => {
     const { data } = await api.get<PublicPricingPayload>("/api/public/pricing");
     return data;
+  },
+
+  submitPartnerContact: async (payload: PublicPartnerContactPayload) => {
+    try {
+      const { data } = await api.post("/api/public/postou-ganhou/contact", payload);
+      return data;
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+
+      if (![400, 404, 422].includes(status)) {
+        throw error;
+      }
+
+      const fallbackPayload = {
+        responsavel: payload.responsibleName,
+        nomeEstabelecimento: payload.establishmentName,
+        segmento: payload.segment,
+        whatsapp: payload.whatsapp,
+        instagram: payload.instagram,
+      };
+
+      const { data } = await api.post("/api/public/postou-ganhou/contact", fallbackPayload);
+      return data;
+    }
   },
 };
