@@ -99,7 +99,7 @@ export function getEntityId(record: AnyRecord | null | undefined) {
 
 export function buildAvatarFallback(name?: string) {
   return `https://ui-avatars.com/api/?background=E2E8F0&color=0F172A&name=${encodeURIComponent(
-    ensureText(name, "Postou Ganhou"),
+    ensureText(name, "Marque & Ganhe"),
   )}`;
 }
 

@@ -5,7 +5,7 @@ import {
   normalizeCampaign,
   normalizeEstablishment,
   normalizeParticipation,
-} from "./postou-ganhou-normalizers";
+} from "./marque-e-ganhe-normalizers";
 
 export interface PublicPricingPlan {
   id: string;

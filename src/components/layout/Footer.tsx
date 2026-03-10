@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 py-12 text-sm mt-auto">
       <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="space-y-4">
-          <span className="font-heading font-bold text-2xl text-white">Postou, Ganhou</span>
+          <span className="font-heading font-bold text-2xl text-white">Marque &amp; Ganhe</span>
           <p className="max-w-xs">A primeira plataforma de recompensas sociais onde seu engajamento vale prêmios de verdade.</p>
         </div>
         
@@ -39,7 +39,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="container mx-auto px-4 mt-12 pt-8 border-t border-slate-800 text-center text-slate-500">
-        <p>© {new Date().getFullYear()} Postou, Ganhou. Todos os direitos reservados.</p>
+        <p>© {new Date().getFullYear()} Marque &amp; Ganhe. Todos os direitos reservados.</p>
       </div>
     </footer>
   );

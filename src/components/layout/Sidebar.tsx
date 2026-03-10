@@ -58,7 +58,7 @@ export default function Sidebar() {
   return (
     <div className="flex flex-col w-64 bg-slate-900 text-slate-300 h-screen fixed top-0 left-0 border-r border-slate-800">
       <div className="h-16 flex items-center px-6 border-b border-slate-800">
-        <span className="font-heading font-bold text-xl text-white">Postou, Ganhou</span>
+        <span className="font-heading font-bold text-xl text-white">Marque &amp; Ganhe</span>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">

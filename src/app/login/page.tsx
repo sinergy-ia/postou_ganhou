@@ -146,7 +146,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md bg-white rounded-[2rem] p-8 md:p-12 shadow-xl border border-slate-100">
           <div className="text-center mb-8">
-            <h1 className="font-heading font-black text-3xl text-primary-600 mb-2">Postou, Ganhou</h1>
+            <h1 className="font-heading font-black text-3xl text-primary-600 mb-2">Marque &amp; Ganhe</h1>
             <p className="text-slate-500 text-sm">Painel do Estabelecimento</p>
           </div>
           
