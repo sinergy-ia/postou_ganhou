@@ -4,7 +4,87 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { establishmentApi } from '@/services/establishment-api';
-import { Search, Filter, Check, X, AlertTriangle, MessageSquare, Tag, Heart, Loader2 } from 'lucide-react';
+import { Search, Check, X, MessageSquare, Tag, Heart, Loader2 } from 'lucide-react';
+
+const PAGE_SIZE = 100;
+
+interface MonthlyParticipationPage {
+  items: Array<{
+    createdAt?: string;
+  }>;
+  total: number;
+}
+
+interface PostCampaign {
+  title?: string;
+  rules?: string[];
+  baseReward?: string;
+  baseLikesRequired?: number;
+  maxReward?: string;
+  maxLikesRequired?: number;
+}
+
+interface PostItem {
+  id: string;
+  imageUrl?: string;
+  userHandle?: string;
+  userAvatar?: string;
+  userName?: string;
+  discountEarned?: string;
+  type: string;
+  likes?: number;
+  status?: 'pending' | 'approved' | 'redeemed' | 'rejected' | string;
+  createdAt?: string;
+  client?: {
+    name?: string;
+  } | null;
+  campaign?: PostCampaign | null;
+}
+
+function isCurrentMonth(value?: string | null) {
+  if (!value) {
+    return false;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+
+  return (
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear()
+  );
+}
+
+async function fetchAllParticipationPages() {
+  const firstPage = (await establishmentApi.getParticipations({
+    page: 1,
+    limit: PAGE_SIZE,
+  })) as MonthlyParticipationPage;
+  const totalPages = Math.max(
+    1,
+    Math.ceil((firstPage.total || firstPage.items.length) / PAGE_SIZE),
+  );
+
+  if (totalPages === 1) {
+    return firstPage.items;
+  }
+
+  const otherPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      establishmentApi.getParticipations({
+        page: index + 2,
+        limit: PAGE_SIZE,
+      }) as Promise<MonthlyParticipationPage>,
+    ),
+  );
+
+  return [firstPage, ...otherPages].flatMap((page) => page.items);
+}
 
 export default function PostagensPage() {
   const queryClient = useQueryClient();
@@ -15,6 +95,8 @@ export default function PostagensPage() {
     queryFn: establishmentApi.getMe,
   });
   const canModeratePosts = (me?.currentUser?.role || 'owner') !== 'viewer';
+  const monthlyParticipationLimit = me?.planAccess?.limits?.maxMonthlyParticipations ?? null;
+  const hasMonthlyParticipationLimit = typeof monthlyParticipationLimit === 'number';
 
   const getStatus = (tab: string) => {
     switch (tab) {
@@ -30,7 +112,7 @@ export default function PostagensPage() {
     queryFn: () => establishmentApi.getParticipations({ status: getStatus(activeTab) })
   });
 
-  const posts: Array<Record<string, any>> = data?.items || [];
+  const posts: PostItem[] = data?.items || [];
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedRewardTierByPostId, setSelectedRewardTierByPostId] = useState<Record<string, 'BASE' | 'MAX'>>({});
 
@@ -44,8 +126,17 @@ export default function PostagensPage() {
     queryFn: () => establishmentApi.getAnalyticsConversion()
   });
 
+  const { data: monthlyParticipationCount = 0, isLoading: isLoadingMonthlyParticipations } = useQuery({
+    queryKey: ['participations-monthly-usage'],
+    queryFn: async () => {
+      const items = await fetchAllParticipationPages();
+      return items.filter((item) => isCurrentMonth(item.createdAt)).length;
+    },
+    enabled: hasMonthlyParticipationLimit,
+  });
+
   const selectedPost = posts.find(p => p.id === selectedPostId) || posts[0];
-  const campaign = (selectedPost as any)?.campaign || {};
+  const campaign = selectedPost?.campaign || {};
   const actualLikes = Number(selectedPost?.likes || 0);
   const baseLikesRequired = Number(campaign?.baseLikesRequired ?? 0);
   const maxLikesRequired = campaign?.maxLikesRequired !== undefined && campaign?.maxLikesRequired !== null
@@ -65,6 +156,11 @@ export default function PostagensPage() {
       : campaign?.baseReward || selectedPost?.discountEarned || 'Brinde';
   const canApproveSelectedTier =
     selectedRewardTier === 'MAX' ? canApproveMax : canApproveBase;
+  const hasReachedMonthlyParticipationLimit = Boolean(
+    hasMonthlyParticipationLimit &&
+      monthlyParticipationLimit !== null &&
+      monthlyParticipationCount >= monthlyParticipationLimit,
+  );
 
   const approveMutation = useMutation({
     mutationFn: ({ id, rewardTier }: { id: string; rewardTier: 'BASE' | 'MAX' }) =>
@@ -83,7 +179,7 @@ export default function PostagensPage() {
     }
   });
 
-  if (isLoadingMe) {
+  if (isLoadingMe || (hasMonthlyParticipationLimit && isLoadingMonthlyParticipations)) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
@@ -110,12 +206,34 @@ export default function PostagensPage() {
         />
       ) : null}
 
+      {hasMonthlyParticipationLimit ? (
+        <div
+          className={`rounded-2xl border px-5 py-4 text-sm font-medium ${
+            hasReachedMonthlyParticipationLimit
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-slate-200 bg-white text-slate-700'
+          }`}
+        >
+          Participações deste mês:{" "}
+          <span className="font-bold">
+            {monthlyParticipationCount} / {monthlyParticipationLimit}
+          </span>
+          {hasReachedMonthlyParticipationLimit ? (
+            <span>
+              {" "}
+              O limite do seu plano foi atingido. Novas aprovações ficam bloqueadas
+              até o próximo ciclo ou até o upgrade do plano.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Aguardando', value: metrics?.pendingPosts || 0, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
           { label: 'Total Postagens', value: metrics?.totalPosts || 0, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
-          { label: 'Reprovadas Atuais', value: posts.filter((p: any) => p.status === 'rejected').length || 0, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+          { label: 'Reprovadas Atuais', value: posts.filter((post) => post.status === 'rejected').length || 0, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
           { label: 'Taxa de Conversão', value: conversionData?.rate || '0%', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
         ].map(stat => (
           <div key={stat.label} className={`rounded-2xl border p-4 ${stat.bg} ${stat.border}`}>
@@ -204,7 +322,7 @@ export default function PostagensPage() {
                 <div className="flex items-center gap-4">
                   <img src={selectedPost.userAvatar || `https://ui-avatars.com/api/?name=${selectedPost.userName || selectedPost.userHandle}`} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" alt="" />
                   <div>
-                    <h3 className="font-bold text-lg text-slate-900">{selectedPost.userName || ((selectedPost as any).client?.name)}</h3>
+                    <h3 className="font-bold text-lg text-slate-900">{selectedPost.userName || selectedPost.client?.name}</h3>
                     <a href="#" className="text-primary-600 font-medium text-sm hover:underline">{selectedPost.userHandle}</a>
                   </div>
                 </div>
@@ -254,7 +372,7 @@ export default function PostagensPage() {
                 <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Detalhes da Participação</div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Campanha</span>
-                    <span className="font-medium text-slate-900 text-right">{(selectedPost as any).campaign?.title || 'Campanha Excluída'}</span>
+                    <span className="font-medium text-slate-900 text-right">{selectedPost.campaign?.title || 'Campanha Excluída'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Tipo Exigido</span>
@@ -273,8 +391,8 @@ export default function PostagensPage() {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Checklist de Regras</div>
                 <div className="space-y-2">
-                  {((selectedPost as any).campaign?.rules || []).length > 0 ? (
-                    ((selectedPost as any).campaign?.rules || []).map((rule: string, index: number) => (
+                  {(selectedPost.campaign?.rules || []).length > 0 ? (
+                    (selectedPost.campaign?.rules || []).map((rule: string, index: number) => (
                       <label key={`${rule}-${index}`} className="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" defaultChecked className="text-primary-600 rounded focus:ring-primary-600" />
                         {rule}
@@ -383,7 +501,12 @@ export default function PostagensPage() {
                     <X className="w-5 h-5" /> Reprovar
                   </button>
                   <button 
-                    disabled={rejectMutation.isPending || approveMutation.isPending || !canApproveSelectedTier}
+                    disabled={
+                      rejectMutation.isPending ||
+                      approveMutation.isPending ||
+                      !canApproveSelectedTier ||
+                      hasReachedMonthlyParticipationLimit
+                    }
                     onClick={() =>
                       approveMutation.mutate({
                         id: selectedPost.id,
@@ -402,6 +525,14 @@ export default function PostagensPage() {
                   {selectedRewardTier === 'MAX'
                     ? `Essa postagem ainda nao atingiu a meta de ${maxLikesRequired ?? 0} likes para liberar a recompensa maxima.`
                     : `Essa postagem ainda nao atingiu a meta minima de ${baseLikesRequired} likes para ser aprovada com a recompensa base.`}
+                </div>
+              ) : null}
+
+              {selectedPost.status === 'pending' && hasReachedMonthlyParticipationLimit ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  O plano atual já consumiu o limite mensal de participações. Você ainda
+                  pode revisar e reprovar postagens, mas novas aprovações exigem upgrade
+                  ou a virada do próximo ciclo.
                 </div>
               ) : null}
               

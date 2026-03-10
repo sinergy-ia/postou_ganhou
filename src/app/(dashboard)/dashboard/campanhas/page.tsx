@@ -47,6 +47,16 @@ interface BoostStatusDescriptor {
   disabled: boolean;
 }
 
+function getPlanCampaignLimitMessage(limit: number | null) {
+  if (limit === null) {
+    return "Seu plano permite campanhas ativas ilimitadas.";
+  }
+
+  return `Seu plano permite até ${limit} campanha${limit === 1 ? "" : "s"} ativa${
+    limit === 1 ? "" : "s"
+  }.`;
+}
+
 function getCampaignErrorMessage(error: unknown, fallback: string) {
   if (
     typeof error === "object" &&
@@ -159,6 +169,7 @@ export default function CampanhasPage() {
     queryFn: establishmentApi.getMe,
   });
   const canManageCampaigns = (me?.currentUser?.role || "owner") !== "viewer";
+  const maxActiveCampaigns = me?.planAccess?.limits?.maxActiveCampaigns ?? null;
 
   const { data: sponsoredLookups } = useQuery({
     queryKey: ["sponsored-highlights", "boost-lookups"],
@@ -195,6 +206,11 @@ export default function CampanhasPage() {
 
     return true;
   });
+  const allCampaigns: RegularCampaign[] = (data?.items || []) as RegularCampaign[];
+  const activeCampaignsCount = allCampaigns.filter((campaign) => campaign.status === "active").length;
+  const hasReachedActiveCampaignLimit = Boolean(
+    maxActiveCampaigns !== null && activeCampaignsCount >= maxActiveCampaigns,
+  );
   const sponsoredRequestsByCampaignId = useMemo(() => {
     const establishmentId = String(me?.id || me?._id || "");
     const items = (sponsoredRequestsData?.items || []).filter(
@@ -349,6 +365,27 @@ export default function CampanhasPage() {
           }`}
         >
           {boostFeedback.message}
+        </div>
+      ) : null}
+
+      {canManageCampaigns ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            hasReachedActiveCampaignLimit
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-slate-200 bg-white text-slate-700"
+          }`}
+        >
+          <span className="font-semibold">
+            Campanhas ativas: {activeCampaignsCount}
+            {maxActiveCampaigns === null ? "" : ` / ${maxActiveCampaigns}`}
+          </span>
+          <span className="ml-2">{getPlanCampaignLimitMessage(maxActiveCampaigns)}</span>
+          {hasReachedActiveCampaignLimit ? (
+            <span className="ml-2">
+              Pause ou encerre uma campanha antes de ativar outra.
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -528,13 +565,25 @@ export default function CampanhasPage() {
                                 onClick={() => {
                                   const idToUpdate = promo.id || promo._id;
                                   if (idToUpdate) {
+                                    if (!promo.isActive && hasReachedActiveCampaignLimit) {
+                                      setBoostFeedback({
+                                        type: "error",
+                                        message:
+                                          "Você atingiu o limite de campanhas ativas do seu plano. Pause ou encerre uma campanha antes de reativar outra.",
+                                      });
+                                      return;
+                                    }
+
                                     updateStatusMutation.mutate({
                                       id: idToUpdate,
                                       isActive: !promo.isActive,
                                     });
                                   }
                                 }}
-                                disabled={updateStatusMutation.isPending}
+                                disabled={
+                                  updateStatusMutation.isPending ||
+                                  (!promo.isActive && hasReachedActiveCampaignLimit)
+                                }
                                 className="p-1.5 hover:text-orange-600 hover:bg-orange-50 rounded-md transition-colors disabled:opacity-50"
                                 title={promo.isActive ? "Pausar" : "Reativar"}
                               >

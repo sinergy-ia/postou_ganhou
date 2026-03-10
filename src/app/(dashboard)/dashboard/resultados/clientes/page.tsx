@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
+import { downloadCsvFile } from "@/lib/csv";
 import { establishmentApi } from "@/services/establishment-api";
 import {
   ArrowLeft,
   BarChart3,
+  Download,
   Loader2,
   Search,
   Ticket,
@@ -183,6 +185,7 @@ export default function ClientesReportPage() {
     queryFn: establishmentApi.getMe,
   });
   const canAccessClientRanking = Boolean(me?.planAccess?.features?.clientRanking);
+  const canExportAdvanced = Boolean(me?.planAccess?.features?.advancedExports);
 
   const { data, isLoading } = useQuery({
     queryKey: ["client-report-data"],
@@ -346,6 +349,38 @@ export default function ClientesReportPage() {
     };
   }, [reportRows]);
 
+  const handleExportClients = () => {
+    downloadCsvFile(
+      "relatorio-clientes.csv",
+      [
+        "Cliente",
+        "Instagram",
+        "Campanhas",
+        "Posts",
+        "Aprovadas",
+        "Pendentes",
+        "Reprovadas",
+        "Cupons ativos",
+        "Cupons usados",
+        "Likes",
+        "Ultima atividade",
+      ],
+      reportRows.map((row) => [
+        row.name,
+        row.handle,
+        Array.from(row.campaigns).join(", "),
+        row.totalPosts,
+        row.approvedPosts,
+        row.pendingPosts,
+        row.rejectedPosts,
+        row.activeCoupons,
+        row.usedCoupons,
+        row.totalLikes,
+        formatDate(row.lastActivityAt),
+      ]),
+    );
+  };
+
   if (isLoadingMe || (canAccessClientRanking && isLoading)) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -366,22 +401,40 @@ export default function ClientesReportPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
-      <div className="flex items-center gap-4">
-        <Link
-          href="/dashboard/resultados"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="font-heading font-bold text-3xl text-slate-900">
-            Relatório de Clientes
-          </h1>
-          <p className="mt-1 text-slate-500">
-            Veja quem mais participa, aprovações e resgates por cliente.
-          </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard/resultados"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <h1 className="font-heading font-bold text-3xl text-slate-900">
+              Relatório de Clientes
+            </h1>
+            <p className="mt-1 text-slate-500">
+              Veja quem mais participa, aprovações e resgates por cliente.
+            </p>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleExportClients}
+          disabled={!canExportAdvanced || reportRows.length === 0}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Download className="h-4 w-4" />
+          Exportar CSV
+        </button>
       </div>
+
+      {!canExportAdvanced ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+          Exportações avançadas em CSV ficam disponíveis no plano Scale White Label.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
