@@ -141,10 +141,7 @@ export default function PricingSection() {
           {plans.map((plan) => {
             const price = resolveDisplayedPrice(plan, billingCycle);
             const isAnnual = billingCycle === "annual";
-            const ctaHref =
-              plan.type === "free"
-                ? "/cadastro"
-                : plan.ctaHref || "#cadastro";
+            const ctaHref = "/para-estabelecimentos#cadastro";
 
             return (
               <article
