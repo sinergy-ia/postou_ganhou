@@ -29,6 +29,14 @@ interface RecentActivityItem {
   status?: "approved" | "redeemed" | "pending" | string;
 }
 
+function formatPostTypeLabel(type?: string) {
+  if (!type) {
+    return "Post";
+  }
+
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 export default function DashboardPage() {
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ["establishment-me"],
@@ -224,7 +232,7 @@ export default function DashboardPage() {
                           <img src={post.imageUrl} className="w-full h-full object-cover" alt="Post thumbnail" />
                         </div>
                         <div className="text-xs text-slate-500">
-                          {post.type.charAt(0).toUpperCase() + post.type.slice(1)} • {post.likes} likes
+                          {formatPostTypeLabel(post.type)} • {post.likes ?? 0} likes
                         </div>
                       </div>
                     </td>
