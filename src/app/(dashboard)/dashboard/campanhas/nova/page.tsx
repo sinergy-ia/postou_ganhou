@@ -21,6 +21,12 @@ type CampaignFormState = {
   isActive: boolean;
 };
 
+type ActiveCampaignListItem = {
+  id?: string;
+  _id?: string;
+  status?: 'active' | 'scheduled' | 'paused' | 'ended' | string;
+};
+
 const defaultFormData: CampaignFormState = {
   title: '',
   description: '',
@@ -120,7 +126,8 @@ function CampaignForm() {
     [campaignToEdit],
   );
   const formData = draftFormData ?? initialFormData;
-  const activeCampaignsCount = (activeCampaignsData?.items || []).filter((campaign) => {
+  const activeCampaigns = (activeCampaignsData?.items ?? []) as ActiveCampaignListItem[];
+  const activeCampaignsCount = activeCampaigns.filter((campaign) => {
     if (!campaignId) {
       return campaign?.status === 'active';
     }
