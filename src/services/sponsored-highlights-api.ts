@@ -312,6 +312,28 @@ export const sponsoredHighlightsApi = {
     return data;
   },
 
+  async getPublicCampaigns() {
+    try {
+      const { data } = await api.get<SponsoredCampaignListResponse>(
+        "/api/sponsored-highlights/campaigns",
+        {
+          params: {
+            status: "active",
+            limit: 100,
+          },
+        },
+      );
+
+      return Array.isArray(data?.items) ? data.items : [];
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Nao foi possivel carregar campanhas patrocinadas publicas.", error);
+      }
+
+      return [];
+    }
+  },
+
   async getCampaign(id: string) {
     const { data } = await api.get<SponsoredCampaign>(`/api/sponsored-highlights/campaigns/${id}`);
     return data;

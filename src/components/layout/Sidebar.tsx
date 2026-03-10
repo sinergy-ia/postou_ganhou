@@ -22,7 +22,7 @@ function cn(...inputs: ClassValue[]) {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Destaques', href: '/dashboard/destaques-patrocinados', icon: Sparkles, requiredFeature: 'sponsoredHighlights' },
+  { name: 'Destaques', href: '/dashboard/destaques-patrocinados', icon: Sparkles, superAdminOnly: true },
   { name: 'Campanhas', href: '/dashboard/campanhas', icon: Megaphone },
   { name: 'Postagens', href: '/dashboard/postagens', icon: ImageIcon },
   { name: 'Cupons', href: '/dashboard/cupons', icon: Ticket },
@@ -41,8 +41,13 @@ export default function Sidebar() {
   const establishmentName = user?.name || 'Estabelecimento';
   const currentUserName = user?.currentUser?.name || establishmentName;
   const currentUserRole = user?.currentUser?.role || 'owner';
+  const isSuperAdmin = Boolean(user?.superAdmin || user?.currentUser?.superAdmin);
   const planName = user?.plan || 'Free';
   const visibleNavigation = navigation.filter((item) => {
+    if (item.superAdminOnly) {
+      return isSuperAdmin;
+    }
+
     if (!item.requiredFeature) {
       return true;
     }

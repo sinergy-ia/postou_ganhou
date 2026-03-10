@@ -1,10 +1,36 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { publicApi } from '@/services/public-api';
-import { Map as MapIcon, MapPin, Navigation, Tag, Star, Loader2 } from 'lucide-react';
+import { Map as MapIcon, Navigation, Star, Loader2 } from 'lucide-react';
+import PublicSponsoredCard from '@/components/sponsored-highlights/PublicSponsoredCard';
+import {
+  buildPublicSponsoredCards,
+  filterPublicSponsoredCards,
+} from '@/lib/sponsored-highlights-public';
+import { sponsoredHighlightsApi } from '@/services/sponsored-highlights-api';
+
+interface MapEstablishment {
+  id: string;
+  name: string;
+  avatar: string;
+  cover: string;
+  category?: string;
+  distance?: string;
+}
+
+interface MapPromotion {
+  id?: string;
+  _id?: string;
+  title?: string;
+  establishmentId?: string;
+  establishment?: {
+    id?: string;
+    _id?: string;
+  };
+}
 
 export default function MapaPage() {
   const [selectedPin, setSelectedPin] = useState<string | null>(null);
@@ -25,11 +51,36 @@ export default function MapaPage() {
     queryFn: () => publicApi.getCampaigns()
   });
 
-  const establishments = establishmentsData || [];
-  const campaigns = campaignsData?.items || [];
+  const { data: sponsoredCampaigns } = useQuery({
+    queryKey: ['public-sponsored-campaigns', 'map'],
+    queryFn: sponsoredHighlightsApi.getPublicCampaigns,
+  });
 
-  const selectedEst = selectedPin ? establishments.find((e: any) => e.id === selectedPin) : null;
-  const selectedPromo = selectedEst ? campaigns.find((p: any) => p.establishmentId === selectedEst.id || p.establishment?.id === selectedEst.id) : null;
+  const establishments: MapEstablishment[] = (establishmentsData || []) as MapEstablishment[];
+  const campaigns: MapPromotion[] = (campaignsData?.items || []) as MapPromotion[];
+  const sponsoredCards = useMemo(
+    () => buildPublicSponsoredCards(sponsoredCampaigns),
+    [sponsoredCampaigns],
+  );
+  const visibleSponsoredCards = useMemo(
+    () =>
+      filterPublicSponsoredCards(sponsoredCards, {
+        placement: 'map',
+        search: searchQuery,
+        category: activeCategory || undefined,
+      }).slice(0, 5),
+    [activeCategory, searchQuery, sponsoredCards],
+  );
+
+  const selectedEst = selectedPin ? establishments.find((est) => est.id === selectedPin) : null;
+  const selectedPromo = selectedEst
+    ? campaigns.find(
+        (promo) =>
+          promo.establishmentId === selectedEst.id ||
+          promo.establishment?.id === selectedEst.id ||
+          promo.establishment?._id === selectedEst.id,
+      )
+    : null;
   const selectedPromoId = selectedPromo?.id || selectedPromo?._id;
 
   return (
@@ -66,6 +117,32 @@ export default function MapaPage() {
             </button>
           ))}
         </div>
+
+        {visibleSponsoredCards.length > 0 ? (
+          <div className="mt-4 w-full max-w-5xl pointer-events-auto px-2">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-100">
+                  Patrocinados
+                </p>
+                <p className="text-sm font-semibold text-white">
+                  Destaques promovidos no mapa
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {visibleSponsoredCards.map((card) => (
+                <PublicSponsoredCard
+                  key={card.id}
+                  card={card}
+                  compact
+                  className="min-w-[280px] max-w-[320px] shrink-0"
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Mock Map Area */}
@@ -87,7 +164,7 @@ export default function MapaPage() {
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           </div>
-        ) : establishments.map((est: any, i: number) => {
+        ) : establishments.map((est, i: number) => {
           // Fake positions for the mockup
           const positions = [
             { top: '30%', left: '40%' },

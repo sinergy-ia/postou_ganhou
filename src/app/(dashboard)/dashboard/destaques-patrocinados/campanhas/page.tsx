@@ -30,10 +30,44 @@ import {
 import {
   sponsoredHighlightsApi,
   type SponsoredCampaign,
+  type SponsoredCampaignListResponse,
   type SponsoredCampaignStatus,
 } from "@/services/sponsored-highlights-api";
 
 type CampaignAction = "activate" | "pause" | "cancel" | "renew" | "duplicate";
+
+function getOptimisticStatus(
+  action: CampaignAction,
+  currentStatus: SponsoredCampaignStatus,
+): SponsoredCampaignStatus | null {
+  switch (action) {
+    case "activate":
+      return currentStatus === "active" ? null : "active";
+    case "pause":
+      return currentStatus === "paused" ? null : "paused";
+    case "cancel":
+      return currentStatus === "cancelled" ? null : "cancelled";
+    default:
+      return null;
+  }
+}
+
+function canRunAction(action: CampaignAction, status: SponsoredCampaignStatus) {
+  switch (action) {
+    case "activate":
+      return !["active", "cancelled", "expired"].includes(status);
+    case "pause":
+      return status === "active";
+    case "cancel":
+      return !["cancelled", "expired"].includes(status);
+    case "renew":
+      return ["ended", "expired", "cancelled"].includes(status);
+    case "duplicate":
+      return true;
+    default:
+      return false;
+  }
+}
 
 export default function SponsoredCampaignsPage() {
   const queryClient = useQueryClient();
@@ -77,7 +111,78 @@ export default function SponsoredCampaignsPage() {
           return sponsoredHighlightsApi.getCampaign(id);
       }
     },
+    onMutate: async (variables) => {
+      const optimisticStatus = items.find((item) => item.id === variables.id)?.status
+        ? getOptimisticStatus(
+            variables.action,
+            items.find((item) => item.id === variables.id)!.status,
+          )
+        : null;
+
+      await queryClient.cancelQueries({ queryKey: ["sponsored-highlights", "campaigns"] });
+
+      const previousCampaignQueries = queryClient.getQueriesData<SponsoredCampaignListResponse>({
+        queryKey: ["sponsored-highlights", "campaigns"],
+      });
+
+      if (optimisticStatus) {
+        queryClient.setQueriesData<SponsoredCampaignListResponse>(
+          { queryKey: ["sponsored-highlights", "campaigns"] },
+          (current) => {
+            if (!current?.items?.length) {
+              return current;
+            }
+
+            return {
+              ...current,
+              items: current.items.map((item) =>
+                item.id === variables.id ? { ...item, status: optimisticStatus } : item,
+              ),
+            };
+          },
+        );
+
+        setSelectedCampaign((current) =>
+          current && current.id === variables.id
+            ? { ...current, status: optimisticStatus }
+            : current,
+        );
+      }
+
+      return {
+        previousCampaignQueries,
+      };
+    },
     onSuccess: async (updatedCampaign, variables) => {
+      queryClient.setQueriesData<SponsoredCampaignListResponse>(
+        { queryKey: ["sponsored-highlights", "campaigns"] },
+        (current) => {
+          if (!current?.items?.length) {
+            return current;
+          }
+
+          const existingIndex = current.items.findIndex((item) => item.id === variables.id);
+
+          if (existingIndex >= 0) {
+            return {
+              ...current,
+              items: current.items.map((item) =>
+                item.id === variables.id ? updatedCampaign : item,
+              ),
+            };
+          }
+
+          if (variables.action === "renew" || variables.action === "duplicate") {
+            return {
+              ...current,
+              items: [updatedCampaign, ...current.items],
+            };
+          }
+
+          return current;
+        },
+      );
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["sponsored-highlights", "campaigns"] }),
         queryClient.invalidateQueries({ queryKey: ["sponsored-highlights", "overview"] }),
@@ -92,7 +197,11 @@ export default function SponsoredCampaignsPage() {
         setSelectedCampaign(updatedCampaign);
       }
     },
-    onError: (mutationError) => {
+    onError: (mutationError, _variables, context) => {
+      for (const [queryKey, queryData] of context?.previousCampaignQueries || []) {
+        queryClient.setQueryData(queryKey, queryData);
+      }
+
       window.alert(getErrorMessage(mutationError));
     },
   });
@@ -240,7 +349,14 @@ export default function SponsoredCampaignsPage() {
                   </td>
                 </tr>
               ) : items.length > 0 ? (
-                items.map((campaign) => (
+                items.map((campaign) => {
+                  const isPendingForCampaign =
+                    actionMutation.isPending && actionMutation.variables?.id === campaign.id;
+                  const activeAction = isPendingForCampaign
+                    ? actionMutation.variables?.action
+                    : null;
+
+                  return (
                   <tr key={campaign.id} className="hover:bg-slate-50/70">
                     <td className="px-6 py-4 align-top">
                       <div className="flex items-center gap-3">
@@ -320,47 +436,84 @@ export default function SponsoredCampaignsPage() {
                         <button
                           type="button"
                           onClick={() => handleAction(campaign.id, "activate")}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                          disabled={actionMutation.isPending || !canRunAction("activate", campaign.status)}
+                          className={`rounded-lg border p-2 transition-colors ${
+                            campaign.status === "active"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
                           title="Ativar"
                         >
-                          <Play className="h-4 w-4" />
+                          {activeAction === "activate" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleAction(campaign.id, "pause")}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          disabled={actionMutation.isPending || !canRunAction("pause", campaign.status)}
+                          className={`rounded-lg border p-2 transition-colors ${
+                            campaign.status === "paused"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-slate-200 text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
                           title="Pausar"
                         >
-                          <Pause className="h-4 w-4" />
+                          {activeAction === "pause" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Pause className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleAction(campaign.id, "cancel")}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                          disabled={actionMutation.isPending || !canRunAction("cancel", campaign.status)}
+                          className={`rounded-lg border p-2 transition-colors ${
+                            campaign.status === "cancelled"
+                              ? "border-rose-200 bg-rose-50 text-rose-700"
+                              : "border-slate-200 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
                           title="Cancelar"
                         >
-                          <Ban className="h-4 w-4" />
+                          {activeAction === "cancel" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Ban className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleAction(campaign.id, "renew")}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                          disabled={actionMutation.isPending || !canRunAction("renew", campaign.status)}
+                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Renovar"
                         >
-                          <RefreshCw className="h-4 w-4" />
+                          {activeAction === "renew" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleAction(campaign.id, "duplicate")}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                          disabled={actionMutation.isPending || !canRunAction("duplicate", campaign.status)}
+                          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Duplicar"
                         >
-                          <Copy className="h-4 w-4" />
+                          {activeAction === "duplicate" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))
+                )})
               ) : (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-500">

@@ -1,10 +1,35 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { publicApi } from '@/services/public-api';
-import { Search, MapPin, Filter, Star, Tag, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, MapPin, Filter, Tag, ChevronDown, Loader2 } from 'lucide-react';
+import PublicSponsoredCard from '@/components/sponsored-highlights/PublicSponsoredCard';
+import {
+  buildPublicSponsoredCards,
+  filterPublicSponsoredCards,
+} from '@/lib/sponsored-highlights-public';
+import { sponsoredHighlightsApi } from '@/services/sponsored-highlights-api';
+
+interface PromotionEstablishment {
+  id?: string;
+  _id?: string;
+  name: string;
+  cover: string;
+  avatar: string;
+  distance?: string;
+}
+
+interface PromotionCard {
+  id?: string;
+  _id?: string;
+  title: string;
+  description?: string;
+  baseReward?: string;
+  badges?: string[];
+  establishment?: PromotionEstablishment;
+}
 
 export default function PromocoesPage() {
   const [activeCategory, setActiveCategory] = useState('Todos');
@@ -33,7 +58,39 @@ export default function PromocoesPage() {
     })
   });
 
-  const campaigns = campaignsData?.items || [];
+  const { data: sponsoredCampaigns } = useQuery({
+    queryKey: ['public-sponsored-campaigns', 'listing'],
+    queryFn: sponsoredHighlightsApi.getPublicCampaigns,
+  });
+
+  const campaigns: PromotionCard[] = (campaignsData?.items || []) as PromotionCard[];
+  const sponsoredCards = useMemo(
+    () => buildPublicSponsoredCards(sponsoredCampaigns),
+    [sponsoredCampaigns],
+  );
+  const sponsoredPlacement = searchQuery.trim() ? 'search' : 'listing';
+  const visibleSponsoredCards = useMemo(() => {
+    const category = activeCategory === 'Todos' ? undefined : activeCategory;
+    const preferredCards = filterPublicSponsoredCards(sponsoredCards, {
+      placement: sponsoredPlacement,
+      search: searchQuery,
+      category,
+    });
+
+    if (preferredCards.length > 0) {
+      return preferredCards.slice(0, 4);
+    }
+
+    if (sponsoredPlacement === 'search') {
+      return filterPublicSponsoredCards(sponsoredCards, {
+        placement: 'listing',
+        search: searchQuery,
+        category,
+      }).slice(0, 4);
+    }
+
+    return [];
+  }, [activeCategory, searchQuery, sponsoredCards, sponsoredPlacement]);
 
   const handleNearMeClick = () => {
     if (locationFilter) {
@@ -185,6 +242,30 @@ export default function PromocoesPage() {
 
         {/* Content */}
         <div className="flex-1">
+          {visibleSponsoredCards.length > 0 ? (
+            <section className="mb-8">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-600">
+                    Patrocinados
+                  </p>
+                  <h2 className="font-heading text-2xl font-bold text-slate-900">
+                    {searchQuery.trim() ? 'Resultados promovidos para sua busca' : 'Campanhas com mais destaque'}
+                  </h2>
+                </div>
+                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+                  Visibilidade premium
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {visibleSponsoredCards.map((card) => (
+                  <PublicSponsoredCard key={card.id} card={card} compact />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <div className="flex items-center justify-between mb-6">
             <p className="text-slate-600">Mostrando <strong>{campaigns.length} promoções</strong></p>
             <div className="flex items-center gap-2 text-sm">
@@ -205,7 +286,7 @@ export default function PromocoesPage() {
                 Nenhuma promoção encontrada. Tente buscar algo diferente.
               </div>
             ) : (
-              campaigns.map((promo: any) => {
+              campaigns.map((promo) => {
                 const promoId = promo.id || promo._id;
                 const est = promo.establishment || { name: 'Estabelecimento Padrão', cover: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&h=300&fit=crop', avatar: 'https://ui-avatars.com/api/?name=EP', distance: '1.2 km' };
                 return (

@@ -1,9 +1,26 @@
 "use client";
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { Camera, MapPin, Tag, ArrowRight, Star, Heart, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import PublicSponsoredCard from '@/components/sponsored-highlights/PublicSponsoredCard';
+import {
+  buildPublicSponsoredCards,
+  filterPublicSponsoredCards,
+} from '@/lib/sponsored-highlights-public';
 import { publicApi } from '@/services/public-api';
+import { sponsoredHighlightsApi } from '@/services/sponsored-highlights-api';
+
+interface HomePlace {
+  id: string;
+  name: string;
+  cover: string;
+  avatar: string;
+  category?: string;
+  distance?: string;
+  description?: string;
+}
 
 export default function Home() {
   const { data: establishmentsData, isLoading: isLoadingPlaces } = useQuery({
@@ -11,11 +28,28 @@ export default function Home() {
     queryFn: () => publicApi.getEstablishments()
   });
 
-  const featuredPlaces = establishmentsData?.slice(0, 3) || [];
-  const heroPlace = featuredPlaces[0] || {
+  const { data: sponsoredCampaigns } = useQuery({
+    queryKey: ['public-sponsored-campaigns', 'home'],
+    queryFn: sponsoredHighlightsApi.getPublicCampaigns,
+  });
+
+  const featuredPlaces: HomePlace[] = (establishmentsData?.slice(0, 3) || []) as HomePlace[];
+  const heroPlace: Pick<HomePlace, 'name' | 'cover'> = featuredPlaces[0] || {
     name: 'Postou, Ganhou',
     cover: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80',
   };
+  const sponsoredCards = useMemo(
+    () => buildPublicSponsoredCards(sponsoredCampaigns),
+    [sponsoredCampaigns],
+  );
+  const homeSponsoredCards = useMemo(
+    () => filterPublicSponsoredCards(sponsoredCards, { placement: 'home' }).slice(0, 3),
+    [sponsoredCards],
+  );
+  const carouselSponsoredCards = useMemo(
+    () => filterPublicSponsoredCards(sponsoredCards, { placement: 'carousel' }).slice(0, 6),
+    [sponsoredCards],
+  );
 
   return (
     <div className="flex flex-col w-full overflow-hidden">
@@ -138,6 +172,32 @@ export default function Home() {
         </div>
       </section>
 
+      {homeSponsoredCards.length > 0 ? (
+        <section className="py-24 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+              <div>
+                <h2 className="font-heading font-bold text-3xl md:text-4xl text-slate-900">
+                  Patrocinados do Momento
+                </h2>
+                <p className="mt-4 text-slate-600 max-w-2xl">
+                  Campanhas com visibilidade extra para quem quer descobrir ofertas em destaque agora.
+                </p>
+              </div>
+              <Link href="/promocoes" className="text-primary-600 font-medium hover:text-primary-700 flex items-center gap-1 group">
+                Ver promoções <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {homeSponsoredCards.map((card) => (
+                <PublicSponsoredCard key={card.id} card={card} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* Estabelecimentos Destaque */}
       <section className="py-24 bg-slate-50">
         <div className="container mx-auto px-4">
@@ -160,7 +220,7 @@ export default function Home() {
               <div className="col-span-full rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center text-slate-500">
                 Nenhum estabelecimento em destaque encontrado no momento.
               </div>
-            ) : featuredPlaces.map((place: any) => (
+            ) : featuredPlaces.map((place) => (
               <div key={place.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-xl transition-shadow group">
                 <div className="h-48 relative overflow-hidden">
                   <img src={place.cover} alt={place.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -199,6 +259,32 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {carouselSponsoredCards.length > 0 ? (
+        <section className="py-24 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="mb-10">
+              <h2 className="font-heading font-bold text-3xl md:text-4xl text-slate-900">
+                Vitrine Patrocinada
+              </h2>
+              <p className="mt-4 text-slate-600 max-w-2xl">
+                Uma faixa rotativa de campanhas patrocinadas para ampliar a descoberta de restaurantes e lojas.
+              </p>
+            </div>
+
+            <div className="flex gap-6 overflow-x-auto pb-3">
+              {carouselSponsoredCards.map((card) => (
+                <PublicSponsoredCard
+                  key={card.id}
+                  card={card}
+                  compact
+                  className="min-w-[300px] max-w-[320px] shrink-0"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* CTA Final */}
       <section className="py-24 bg-primary-900 relative overflow-hidden">
