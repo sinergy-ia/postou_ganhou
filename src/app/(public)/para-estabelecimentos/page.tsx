@@ -1,8 +1,78 @@
+"use client";
+
 import Link from 'next/link';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, TrendingUp, Users, Target, MessageSquare } from 'lucide-react';
 import PricingSection from '@/components/public/PricingSection';
+import { publicApi } from '@/services/public-api';
 
 export default function ParaEstabelecimentosPage() {
+  const [formData, setFormData] = useState({
+    responsibleName: '',
+    establishmentName: '',
+    segment: 'Restaurante / Bar',
+    whatsapp: '',
+    instagram: '',
+  });
+  const [submitState, setSubmitState] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const contactMutation = useMutation({
+    mutationFn: publicApi.submitPartnerContact,
+    onSuccess: () => {
+      setSubmitState({
+        type: 'success',
+        message:
+          'Recebemos seu cadastro. Nossa equipe vai entrar em contato em breve para apresentar a plataforma.',
+      });
+      setFormData({
+        responsibleName: '',
+        establishmentName: '',
+        segment: 'Restaurante / Bar',
+        whatsapp: '',
+        instagram: '',
+      });
+    },
+    onError: (error: unknown) => {
+      const responseMessage =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message ===
+          'string'
+          ? String((error as { response?: { data?: { message?: unknown } } }).response?.data?.message)
+          : '';
+
+      const fallbackMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Não foi possível enviar seu cadastro agora. Tente novamente em instantes.';
+
+      setSubmitState({
+        type: 'error',
+        message: responseMessage || fallbackMessage,
+      });
+    },
+  });
+
+  function handleInputChange(
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setFormData((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }));
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitState(null);
+    contactMutation.mutate(formData);
+  }
+
   return (
     <div className="bg-slate-50 min-h-screen">
       {/* Hero Section */}
@@ -125,19 +195,55 @@ export default function ParaEstabelecimentosPage() {
               </p>
             </div>
             
-            <form className="relative z-10 bg-white rounded-2xl p-6 md:p-8 shadow-xl">
+            <form
+              className="relative z-10 bg-white rounded-2xl p-6 md:p-8 shadow-xl"
+              onSubmit={handleSubmit}
+            >
+              {submitState ? (
+                <div
+                  className={`mb-6 rounded-xl border px-4 py-3 text-sm font-medium ${
+                    submitState.type === 'success'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-rose-200 bg-rose-50 text-rose-700'
+                  }`}
+                >
+                  {submitState.message}
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Nome do Responsável</label>
-                  <input type="text" className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none" placeholder="João Silva" />
+                  <input
+                    type="text"
+                    name="responsibleName"
+                    value={formData.responsibleName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    placeholder="João Silva"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Nome do Estabelecimento</label>
-                  <input type="text" className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none" placeholder="Yuruzu Sushi" />
+                  <input
+                    type="text"
+                    name="establishmentName"
+                    value={formData.establishmentName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    placeholder="Yuruzu Sushi"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Segmento</label>
-                  <select className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none">
+                  <select
+                    name="segment"
+                    value={formData.segment}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  >
                     <option>Restaurante / Bar</option>
                     <option>Cafeteria / Doceria</option>
                     <option>Vestuário / Moda</option>
@@ -147,16 +253,36 @@ export default function ParaEstabelecimentosPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">WhatsApp</label>
-                  <input type="tel" className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none" placeholder="(11) 90000-0000" />
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    value={formData.whatsapp}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    placeholder="(11) 90000-0000"
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Instagram do Estabelecimento</label>
-                  <input type="text" className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none" placeholder="@seuestabelecimento" />
+                  <input
+                    type="text"
+                    name="instagram"
+                    value={formData.instagram}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    placeholder="@seuestabelecimento"
+                  />
                 </div>
               </div>
               
-              <button type="button" className="w-full mt-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-md shadow-primary-200 flex items-center justify-center gap-2">
-                Solicitar Acesso 🚀
+              <button
+                type="submit"
+                disabled={contactMutation.isPending}
+                className="w-full mt-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {contactMutation.isPending ? 'Enviando...' : 'Solicitar Acesso 🚀'}
               </button>
               <p className="text-center text-xs text-slate-500 mt-4">
                 Não exigimos cartão de crédito neste momento.
