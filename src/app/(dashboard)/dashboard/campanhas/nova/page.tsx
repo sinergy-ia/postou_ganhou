@@ -97,7 +97,18 @@ function CampaignForm() {
     me?.planAccess?.features?.progressiveRewards,
   );
   const canUseAutoApproval = Boolean(me?.planAccess?.features?.autoApproval);
+  const maxActiveCampaigns = me?.planAccess?.limits?.maxActiveCampaigns ?? null;
   const [draftFormData, setDraftFormData] = useState<CampaignFormState | null>(null);
+
+  const { data: activeCampaignsData } = useQuery({
+    queryKey: ['campaigns', 'active-limit-check'],
+    queryFn: () =>
+      establishmentApi.getCampaigns({
+        status: 'ACTIVE',
+        limit: 100,
+      }),
+    enabled: Boolean(me),
+  });
 
   const { data: campaignToEdit, isLoading: isFetching } = useQuery({
     queryKey: ['campaign', campaignId],
@@ -109,6 +120,20 @@ function CampaignForm() {
     [campaignToEdit],
   );
   const formData = draftFormData ?? initialFormData;
+  const activeCampaignsCount = (activeCampaignsData?.items || []).filter((campaign) => {
+    if (!campaignId) {
+      return campaign?.status === 'active';
+    }
+
+    return (
+      campaign?.status === 'active' &&
+      campaign.id !== campaignId &&
+      campaign._id !== campaignId
+    );
+  }).length;
+  const hasReachedActiveCampaignLimit = Boolean(
+    maxActiveCampaigns !== null && activeCampaignsCount >= maxActiveCampaigns,
+  );
 
   const createMutation = useMutation({
     mutationFn: establishmentApi.createCampaign,
@@ -135,6 +160,15 @@ function CampaignForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (formData.isActive && hasReachedActiveCampaignLimit) {
+      setError(
+        `Seu plano permite até ${maxActiveCampaigns} campanha${
+          maxActiveCampaigns === 1 ? '' : 's'
+        } ativa${maxActiveCampaigns === 1 ? '' : 's'}. Pause ou encerre uma campanha antes de ativar outra.`,
+      );
+      return;
+    }
 
     // Prepare JSON payload
     let expiresAtDate = new Date();
@@ -202,6 +236,18 @@ function CampaignForm() {
               {error}
             </div>
           )}
+
+          {maxActiveCampaigns !== null ? (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                hasReachedActiveCampaignLimit
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                  : 'border-slate-200 bg-slate-50 text-slate-700'
+              }`}
+            >
+              Campanhas ativas no plano: <span className="font-bold">{activeCampaignsCount} / {maxActiveCampaigns}</span>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
@@ -341,6 +387,7 @@ function CampaignForm() {
                         isActive: e.target.checked,
                       }))
                     }
+                    disabled={hasReachedActiveCampaignLimit && !formData.isActive}
                     className="w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer"
                   />
                   <span className="font-bold text-slate-700 select-none">Ativar imediatamente</span>

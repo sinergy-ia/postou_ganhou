@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { establishmentApi } from "@/services/establishment-api";
 import PricingAdminSection from "@/components/dashboard/PricingAdminSection";
@@ -27,7 +27,7 @@ type ConfigSectionId =
   | "notifications"
   | "billing";
 
-const configSections: Array<{
+const baseConfigSections: Array<{
   id: ConfigSectionId;
   label: string;
   description: string;
@@ -99,6 +99,20 @@ const INSTAGRAM_PROFESSIONAL_CONNECT_URL =
     return url.toString();
   })();
 
+function resolvePlanUserLimit(planType?: "free" | "start" | "pro" | "scale") {
+  switch (planType) {
+    case "start":
+      return 2;
+    case "pro":
+      return 3;
+    case "scale":
+      return null;
+    case "free":
+    default:
+      return 1;
+  }
+}
+
 function normalizeCategoryValue(value?: string | null) {
   const normalized = String(value || "").trim();
   return normalized === "Sem categoria" ? "" : normalized;
@@ -159,7 +173,7 @@ export default function ConfiguracoesPage() {
     }
 
     const savedSection = window.sessionStorage.getItem("marque_e_ganhe_config_section");
-    return configSections.some((section) => section.id === savedSection)
+    return baseConfigSections.some((section) => section.id === savedSection)
       ? (savedSection as ConfigSectionId)
       : "profile";
   });
@@ -168,10 +182,6 @@ export default function ConfiguracoesPage() {
 
   const [draftCoverPreview, setDraftCoverPreview] = useState<string | null>(null);
   const [draftAvatarPreview, setDraftAvatarPreview] = useState<string | null>(null);
-
-  const activeSectionMeta =
-    configSections.find((section) => section.id === activeSection) ||
-    configSections[0];
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -235,10 +245,22 @@ export default function ConfiguracoesPage() {
   const isMetaConnected = Boolean(establishment?.metaConnected);
   const establishmentId = establishment?.id || establishment?._id;
   const canEditSettings = (establishment?.currentUserRole || "owner") === "owner";
+  const configSections = useMemo(
+    () => baseConfigSections,
+    [],
+  );
+  const activeSectionMeta =
+    configSections.find((section) => section.id === activeSection) ||
+    configSections[0];
   const initialFormData = buildInitialFormData(establishment);
   const formData = draftFormData ?? initialFormData;
   const coverPreview = draftCoverPreview ?? formData.coverUrl ?? null;
   const avatarPreview = draftAvatarPreview ?? formData.avatarUrl ?? null;
+  const canSaveCurrentSection =
+    canEditSettings &&
+    (activeSection === "profile" ||
+      activeSection === "address" ||
+      activeSection === "social");
 
   const updateMutation = useMutation({
     mutationFn: (payload: ConfigFormData) =>
@@ -347,9 +369,9 @@ export default function ConfiguracoesPage() {
           </p>
         </div>
         <button
-          disabled={updateMutation.isPending || !canEditSettings}
+          disabled={updateMutation.isPending || !canSaveCurrentSection}
           onClick={() => updateMutation.mutate(formData)}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:opacity-50"
+          className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {updateMutation.isPending ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -770,6 +792,17 @@ export default function ConfiguracoesPage() {
                     <div className="mt-2">
                       {establishment?.planAccess?.limits?.maxMonthlyParticipations ??
                         "Ilimitado"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm text-slate-600">
+                    <div className="font-semibold text-slate-900">
+                      Limite de usuários
+                    </div>
+                    <div className="mt-2">
+                      {resolvePlanUserLimit(establishment?.planAccess?.planType) === null
+                        ? "Ilimitado"
+                        : resolvePlanUserLimit(establishment?.planAccess?.planType)}
                     </div>
                   </div>
                 </div>

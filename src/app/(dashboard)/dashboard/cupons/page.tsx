@@ -3,20 +3,42 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
+import { downloadCsvFile } from '@/lib/csv';
 import { establishmentApi } from '@/services/establishment-api';
 import { Search, Filter, Download, Ticket, Ban, RefreshCw, Eye, Loader2, X } from 'lucide-react';
+
+interface CouponDetails {
+  id: string;
+  code: string;
+  userName?: string;
+  campaignName?: string;
+  benefit?: string;
+  validUntil?: string;
+  status?: 'active' | 'used' | 'expired' | 'cancelled' | string;
+  usedAt?: string | null;
+  createdAt?: string | null;
+  client?: {
+    id?: string;
+    instagramHandle?: string;
+  } | null;
+  participation?: {
+    id?: string;
+    userHandle?: string;
+  } | null;
+}
 
 export default function CuponsPage() {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('Todos');
   const filters = ['Todos', 'Ativos', 'Usados', 'Expirados'];
   const [search, setSearch] = useState('');
-  const [selectedCoupon, setSelectedCoupon] = useState<Record<string, any> | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = useState<CouponDetails | null>(null);
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
     queryFn: establishmentApi.getMe,
   });
   const canManageCoupons = (me?.currentUser?.role || 'owner') !== 'viewer';
+  const canExportAdvanced = Boolean(me?.planAccess?.features?.advancedExports);
 
   const formatDateTime = (value?: string | null) => {
     if (!value) {
@@ -41,7 +63,7 @@ export default function CuponsPage() {
     queryFn: () => establishmentApi.getCoupons({ status: getStatus(activeFilter), search })
   });
   
-  const coupons: Array<Record<string, any>> = data?.items || [];
+  const coupons: CouponDetails[] = data?.items || [];
 
   const { data: metrics } = useQuery({
     queryKey: ['dashboard-metrics'],
@@ -62,6 +84,21 @@ export default function CuponsPage() {
     }
   });
 
+  const handleExportCoupons = () => {
+    downloadCsvFile(
+      'cupons.csv',
+      ['Codigo', 'Cliente', 'Campanha', 'Beneficio', 'Validade', 'Status'],
+      coupons.map((coupon) => [
+        coupon.code,
+        coupon.userName,
+        coupon.campaignName,
+        coupon.benefit,
+        coupon.validUntil,
+        coupon.status,
+      ]),
+    );
+  };
+
   if (isLoadingMe) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -79,7 +116,12 @@ export default function CuponsPage() {
           <h1 className="font-heading font-bold text-3xl text-slate-900">Gerenciamento de Cupons</h1>
           <p className="text-slate-500 mt-1">Acompanhe os cupons emitidos e valide resgates reais.</p>
         </div>
-        <button className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={handleExportCoupons}
+          disabled={!canExportAdvanced || coupons.length === 0}
+          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <Download className="w-4 h-4" /> Exportar Relatório
         </button>
       </div>
@@ -94,13 +136,19 @@ export default function CuponsPage() {
         />
       ) : null}
 
+      {canManageCoupons && !canExportAdvanced ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+          Exportações avançadas em CSV ficam disponíveis no plano Scale White Label.
+        </div>
+      ) : null}
+
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Ativos', value: coupons.filter((c: any) => c.status === 'active').length || 0, color: 'text-primary-600', bg: 'bg-primary-50' },
+          { label: 'Ativos', value: coupons.filter((coupon) => coupon.status === 'active').length || 0, color: 'text-primary-600', bg: 'bg-primary-50' },
           { label: 'Usados (Total)', value: metrics?.couponsRedeemed || 0, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Total Emitido', value: metrics?.couponsIssued || 0, color: 'text-slate-600', bg: 'bg-slate-100' },
-          { label: 'Cancelados', value: coupons.filter((c: any) => c.status === 'cancelled').length || 0, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Cancelados', value: coupons.filter((coupon) => coupon.status === 'cancelled').length || 0, color: 'text-red-600', bg: 'bg-red-50' },
         ].map(stat => (
           <div key={stat.label} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${stat.bg} ${stat.color}`}>

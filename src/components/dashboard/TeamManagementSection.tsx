@@ -59,6 +59,20 @@ function roleLabel(role?: string) {
   }
 }
 
+function resolvePlanUserLimit(planType?: "free" | "start" | "pro" | "scale") {
+  switch (planType) {
+    case "start":
+      return 2;
+    case "pro":
+      return 3;
+    case "scale":
+      return null;
+    case "free":
+    default:
+      return 1;
+  }
+}
+
 export default function TeamManagementSection() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -72,6 +86,10 @@ export default function TeamManagementSection() {
   });
 
   const currentUserRole = me?.currentUser?.role || "owner";
+  const planType = me?.planAccess?.planType || "free";
+  const maxUsers = resolvePlanUserLimit(planType);
+  const canUseMultipleUsers =
+    maxUsers === null || maxUsers > 1;
   const canViewTeam = currentUserRole === "owner" || currentUserRole === "manager";
   const canManageTeam = currentUserRole === "owner";
 
@@ -130,6 +148,10 @@ export default function TeamManagementSection() {
         .includes(normalizedSearch),
     );
   }, [teamUsers, search]);
+  const registeredUsersCount = teamUsers?.length || 0;
+  const hasReachedUserLimit =
+    maxUsers !== null && registeredUsersCount >= maxUsers;
+  const canCreateMoreUsers = canManageTeam && canUseMultipleUsers && !hasReachedUserLimit;
 
   if (isLoadingMe || (canViewTeam && isLoadingTeam)) {
     return (
@@ -151,6 +173,18 @@ export default function TeamManagementSection() {
     );
   }
 
+  if (!canUseMultipleUsers) {
+    return (
+      <FeatureUpgradeNotice
+        badge="Multiusuários"
+        title="Usuários adicionais estão disponíveis a partir do plano Start"
+        description="Seu plano atual inclui apenas 1 acesso por estabelecimento. Faça upgrade para liberar mais usuários na equipe e uma operação compartilhada da loja."
+        ctaLabel="Voltar ao faturamento"
+        ctaHref="/dashboard/configuracoes"
+      />
+    );
+  }
+
   return (
     <div className="space-y-8">
       <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
@@ -165,6 +199,13 @@ export default function TeamManagementSection() {
             </h2>
             <p className="mt-2 text-sm text-slate-500">
               Perfil atual: <span className="font-semibold text-slate-700">{roleLabel(currentUserRole)}</span>
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Uso do plano:{" "}
+              <span className="font-semibold text-slate-700">
+                {registeredUsersCount}
+                {maxUsers === null ? " usuários cadastrados" : ` de ${maxUsers} usuários`}
+              </span>
             </p>
           </div>
 
@@ -187,14 +228,22 @@ export default function TeamManagementSection() {
                   setError("");
                   setIsCreateModalOpen(true);
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-primary-200 transition-colors hover:bg-primary-700"
+                disabled={!canCreateMoreUsers}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-primary-200 transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
-                Novo usuário
+                {hasReachedUserLimit ? "Limite atingido" : "Novo usuário"}
               </button>
             ) : null}
           </div>
         </div>
+
+        {hasReachedUserLimit ? (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Seu plano já atingiu o limite de {maxUsers} usuários. Faça upgrade para
+            liberar mais acessos.
+          </div>
+        ) : null}
 
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
@@ -320,6 +369,14 @@ export default function TeamManagementSection() {
               onSubmit={(event) => {
                 event.preventDefault();
                 setError("");
+
+                if (hasReachedUserLimit) {
+                  setError(
+                    `Seu plano já atingiu o limite de ${maxUsers} usuários cadastrados.`,
+                  );
+                  return;
+                }
+
                 createMutation.mutate(formData);
               }}
               className="space-y-6 p-6"

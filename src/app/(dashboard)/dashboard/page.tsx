@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
 import { establishmentApi } from "@/services/establishment-api";
 import { Activity, Loader2, Megaphone, Ticket, Users } from "lucide-react";
 import {
@@ -13,7 +14,30 @@ import {
   YAxis,
 } from "recharts";
 
+interface RecentActivityItem {
+  id: string;
+  userAvatar?: string;
+  userName?: string;
+  userHandle?: string;
+  imageUrl?: string;
+  type?: string;
+  likes?: number;
+  campaign?: {
+    title?: string;
+  } | null;
+  discountEarned?: string;
+  status?: "approved" | "redeemed" | "pending" | string;
+}
+
 export default function DashboardPage() {
+  const { data: me, isLoading: isLoadingMe } = useQuery({
+    queryKey: ["establishment-me"],
+    queryFn: establishmentApi.getMe,
+  });
+  const planType = me?.planAccess?.planType || "free";
+  const hasManagementDashboard = planType !== "free";
+  const canAccessBetterReports = Boolean(me?.planAccess?.features?.advancedAnalytics);
+
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ["dashboard-metrics"],
     queryFn: establishmentApi.getMetrics,
@@ -22,6 +46,7 @@ export default function DashboardPage() {
   const { data: chartData, isLoading: isLoadingCharts } = useQuery({
     queryKey: ["dashboard-charts"],
     queryFn: () => establishmentApi.getCharts(),
+    enabled: hasManagementDashboard,
   });
 
   const { data: participationsRes, isLoading: isLoadingParticipation } = useQuery({
@@ -32,12 +57,18 @@ export default function DashboardPage() {
   const { data: insightsData, isLoading: isLoadingInsights } = useQuery({
     queryKey: ["dashboard-insights"],
     queryFn: establishmentApi.getAnalyticsInsights,
+    enabled: hasManagementDashboard,
   });
 
-  const recentActivity: Array<Record<string, any>> = participationsRes?.items || [];
+  const recentActivity: RecentActivityItem[] = participationsRes?.items || [];
   const highlightCard = insightsData?.cards?.[0] || null;
 
-  if (isLoadingMetrics || isLoadingCharts || isLoadingParticipation || isLoadingInsights) {
+  if (
+    isLoadingMe ||
+    isLoadingMetrics ||
+    isLoadingParticipation ||
+    (hasManagementDashboard && (isLoadingCharts || isLoadingInsights))
+  ) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
@@ -71,75 +102,90 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-heading font-bold text-xl text-slate-900">Evolução do Período</h2>
-              <p className="text-xs text-slate-500">Postagens vs. Cupons Resgatados</p>
+      {hasManagementDashboard ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="font-heading font-bold text-xl text-slate-900">Evolução do Período</h2>
+                <p className="text-xs text-slate-500">Postagens vs. Cupons Resgatados</p>
+              </div>
+            </div>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#9333ea" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorResgates" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                  />
+                  <Area type="monotone" dataKey="posts" name="Postagens" stroke="#9333ea" strokeWidth={3} fillOpacity={1} fill="url(#colorPosts)" />
+                  <Area type="monotone" dataKey="resgates" name="Resgates" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorResgates)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#9333ea" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorResgates" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                />
-                <Area type="monotone" dataKey="posts" name="Postagens" stroke="#9333ea" strokeWidth={3} fillOpacity={1} fill="url(#colorPosts)" />
-                <Area type="monotone" dataKey="resgates" name="Resgates" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorResgates)" />
-              </AreaChart>
-            </ResponsiveContainer>
+
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading font-bold text-xl text-slate-900">Em Destaque</h2>
+            </div>
+
+            {highlightCard ? (
+              <div className="flex-1 bg-gradient-to-br from-primary-600 to-indigo-700 rounded-2xl p-6 text-white relative overflow-hidden flex flex-col">
+                <div className="absolute top-0 right-0 -m-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+
+                <div className="inline-block px-3 py-1 bg-white/20 backdrop-blur border border-white/20 rounded-full text-xs font-bold self-start mb-6 shadow-sm">
+                  Insight principal
+                </div>
+                <h3 className="font-bold text-2xl leading-tight drop-shadow-md mb-2">
+                  {highlightCard.title}
+                </h3>
+                <p className="text-primary-100 text-sm mb-6 drop-shadow-sm">
+                  {highlightCard.description}
+                </p>
+
+                <div className="mt-auto rounded-xl border border-white/20 bg-white/10 p-4 text-sm text-primary-100 backdrop-blur-sm">
+                  Os insights abaixo são gerados diretamente a partir das postagens, aprovações e resgates do estabelecimento.
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 bg-slate-50 rounded-2xl p-6 flex flex-col items-center justify-center text-center border border-slate-100">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-400 mb-3 shadow-sm">
+                  <Megaphone className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-slate-700 text-sm mb-1">Aguardando dados</h3>
+                <p className="text-slate-500 text-xs">Crie campanhas e aprove postagens para ver os destaques aqui.</p>
+              </div>
+            )}
           </div>
         </div>
+      ) : (
+        <FeatureUpgradeNotice
+          badge="Dashboard básico"
+          title="Painel de gestão completo disponível a partir do plano Start"
+          description="No plano Free você acompanha os números principais e a atividade recente. Faça upgrade para liberar gráficos de evolução, insights automáticos e uma visão gerencial mais detalhada."
+        />
+      )}
 
-        <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-heading font-bold text-xl text-slate-900">Em Destaque</h2>
-          </div>
-
-          {highlightCard ? (
-            <div className="flex-1 bg-gradient-to-br from-primary-600 to-indigo-700 rounded-2xl p-6 text-white relative overflow-hidden flex flex-col">
-              <div className="absolute top-0 right-0 -m-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-
-              <div className="inline-block px-3 py-1 bg-white/20 backdrop-blur border border-white/20 rounded-full text-xs font-bold self-start mb-6 shadow-sm">
-                Insight principal
-              </div>
-              <h3 className="font-bold text-2xl leading-tight drop-shadow-md mb-2">
-                {highlightCard.title}
-              </h3>
-              <p className="text-primary-100 text-sm mb-6 drop-shadow-sm">
-                {highlightCard.description}
-              </p>
-
-              <div className="mt-auto rounded-xl border border-white/20 bg-white/10 p-4 text-sm text-primary-100 backdrop-blur-sm">
-                Os insights abaixo são gerados diretamente a partir das postagens, aprovações e resgates do estabelecimento.
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 bg-slate-50 rounded-2xl p-6 flex flex-col items-center justify-center text-center border border-slate-100">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-400 mb-3 shadow-sm">
-                <Megaphone className="w-6 h-6" />
-              </div>
-              <h3 className="font-bold text-slate-700 text-sm mb-1">Aguardando dados</h3>
-              <p className="text-slate-500 text-xs">Crie campanhas e aprove postagens para ver os destaques aqui.</p>
-            </div>
-          )}
+      {hasManagementDashboard && !canAccessBetterReports ? (
+        <div className="rounded-3xl border border-primary-200 bg-primary-50 px-6 py-5 text-sm text-primary-800 shadow-sm">
+          Seu plano já inclui o painel de gestão, mas os relatórios melhores com ROI,
+          conversão e ranking de clientes ficam disponíveis a partir do plano Pro.
         </div>
-      </div>
+      ) : null}
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
         <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between">
