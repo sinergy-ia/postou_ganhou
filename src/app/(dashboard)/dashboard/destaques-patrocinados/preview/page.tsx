@@ -1,16 +1,37 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Laptop, Loader2, Smartphone } from "lucide-react";
+import PublicSponsoredCard from "@/components/sponsored-highlights/PublicSponsoredCard";
+import {
+  buildPreviewSectionsFromCampaigns,
+  buildPreviewSectionsFromPreview,
+} from "@/lib/sponsored-highlights-public";
 import { sponsoredHighlightsApi } from "@/services/sponsored-highlights-api";
 
 export default function SponsoredPreviewPage() {
-  const { data, isLoading } = useQuery({
+  const { data: previewData, isLoading: isLoadingPreview } = useQuery({
     queryKey: ["sponsored-highlights", "preview"],
     queryFn: sponsoredHighlightsApi.getPreview,
   });
 
-  if (isLoading || !data) {
+  const { data: publicCampaigns, isLoading: isLoadingCampaigns } = useQuery({
+    queryKey: ["sponsored-highlights", "public-campaigns"],
+    queryFn: sponsoredHighlightsApi.getPublicCampaigns,
+  });
+
+  const sections = useMemo(() => {
+    const campaignSections = buildPreviewSectionsFromCampaigns(publicCampaigns);
+
+    if (campaignSections.length > 0) {
+      return campaignSections;
+    }
+
+    return buildPreviewSectionsFromPreview(previewData);
+  }, [previewData, publicCampaigns]);
+
+  if ((isLoadingPreview && isLoadingCampaigns) || (!sections.length && isLoadingPreview)) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
@@ -25,12 +46,19 @@ export default function SponsoredPreviewPage() {
           Simulacao da area publica
         </h2>
         <p className="mt-2 text-sm text-slate-500">
-          Visualize a aparencia dos patrocinados na home, lista de promocoes, mapa e busca em desktop e mobile.
+          Visualize a aparencia dos patrocinados na home, lista de promocoes,
+          mapa e busca em desktop e mobile.
         </p>
       </div>
 
-      <div className="space-y-8">
-        {data.sections.map((section) => (
+      {!sections.length ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
+          Nenhuma campanha patrocinada ativa foi encontrada para gerar a
+          simulacao.
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {sections.map((section) => (
           <section
             key={section.key}
             className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -52,38 +80,7 @@ export default function SponsoredPreviewPage() {
                   <div className="overflow-hidden rounded-[24px] bg-slate-50 p-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                       {section.desktop.map((card) => (
-                        <div
-                          key={card.id}
-                          className="overflow-hidden rounded-3xl border border-primary-100 bg-white shadow-sm"
-                        >
-                          <img
-                            src={card.imageUrl}
-                            alt={card.title}
-                            className="h-36 w-full object-cover"
-                          />
-                          <div className="space-y-3 p-4">
-                            <div className="inline-flex rounded-full bg-primary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">
-                              Patrocinado • {card.slotLabel}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-900">{card.title}</p>
-                              <p className="text-sm text-slate-500">
-                                {card.establishmentName}
-                              </p>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {card.badge}
-                              </span>
-                              <button
-                                type="button"
-                                className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
-                              >
-                                {card.cta}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <PublicSponsoredCard key={card.id} card={card} />
                       ))}
                     </div>
                   </div>
@@ -99,38 +96,11 @@ export default function SponsoredPreviewPage() {
                   <div className="overflow-hidden rounded-[28px] bg-slate-50 p-4">
                     <div className="space-y-4">
                       {section.mobile.map((card) => (
-                        <div
-                          key={`${card.id}-mobile`}
-                          className="overflow-hidden rounded-3xl border border-primary-100 bg-white shadow-sm"
-                        >
-                          <img
-                            src={card.imageUrl}
-                            alt={card.title}
-                            className="h-32 w-full object-cover"
-                          />
-                          <div className="space-y-3 p-4">
-                            <div className="inline-flex rounded-full bg-primary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">
-                              Patrocinado
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-900">{card.title}</p>
-                              <p className="text-sm text-slate-500">
-                                {card.establishmentName}
-                              </p>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {card.badge}
-                              </span>
-                              <button
-                                type="button"
-                                className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
-                              >
-                                {card.cta}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <PublicSponsoredCard
+                          key={card.id}
+                          card={card}
+                          compact
+                        />
                       ))}
                     </div>
                   </div>
@@ -138,8 +108,9 @@ export default function SponsoredPreviewPage() {
               </div>
             </div>
           </section>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

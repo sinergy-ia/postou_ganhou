@@ -5,6 +5,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Save, Sparkles } from "lucide-react";
+import { normalizeSponsoredHref } from "@/lib/sponsored-highlights-public";
 import {
   formatCurrency,
   getErrorMessage,
@@ -92,7 +93,7 @@ function buildInitialFormState(args: {
     manualPriority: String(firstFormat?.renderPriority || 80),
     cityRegion: firstEstablishment?.cityRegion || "",
     category: firstEstablishment?.category || "",
-    landingPage: lookups.landingPages[1]?.value || "/public/promocoes",
+    landingPage: lookups.landingPages[1]?.value || "/promocoes",
     imageUrl: "",
     initialStatus: (lookups.statuses[0]?.value || "scheduled") as SponsoredCampaignStatus,
   };
@@ -228,7 +229,7 @@ function CampaignFormPage() {
       manualPriority: Number(formData.manualPriority || 0),
       cityRegion: formData.cityRegion,
       category: formData.category,
-      landingPage: formData.landingPage,
+      landingPage: normalizeSponsoredHref(formData.landingPage),
       imageUrl: formData.imageUrl,
       initialStatus: formData.initialStatus,
     };

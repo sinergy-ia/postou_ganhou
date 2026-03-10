@@ -16,6 +16,7 @@ export default function SponsoredHighlightsLayout({
     queryKey: ["establishment-me"],
     queryFn: establishmentApi.getMe,
   });
+  const isSuperAdmin = Boolean(me?.superAdmin || me?.currentUser?.superAdmin);
 
   if (isLoading) {
     return (
@@ -25,12 +26,14 @@ export default function SponsoredHighlightsLayout({
     );
   }
 
-  if (!me?.planAccess?.features?.sponsoredHighlights) {
+  if (!isSuperAdmin) {
     return (
       <FeatureUpgradeNotice
-        badge="Destaques patrocinados"
-        title="Este modulo esta disponivel a partir do plano Pro"
-        description="Gerencie formatos, campanhas patrocinadas, slots e regras comerciais com um upgrade de plano."
+        badge="Acesso restrito"
+        title="Este modulo e exclusivo do super admin"
+        description="A area de Destaques Patrocinados e usada pelo time administrativo para organizar formatos, campanhas patrocinadas, slots e regras comerciais do SaaS."
+        ctaLabel="Voltar ao dashboard"
+        ctaHref="/dashboard"
       />
     );
   }
