@@ -14,7 +14,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Postou, Ganhou - Plataforma de Recompensas",
+  title: "Marque & Ganhe - Plataforma de Recompensas",
   description: "Poste, ganhe descontos e descubra lugares incríveis na plataforma de recompensas sociais.",
 };
 

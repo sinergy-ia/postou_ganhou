@@ -35,7 +35,7 @@ export default function Home() {
 
   const featuredPlaces: HomePlace[] = (establishmentsData?.slice(0, 3) || []) as HomePlace[];
   const heroPlace: Pick<HomePlace, 'name' | 'cover'> = featuredPlaces[0] || {
-    name: 'Postou, Ganhou',
+    name: 'Marque & Ganhe',
     cover: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80',
   };
   const sponsoredCards = useMemo(
@@ -94,7 +94,7 @@ export default function Home() {
               <div className="w-full h-full bg-white rounded-3xl shadow-sm overflow-hidden border-8 border-white relative">
                 {/* App like UI Mock */}
                 <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                  <div className="font-heading font-bold text-lg">Postou, Ganhou</div>
+                  <div className="font-heading font-bold text-lg">Marque &amp; Ganhe</div>
                   <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center"><Heart className="w-4 h-4" /></div>
                 </div>
                 <div className="p-4 space-y-4">

@@ -1,6 +1,6 @@
-# Arquitetura e Integração do Backend: Postou, Ganhou
+# Arquitetura e Integração do Backend: Marque & Ganhe
 
-Este documento detalha as instruções e o planejamento para o desenvolvimento do backend oficial da plataforma **Postou, Ganhou**.
+Este documento detalha as instruções e o planejamento para o desenvolvimento do backend oficial da plataforma **Marque & Ganhe**.
 
 A stack definida é **NestJS** com **MongoDB** (utilizando Mongoose).
 
@@ -37,7 +37,7 @@ Para substituir o arquivo `mockData.ts`, o banco de dados precisará das seguint
 - **maxReward**: String
 - **badges**: [String]
 - **rules**: [String]
-- **hashtagRequired**: String (ex: `#PostouGanhouYuruzu`)
+- **hashtagRequired**: String (ex: `#MarqueEGanheYuruzu`)
 - **expiresAt**: Date
 - **isActive**: Boolean
 
@@ -218,7 +218,7 @@ Hoje, o frontend lê listas do `src/lib/mockData.ts`. A transição ocorrerá as
 
 ## Resumo dos Próximos Passos (Backend)
 
-1. `nest new postou-ganhou-api` (Criar o app NestJS)
+1. `nest new marque-e-ganhe-api` (Criar o app NestJS)
 2. `npm install @nestjs/mongoose mongoose` (Conectar ao MongoDB)
 3. Criar os Schemas Mongoose para `Establishment`, `Campaign`, `Participation` e `Coupon`.
 4. Criar conta no [Meta for Developers](https://developers.facebook.com/), configurar o App e cadastrar a URL `/api/webhooks/instagram` lá. (Use o **ngrok** para testar localmente, pois o Facebook exige uma URL pública HTTPS).

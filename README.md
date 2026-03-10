@@ -1,10 +1,10 @@
-# Postou, Ganhou
+# Marque & Ganhe
 
-Aplicacao web em Next.js para a plataforma `postou_ganhou`.
+Aplicacao web em Next.js para a plataforma Marque & Ganhe.
 
 ## Repositorio
 
-- GitHub: https://github.com/sinergy-ia/postou_ganhou
+- GitHub: atualize tambem o nome do repositorio remoto se quiser refletir a nova marca fora do ambiente local.
 
 ## Desenvolvimento
 

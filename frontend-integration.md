@@ -1,6 +1,6 @@
-# Frontend - Integracao com os endpoints de Postou Ganhou
+# Frontend - Integracao com os endpoints de Marque & Ganhe
 
-Este arquivo documenta como o frontend deve consumir os endpoints criados em `src/postou_ganhou`.
+Este arquivo documenta como o frontend deve consumir os endpoints criados em `src/marque_e_ganhe`.
 
 ## Objetivo
 
@@ -171,7 +171,7 @@ Fluxo recomendado:
 1. o frontend chama `GET /api/auth/facebook?redirect=false`
 2. recebe a `url`
 3. faz `window.location.href = url`
-4. a Meta redireciona para a URL configurada em `POSTOU_GANHOU_META_REDIRECT_URI`
+4. a Meta redireciona para a URL configurada em `MARQUE_E_GANHE_META_REDIRECT_URI`
 5. a pagina de callback do frontend le `code` e `state` da query string
 6. a pagina de callback chama `GET /api/auth/facebook/callback?code=...&state=...`
 7. o backend responde com `token` e `establishment`
@@ -310,7 +310,7 @@ Body:
   "maxReward": "30% OFF",
   "badges": ["mais popular", "fim de semana"],
   "rules": ["Perfil publico", "Marcar o restaurante"],
-  "hashtagRequired": "#PostouGanhouYuruzu",
+  "hashtagRequired": "#MarqueEGanheYuruzu",
   "expiresAt": "2026-04-30T23:59:59.000Z",
   "isActive": true
 }

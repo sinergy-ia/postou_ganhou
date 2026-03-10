@@ -10,7 +10,7 @@ import {
   normalizeEstablishment,
   normalizeParticipation,
   toBackendCampaignType,
-} from "./postou-ganhou-normalizers";
+} from "./marque-e-ganhe-normalizers";
 
 export interface Metric {
   activeCampaigns: number;

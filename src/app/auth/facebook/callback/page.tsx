@@ -22,11 +22,11 @@ function FacebookCallbackContent() {
     }
 
     const savedPath = window.sessionStorage.getItem(
-      'postou_ganhou_after_meta_connect',
+      'marque_e_ganhe_after_meta_connect',
     );
 
     if (savedPath) {
-      window.sessionStorage.removeItem('postou_ganhou_after_meta_connect');
+      window.sessionStorage.removeItem('marque_e_ganhe_after_meta_connect');
       return savedPath;
     }
 

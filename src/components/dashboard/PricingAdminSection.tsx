@@ -488,7 +488,7 @@ export default function PricingAdminSection() {
                   Cadastrar novo admin
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Crie uma nova conta administrativa do Postou, Ganhou e enviaremos um convite por e-mail para confirmar o acesso e definir a senha.
+                  Crie uma nova conta administrativa do Marque &amp; Ganhe e enviaremos um convite por e-mail para confirmar o acesso e definir a senha.
                 </p>
               </div>
               <button

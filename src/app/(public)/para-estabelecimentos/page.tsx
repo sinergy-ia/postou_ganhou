@@ -119,7 +119,7 @@ export default function ParaEstabelecimentosPage() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-600/30 blur-3xl rounded-full" />
             
             <div className="relative z-10 text-center mb-10">
-              <h2 className="font-heading font-bold text-3xl md:text-4xl text-white mb-4">Venda mais com o Postou, Ganhou</h2>
+              <h2 className="font-heading font-bold text-3xl md:text-4xl text-white mb-4">Venda mais com o Marque &amp; Ganhe</h2>
               <p className="text-primary-100 max-w-xl mx-auto">
                 Preencha os dados abaixo. Nossa equipe entrará em contato para liberar seu acesso à plataforma com 30 dias de teste grátis.
               </p>

@@ -158,7 +158,7 @@ export default function ConfiguracoesPage() {
       return "profile";
     }
 
-    const savedSection = window.sessionStorage.getItem("postou_ganhou_config_section");
+    const savedSection = window.sessionStorage.getItem("marque_e_ganhe_config_section");
     return configSections.some((section) => section.id === savedSection)
       ? (savedSection as ConfigSectionId)
       : "profile";
@@ -175,7 +175,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem("postou_ganhou_config_section");
+      window.sessionStorage.removeItem("marque_e_ganhe_config_section");
     }
   }, []);
 
@@ -288,11 +288,11 @@ export default function ConfiguracoesPage() {
 
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(
-          "postou_ganhou_after_meta_connect",
+          "marque_e_ganhe_after_meta_connect",
           "/dashboard/configuracoes",
         );
         window.sessionStorage.setItem(
-          "postou_ganhou_config_section",
+          "marque_e_ganhe_config_section",
           "social",
         );
         window.location.href = url;
@@ -796,7 +796,7 @@ export default function ConfiguracoesPage() {
               <div className="bg-amber-50 border border-amber-200 rounded-3xl px-6 py-5 text-sm text-amber-900 shadow-sm">
                 A alteração de plano é uma ação restrita ao super admin da plataforma.
                 Se você precisa de upgrade, downgrade ou white-label, entre em contato
-                com a equipe responsável pelo Postou, Ganhou.
+                com a equipe responsável pelo Marque &amp; Ganhe.
               </div>
             </section>
           ) : null}
@@ -808,7 +808,7 @@ export default function ConfiguracoesPage() {
               </h2>
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
                 Essa seção ainda não tem campos expostos pela API atual do
-                `postou_ganhou`. Por enquanto, a tela já permite editar perfil,
+                Marque &amp; Ganhe. Por enquanto, a tela já permite editar perfil,
                 endereço e redes sociais normalmente.
               </div>
             </section>

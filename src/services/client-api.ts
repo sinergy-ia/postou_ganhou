@@ -7,7 +7,7 @@ import {
   normalizeNotification,
   normalizeParticipation,
   stripHandle,
-} from "./postou-ganhou-normalizers";
+} from "./marque-e-ganhe-normalizers";
 
 function normalizeClientProfile(
   record: Record<string, any> | null | undefined,
