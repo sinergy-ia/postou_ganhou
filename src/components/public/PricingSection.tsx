@@ -8,7 +8,6 @@ import {
   Check,
   CircleHelp,
   Loader2,
-  Minus,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -265,84 +264,6 @@ export default function PricingSection() {
                 <p className="mt-1 text-sm text-slate-500">por cupom resgatado</p>
               </div>
             ))}
-          </div>
-        </div>
-
-        <div className="mt-12 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h3 className="font-heading text-2xl font-bold text-slate-900 md:text-3xl">
-                {data.comparison.title}
-              </h3>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-                {data.comparison.description}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 overflow-x-auto">
-            <table className="min-w-[860px] w-full border-separate border-spacing-0">
-              <thead>
-                <tr>
-                  <th className="sticky left-0 z-10 rounded-l-2xl bg-slate-50 px-4 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                    Recurso
-                  </th>
-                  {plans.map((plan) => (
-                    <th
-                      key={`head-${plan.id}`}
-                      className={`px-4 py-4 text-center text-sm font-bold ${
-                        plan.isHighlighted
-                          ? "bg-primary-50 text-primary-700"
-                          : "bg-slate-50 text-slate-700"
-                      } ${plan === plans[plans.length - 1] ? "rounded-r-2xl" : ""}`}
-                    >
-                      {plan.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.comparison.rows.map((row, rowIndex) => (
-                  <tr key={row.key}>
-                    <td
-                      className={`sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-4 text-sm font-semibold text-slate-800 ${
-                        rowIndex === data.comparison.rows.length - 1 ? "rounded-bl-2xl border-b-0" : ""
-                      }`}
-                    >
-                      {row.label}
-                    </td>
-                    {row.values.map((value, valueIndex) => (
-                      <td
-                        key={`${row.key}-${value.planType}`}
-                        className={`border-b border-slate-100 px-4 py-4 text-center text-sm text-slate-600 ${
-                          rowIndex === data.comparison.rows.length - 1 && valueIndex === row.values.length - 1
-                            ? "rounded-br-2xl border-b-0"
-                            : rowIndex === data.comparison.rows.length - 1
-                              ? "border-b-0"
-                              : ""
-                        } ${plans[valueIndex]?.isHighlighted ? "bg-primary-50/60" : "bg-white"}`}
-                      >
-                        {row.kind === "boolean" ? (
-                          value.value ? (
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                              <Check className="h-4 w-4" />
-                            </span>
-                          ) : (
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                              <Minus className="h-4 w-4" />
-                            </span>
-                          )
-                        ) : (
-                          <span className="font-medium text-slate-700">
-                            {String(value.value)}
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
 
