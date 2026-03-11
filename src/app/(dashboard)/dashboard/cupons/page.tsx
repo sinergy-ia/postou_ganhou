@@ -10,6 +10,8 @@ import { Search, Filter, Download, Ticket, Ban, RefreshCw, Eye, Loader2, X } fro
 interface CouponDetails {
   id: string;
   code: string;
+  participationId?: string;
+  participationIds?: string[];
   userName?: string;
   campaignName?: string;
   benefit?: string;
@@ -47,6 +49,15 @@ export default function CuponsPage() {
 
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Nao informado' : date.toLocaleString('pt-BR');
+  };
+
+  const getParticipationIds = (coupon: CouponDetails) => {
+    if (Array.isArray(coupon.participationIds) && coupon.participationIds.length > 0) {
+      return coupon.participationIds.filter(Boolean);
+    }
+
+    const fallbackId = coupon.participationId || coupon.participation?.id;
+    return fallbackId ? [fallbackId] : [];
   };
 
   const getStatus = (filter: string) => {
@@ -114,7 +125,7 @@ export default function CuponsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-heading font-bold text-3xl text-slate-900">Gerenciamento de Cupons</h1>
-          <p className="text-slate-500 mt-1">Acompanhe os cupons emitidos e valide resgates reais.</p>
+          <p className="text-slate-500 mt-1">Acompanhe os cupons emitidos, inclusive cupons acumulados por cliente, e valide resgates reais.</p>
         </div>
         <button
           type="button"
@@ -242,7 +253,12 @@ export default function CuponsPage() {
                     {coupon.campaignName}
                   </td>
                   <td className="px-6 py-4 text-slate-900 font-medium">
-                    {coupon.benefit}
+                    <div>{coupon.benefit}</div>
+                    {getParticipationIds(coupon).length > 1 ? (
+                      <div className="mt-1 text-xs font-semibold text-primary-600">
+                        {getParticipationIds(coupon).length} participacoes acumuladas
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 text-slate-500">
                     {coupon.validUntil}
@@ -299,6 +315,12 @@ export default function CuponsPage() {
       {selectedCoupon ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            {(() => {
+              const linkedParticipationIds = getParticipationIds(selectedCoupon);
+              const isAccumulatedCoupon = linkedParticipationIds.length > 1;
+
+              return (
+                <>
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-primary-600">
@@ -310,6 +332,11 @@ export default function CuponsPage() {
                 <p className="mt-1 text-sm text-slate-500">
                   {selectedCoupon.campaignName} • {selectedCoupon.userName}
                 </p>
+                {isAccumulatedCoupon ? (
+                  <p className="mt-2 text-xs font-semibold text-primary-600">
+                    Cupom acumulado com {linkedParticipationIds.length} participacoes aprovadas
+                  </p>
+                ) : null}
               </div>
               <button
                 onClick={() => setSelectedCoupon(null)}
@@ -331,7 +358,8 @@ export default function CuponsPage() {
                 { label: 'Valido ate', value: selectedCoupon.validUntil || 'Nao informado' },
                 { label: 'Utilizado em', value: formatDateTime(selectedCoupon.usedAt) },
                 { label: 'Criado em', value: formatDateTime(selectedCoupon.createdAt) },
-                { label: 'Participacao', value: selectedCoupon.participation?.id || 'Nao informado' },
+                  { label: 'Participacao principal', value: selectedCoupon.participationId || selectedCoupon.participation?.id || 'Nao informado' },
+                  { label: 'Participacoes vinculadas', value: linkedParticipationIds.length > 0 ? linkedParticipationIds.join(', ') : 'Nao informado' },
                 { label: 'Cliente ID', value: selectedCoupon.client?.id || 'Nao informado' },
                 { label: 'Cupom ID', value: selectedCoupon.id || 'Nao informado' },
               ].map((item) => (
@@ -354,6 +382,9 @@ export default function CuponsPage() {
                 Fechar
               </button>
             </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       ) : null}

@@ -233,6 +233,7 @@ export default function ClientesReportPage() {
 
       switch (participation.status) {
         case "approved":
+        case "redeemed":
           existing.approvedPosts += 1;
           break;
         case "rejected":

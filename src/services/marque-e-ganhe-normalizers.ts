@@ -403,6 +403,12 @@ export function normalizeCoupon(
   const establishment = normalizeEstablishment(record.establishment);
   const participation = normalizeParticipation(record.participation);
   const reward = ensureText(record.reward ?? record.benefit);
+  const participationIds = Array.isArray(record.participationIds)
+    ? record.participationIds
+        .map((item) => ensureText(item))
+        .filter(Boolean)
+    : [];
+  const primaryParticipationId = ensureText(record.participationId, participation?.id || "");
 
   return {
     ...record,
@@ -420,6 +426,13 @@ export function normalizeCoupon(
     validUntilDate: record.validUntil,
     expiresAt: record.validUntil ?? record.expiresAt,
     usedAt: record.redeemedAt ?? record.usedAt,
+    participationId: primaryParticipationId,
+    participationIds:
+      participationIds.length > 0
+        ? participationIds
+        : primaryParticipationId
+          ? [primaryParticipationId]
+          : [],
     client,
     campaign,
     establishment,
