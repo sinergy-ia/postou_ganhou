@@ -145,8 +145,8 @@ export default function PostagensPage() {
   const selectedRewardTier = selectedPost
     ? selectedRewardTierByPostId[selectedPost.id] || 'BASE'
     : 'BASE';
-  const canApproveBase = actualLikes >= baseLikesRequired;
-  const canApproveMax = Boolean(
+  const meetsBaseThresholdOnCurrentPost = actualLikes >= baseLikesRequired;
+  const meetsMaxThresholdOnCurrentPost = Boolean(
     campaign?.maxReward &&
       (maxLikesRequired === undefined || actualLikes >= maxLikesRequired),
   );
@@ -154,8 +154,10 @@ export default function PostagensPage() {
     selectedRewardTier === 'MAX' && campaign?.maxReward
       ? campaign.maxReward
       : campaign?.baseReward || selectedPost?.discountEarned || 'Brinde';
-  const canApproveSelectedTier =
-    selectedRewardTier === 'MAX' ? canApproveMax : canApproveBase;
+  const selectedTierReachedOnCurrentPost =
+    selectedRewardTier === 'MAX'
+      ? meetsMaxThresholdOnCurrentPost
+      : meetsBaseThresholdOnCurrentPost;
   const hasReachedMonthlyParticipationLimit = Boolean(
     hasMonthlyParticipationLimit &&
       monthlyParticipationLimit !== null &&
@@ -383,7 +385,7 @@ export default function PostagensPage() {
                     <span className="font-bold text-primary-600 flex items-center gap-1"><Tag className="w-3 h-3"/> {selectedPost.discountEarned || 'Brinde'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Likes atuais</span>
+                    <span className="text-slate-500">Likes desta postagem</span>
                     <span className="font-medium text-slate-900">{actualLikes}</span>
                   </div>
               </div>
@@ -437,8 +439,10 @@ export default function PostagensPage() {
                       </div>
                       <div className="text-right text-xs text-slate-500">
                         <div>Meta: {baseLikesRequired} likes</div>
-                        <div className={canApproveBase ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
-                          {canApproveBase ? 'Meta atingida' : 'Meta pendente'}
+                        <div className={meetsBaseThresholdOnCurrentPost ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
+                          {meetsBaseThresholdOnCurrentPost
+                            ? 'Nesta postagem: meta atingida'
+                            : 'Nesta postagem: abaixo da meta'}
                         </div>
                       </div>
                     </div>
@@ -472,8 +476,10 @@ export default function PostagensPage() {
                           <div>
                             Meta: {maxLikesRequired !== undefined ? `${maxLikesRequired} likes` : 'sem meta configurada'}
                           </div>
-                          <div className={canApproveMax ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
-                            {canApproveMax ? 'Meta atingida' : 'Meta pendente'}
+                          <div className={meetsMaxThresholdOnCurrentPost ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
+                            {meetsMaxThresholdOnCurrentPost
+                              ? 'Nesta postagem: meta atingida'
+                              : 'Nesta postagem: abaixo da meta'}
                           </div>
                         </div>
                       </div>
@@ -481,7 +487,9 @@ export default function PostagensPage() {
                   ) : null}
 
                   <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                    A aprovacao continua manual, mas o sistema agora respeita a meta de likes configurada na campanha para liberar cada variacao.
+                    A aprovacao continua manual, mas a validacao final e feita no backend
+                    com os likes acumulados do cliente na campanha. Os likes exibidos aqui
+                    representam apenas esta postagem.
                   </div>
                 </div>
               )}
@@ -504,7 +512,6 @@ export default function PostagensPage() {
                     disabled={
                       rejectMutation.isPending ||
                       approveMutation.isPending ||
-                      !canApproveSelectedTier ||
                       hasReachedMonthlyParticipationLimit
                     }
                     onClick={() =>
@@ -520,11 +527,11 @@ export default function PostagensPage() {
                 </div>
               )}
 
-              {selectedPost.status === 'pending' && !canApproveSelectedTier ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {selectedPost.status === 'pending' && !selectedTierReachedOnCurrentPost ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                   {selectedRewardTier === 'MAX'
-                    ? `Essa postagem ainda nao atingiu a meta de ${maxLikesRequired ?? 0} likes para liberar a recompensa maxima.`
-                    : `Essa postagem ainda nao atingiu a meta minima de ${baseLikesRequired} likes para ser aprovada com a recompensa base.`}
+                    ? `Esta postagem isolada ainda nao atingiu a meta de ${maxLikesRequired ?? 0} likes para a recompensa maxima, mas o backend considera o total acumulado do cliente na campanha ao aprovar.`
+                    : `Esta postagem isolada ainda nao atingiu a meta minima de ${baseLikesRequired} likes, mas o backend considera o total acumulado do cliente na campanha ao aprovar.`}
                 </div>
               ) : null}
 
