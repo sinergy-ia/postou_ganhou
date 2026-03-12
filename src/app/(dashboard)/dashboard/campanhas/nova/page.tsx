@@ -59,6 +59,13 @@ const defaultFormData: CampaignFormState = {
   isActive: true,
 };
 
+const campaignTypeOptions = [
+  { value: 'story', label: 'Apenas Stories', disabled: false },
+  { value: 'feed', label: 'Feed (em breve)', disabled: true },
+  { value: 'reels', label: 'Reels (em breve)', disabled: true },
+  { value: 'all', label: 'Todas as modalidades (em breve)', disabled: true },
+] as const;
+
 const modalitySections = [
   {
     key: 'story',
@@ -270,6 +277,7 @@ function CampaignForm() {
     [campaignToEdit],
   );
   const formData = draftFormData ?? initialFormData;
+  const visibleModalitySections = getActiveModalitySections(formData.type);
   const activeCampaigns = (activeCampaignsData?.items ?? []) as ActiveCampaignListItem[];
   const activeCampaignsCount = activeCampaigns.filter((campaign) => {
     if (!campaignId) {
@@ -481,13 +489,14 @@ function CampaignForm() {
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               >
-                <option value="story">Apenas Stories</option>
-                <option value="feed">Apenas Feed</option>
-                <option value="reels">Apenas Reels</option>
-                <option value="all">Todas as modalidades</option>
+                {campaignTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-slate-500 mt-1">
-                Escolha se a campanha vai contar story, feed, reels ou combinar tudo no mesmo cupom.
+                No momento, campanhas com story estao disponiveis. Feed, reels e combinacao de modalidades entram em breve.
               </p>
               {formData.type === 'story' || formData.type === 'all' ? (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -511,7 +520,7 @@ function CampaignForm() {
             </div>
 
             <div className="md:col-span-2 space-y-4">
-              {modalitySections.map((section) => {
+              {visibleModalitySections.map((section) => {
                 const isEnabled = section.campaignTypes.includes(
                   formData.type as CampaignTypeOption,
                 );
