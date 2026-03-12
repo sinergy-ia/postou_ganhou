@@ -50,12 +50,12 @@ export default function ResultadosPage() {
 
   const { data: metrics } = useQuery({
     queryKey: ["dashboard-metrics"],
-    queryFn: establishmentApi.getMetrics,
+    queryFn: () => establishmentApi.getMetrics(),
   });
 
   const { data: insightsData } = useQuery({
     queryKey: ["dashboard-insights"],
-    queryFn: establishmentApi.getAnalyticsInsights,
+    queryFn: () => establishmentApi.getAnalyticsInsights(),
     enabled: canAccessAdvancedAnalytics,
   });
 

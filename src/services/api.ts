@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 import Cookies from "js-cookie";
 
 export type AuthTokenType = "establishment" | "client";
@@ -45,10 +45,10 @@ function resolveTokenType(url?: string): AuthTokenType | null {
 
 api.interceptors.request.use((config) => {
   const tokenType = resolveTokenType(config.url);
-  const headers = (config.headers ?? {}) as Record<string, string>;
+  const headers = AxiosHeaders.from(config.headers);
 
   if (!tokenType) {
-    delete headers.Authorization;
+    headers.delete("Authorization");
     config.headers = headers;
     return config;
   }
@@ -56,9 +56,9 @@ api.interceptors.request.use((config) => {
   const token = Cookies.get(TOKEN_COOKIE_KEY[tokenType]);
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    headers.set("Authorization", `Bearer ${token}`);
   } else {
-    delete headers.Authorization;
+    headers.delete("Authorization");
   }
 
   config.headers = headers;

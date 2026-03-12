@@ -2,13 +2,18 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { clientApi } from '@/services/client-api';
+import {
+  clearClientInstagramOAuthState,
+  clientApi,
+  readClientInstagramOAuthState,
+} from '@/services/client-api';
 import { Loader2 } from 'lucide-react';
 
 function InstagramCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
+  const state = searchParams.get('state');
   const hasProviderError = Boolean(
     searchParams.get('error') || searchParams.get('error_reason'),
   );
@@ -18,18 +23,28 @@ function InstagramCallbackContent() {
 
   useEffect(() => {
     if (code) {
-      clientApi.instagramCallback(code)
+      const expectedState = readClientInstagramOAuthState();
+
+      if (expectedState && state !== expectedState) {
+        clearClientInstagramOAuthState();
+        setError('Falha ao validar a autenticacao do Instagram. Tente novamente.');
+        return;
+      }
+
+      clientApi.instagramCallback(code, state || undefined)
         .then(() => {
           router.push('/carteira');
         })
         .catch((err) => {
           console.error(err);
+          clearClientInstagramOAuthState();
           setError('Falha ao autenticar com o Instagram. Tente novamente.');
         });
     } else if (!hasProviderError) {
+      clearClientInstagramOAuthState();
       router.push('/');
     }
-  }, [code, hasProviderError, router]);
+  }, [code, hasProviderError, router, state]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
