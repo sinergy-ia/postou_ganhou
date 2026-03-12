@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { api } from "./api";
+import { api, extractAuthToken, setAuthToken } from "./api";
 import {
   normalizeClient,
   normalizeCoupon,
@@ -99,14 +99,15 @@ export const clientApi = {
     const { data } = await api.get("/api/auth/client/callback", {
       params: { code, state },
     });
-
-    import("./api").then(({ setAuthToken }) =>
-      setAuthToken(data.token, "client"),
-    );
+    const token = extractAuthToken(data);
+    if (token) {
+      setAuthToken(token, "client");
+    }
     clearClientInstagramOAuthState();
 
     return {
       ...data,
+      token,
       client: normalizeClientProfile(data?.client),
     };
   },

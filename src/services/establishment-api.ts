@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { api, setAuthToken } from "./api";
+import { api, extractAuthToken, setAuthToken } from "./api";
 import {
   formatCompactNumber,
   formatPercentage,
@@ -314,17 +314,26 @@ function normalizeCampaignPayload(payload: Record<string, any>) {
   };
 }
 
+function persistEstablishmentToken(payload: unknown) {
+  const token = extractAuthToken(payload);
+
+  if (token) {
+    setAuthToken(token, "establishment");
+  }
+
+  return token;
+}
+
 export const establishmentApi = {
   login: async (credentials: { email: string; password?: string }) => {
     const { data } = await api.post<EstablishmentLoginResponse>(
       "/api/auth/establishment/login",
       credentials,
     );
-    if (data.token) {
-      setAuthToken(data.token, "establishment");
-    }
+    const token = persistEstablishmentToken(data);
     return {
       ...data,
+      token,
       establishment: normalizeEstablishment(data?.establishment),
       memberships: Array.isArray(data?.memberships) ? data.memberships : [],
     };
@@ -337,12 +346,11 @@ export const establishmentApi = {
     password?: string;
   }) => {
     const { data } = await api.post("/api/auth/establishment/register", payload);
-    if (data.token) {
-      setAuthToken(data.token, "establishment");
-    }
+    const token = persistEstablishmentToken(data);
 
     return {
       ...data,
+      token,
       establishment: normalizeEstablishment(data?.establishment),
     };
   },
@@ -374,12 +382,11 @@ export const establishmentApi = {
     const { data } = await api.get("/api/auth/facebook/callback", {
       params: { code, state, provider, redirect: false },
     });
-    if (data.token) {
-      setAuthToken(data.token, "establishment");
-    }
+    const token = persistEstablishmentToken(data);
 
     return {
       ...data,
+      token,
       establishment: normalizeEstablishment(data?.establishment),
     };
   },
@@ -716,11 +723,10 @@ export const establishmentApi = {
       "/api/auth/establishment/select-membership",
       payload,
     );
-    if (data.token) {
-      setAuthToken(data.token, "establishment");
-    }
+    const token = persistEstablishmentToken(data);
     return {
       ...data,
+      token,
       establishment: normalizeEstablishment(data?.establishment),
     };
   },
@@ -742,11 +748,10 @@ export const establishmentApi = {
       "/api/auth/establishment/invite",
       payload,
     );
-    if (data.token) {
-      setAuthToken(data.token, "establishment");
-    }
+    const token = persistEstablishmentToken(data);
     return {
       ...data,
+      token,
       establishment: normalizeEstablishment(data?.establishment),
     };
   },

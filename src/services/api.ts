@@ -12,6 +12,20 @@ export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
 });
 
+function isTokenlessAuthRoute(path: string) {
+  return (
+    path === "/api/auth/establishment/login" ||
+    path === "/api/auth/establishment/register" ||
+    path === "/api/auth/establishment/forgot-password" ||
+    path === "/api/auth/establishment/reset-password" ||
+    path === "/api/auth/establishment/invite" ||
+    path === "/api/auth/establishment/select-membership" ||
+    path === "/api/auth/client/instagram" ||
+    path === "/api/auth/client/callback" ||
+    path === "/api/auth/facebook/callback"
+  );
+}
+
 function normalizeApiPath(url?: string) {
   if (!url) {
     return "";
@@ -27,16 +41,15 @@ function normalizeApiPath(url?: string) {
 function resolveTokenType(url?: string): AuthTokenType | null {
   const path = normalizeApiPath(url);
 
-  if (
-    !path.startsWith("/api") ||
-    path.startsWith("/api/public") ||
-    path.startsWith("/api/auth/") ||
-    path.startsWith("/api/webhooks")
-  ) {
+  if (!path.startsWith("/api") || path.startsWith("/api/public") || path.startsWith("/api/webhooks")) {
     return null;
   }
 
-  if (path.startsWith("/api/client")) {
+  if (isTokenlessAuthRoute(path)) {
+    return null;
+  }
+
+  if (path.startsWith("/api/client") || path.startsWith("/api/auth/client")) {
     return "client";
   }
 
@@ -81,4 +94,43 @@ export function setAuthToken(
 
 export function getAuthToken(type: AuthTokenType = "establishment") {
   return Cookies.get(TOKEN_COOKIE_KEY[type]);
+}
+
+function readTokenCandidate(value: unknown, depth = 0): string | undefined {
+  if (depth > 3 || value == null) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    const token = value.trim();
+    return token || undefined;
+  }
+
+  if (typeof value !== "object") {
+    return undefined;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const tokenKeys = ["token", "accessToken", "access_token", "jwt"];
+  const nestedKeys = ["data", "result", "payload"];
+
+  for (const key of tokenKeys) {
+    const token = readTokenCandidate(payload[key], depth + 1);
+    if (token) {
+      return token;
+    }
+  }
+
+  for (const key of nestedKeys) {
+    const token = readTokenCandidate(payload[key], depth + 1);
+    if (token) {
+      return token;
+    }
+  }
+
+  return undefined;
+}
+
+export function extractAuthToken(payload: unknown) {
+  return readTokenCandidate(payload);
 }
