@@ -100,7 +100,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <div key={n.id} className={`p-4 border-b border-slate-50 text-sm ${!n.read ? 'bg-primary-50' : 'bg-white'}`}>
                           <div className="font-medium text-slate-900 mb-1">{n.title}</div>
                           <div className="text-slate-600">{n.message}</div>
-                          <div className="text-xs text-slate-400 mt-2">{new Date(n.createdAt).toLocaleDateString('pt-BR')}</div>
+                          <div className="text-xs text-slate-400 mt-2">
+                            {n.createdAt ? new Date(n.createdAt).toLocaleDateString('pt-BR') : ''}
+                          </div>
                         </div>
                       ))
                     )}
