@@ -225,6 +225,13 @@ function normalizeMediaSelection(
     };
   }
 
+  if (postType === "STORY") {
+    return {
+      generateImage: true,
+      generateVideo: false,
+    };
+  }
+
   if (generateImage && generateVideo) {
     return {
       generateImage: true,
@@ -557,13 +564,29 @@ function getPostTypeLabel(postType?: string | null) {
 function getMediaRecommendation(postType: AiPostType) {
   switch (postType) {
     case "STORY":
-      return "Story costuma performar melhor com arte vertical ou vídeo curto.";
+      return "Story, neste fluxo, deve ser gerado apenas com imagem vertical.";
     case "REELS":
       return "Reels exige vídeo, então mantenha a geração de vídeo ativa.";
     case "FEED":
     default:
       return "Feed pode sair como imagem ou video, de acordo com a estrategia.";
   }
+}
+
+function StoryPremisesBalloons() {
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        No fluxo de Story, a postagem deve ser gerada apenas com imagem.
+        Videos para story ainda nao entram neste fluxo.
+      </div>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Como premissa, o cliente precisa fazer a marcacao da hashtag e do
+        arroba de forma visivel no story. Nao pode usar escrita transparente,
+        branca, escondida ou muito pequena.
+      </div>
+    </div>
+  );
 }
 
 function toDatetimeLocalValue(value?: string | null) {
@@ -810,6 +833,12 @@ export default function PublicacoesIaPage() {
         throw new Error("Publicações do tipo reels precisam de geração de vídeo.");
       }
 
+      if (generateForm.postType === "STORY" && !generateForm.generateImage) {
+        throw new Error(
+          "Publicações do tipo story, neste fluxo, precisam ser geradas apenas com imagem.",
+        );
+      }
+
       return establishmentApi.generateAiPost({
         mode: generateForm.mode,
         campaignId:
@@ -1020,6 +1049,15 @@ export default function PublicacoesIaPage() {
       setFeedback({
         type: "error",
         message: "Rascunhos do tipo reels precisam de geração de vídeo.",
+      });
+      return false;
+    }
+
+    if (currentDraft.postType === "STORY" && !currentDraft.generateImage) {
+      setFeedback({
+        type: "error",
+        message:
+          "Rascunhos do tipo story, neste fluxo, precisam ser mantidos apenas com imagem.",
       });
       return false;
     }
@@ -1353,15 +1391,23 @@ export default function PublicacoesIaPage() {
                 />
                 <span className="text-sm text-slate-700">
                   <span className="block font-bold text-slate-900">Gerar imagem</span>
-                  Use quando quiser uma arte fixa para feed ou story.
+                  Use quando quiser uma arte fixa para feed ou story. Em story,
+                  este e o formato disponivel neste fluxo.
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <label
+                className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
+                  generateForm.postType === "STORY"
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
                 <input
                   type="radio"
                   name="generate-media-type"
                   checked={generateForm.generateVideo}
+                  disabled={generateForm.postType === "STORY"}
                   onChange={() =>
                     setGenerateForm((current) => ({
                       ...current,
@@ -1371,12 +1417,21 @@ export default function PublicacoesIaPage() {
                   }
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                 />
-                <span className="text-sm text-slate-700">
+                <span
+                  className={`text-sm ${
+                    generateForm.postType === "STORY"
+                      ? "text-slate-500"
+                      : "text-slate-700"
+                  }`}
+                >
                   <span className="block font-bold text-slate-900">Gerar vídeo</span>
-                  Ative para reels ou quando quiser motion no feed ou story.
+                  Ative para reels ou quando quiser motion no feed. Story ainda
+                  nao aceita video neste fluxo.
                 </span>
               </label>
             </div>
+
+            {generateForm.postType === "STORY" ? <StoryPremisesBalloons /> : null}
           </div>
 
           {generateForm.mode === "CAMPAIGN" ? (
@@ -2008,32 +2063,53 @@ export default function PublicacoesIaPage() {
                                 <span className="block font-bold text-slate-900">
                                   Gerar imagem
                                 </span>
-                                Use quando quiser uma arte fixa para feed ou story.
+                                Use quando quiser uma arte fixa para feed ou
+                                story. Em story, este e o formato disponivel
+                                neste fluxo.
                               </span>
                             </label>
 
-                            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <label
+                              className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
+                                currentDraft.postType === "STORY"
+                                  ? "cursor-not-allowed border-slate-200 bg-slate-100"
+                                  : "border-slate-200 bg-white"
+                              }`}
+                            >
                               <input
                                 type="radio"
                                 name={`draft-media-type-${selectedPost?.id || "default"}`}
                                 checked={currentDraft.generateVideo}
+                                disabled={
+                                  currentDraft.postType === "STORY" || !canEditAiPosts
+                                }
                                 onChange={() =>
                                   updateDraft({
                                     generateImage: false,
                                     generateVideo: true,
                                   })
                                 }
-                                disabled={!canEditAiPosts}
                                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                               />
-                              <span className="text-sm text-slate-700">
+                              <span
+                                className={`text-sm ${
+                                  currentDraft.postType === "STORY"
+                                    ? "text-slate-500"
+                                    : "text-slate-700"
+                                }`}
+                              >
                                 <span className="block font-bold text-slate-900">
                                   Gerar vídeo
                                 </span>
-                                Ative para reels ou quando quiser motion no feed ou story.
+                                Ative para reels ou quando quiser motion no
+                                feed. Story ainda nao aceita video neste fluxo.
                               </span>
                             </label>
                           </div>
+
+                          {currentDraft.postType === "STORY" ? (
+                            <StoryPremisesBalloons />
+                          ) : null}
                         </div>
 
                         <div className="md:col-span-2">
