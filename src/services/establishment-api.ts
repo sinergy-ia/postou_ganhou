@@ -4,10 +4,12 @@ import { api, setAuthToken } from "./api";
 import {
   formatCompactNumber,
   formatPercentage,
+  getEntityId,
   normalizeCampaign,
   normalizeCoupon,
   normalizeDashboardCharts,
   normalizeEstablishment,
+  normalizeCampaignType,
   normalizeParticipation,
   toBackendCampaignType,
 } from "./marque-e-ganhe-normalizers";
@@ -106,21 +108,207 @@ export interface EstablishmentTeamUser {
   updatedAt?: string;
 }
 
+type AnalyticsScopeParams = {
+  establishmentId?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export type AiPostMode = "CAMPAIGN" | "EDITORIAL";
+export type AiPostType = "STORY" | "FEED" | "REELS";
+export type AiVideoDurationSeconds = 4 | 6 | 8;
+
+export interface AiPostMediaItem {
+  id?: string;
+  url: string;
+  type: string;
+  mimeType?: string;
+}
+
+export interface AiPostRecord {
+  id: string;
+  _id: string;
+  status: string;
+  mode: string;
+  postType: string;
+  generateImage: boolean;
+  generateVideo: boolean;
+  durationSeconds?: AiVideoDurationSeconds;
+  imagePrompt: string;
+  videoPrompt: string;
+  prompt: string;
+  topic: string;
+  briefing: string;
+  targetAudience: string;
+  callToAction: string;
+  caption: string;
+  hashtags: string[];
+  publishPreview: string;
+  media: AiPostMediaItem[];
+  timezone: string;
+  scheduledAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  campaignId?: string;
+  campaign?: Record<string, any> | null;
+}
+
+function normalizeAiPost(record: Record<string, any> | null | undefined): AiPostRecord | null {
+  if (!record) {
+    return null;
+  }
+
+  const id = getEntityId(record);
+  const hashtags = Array.isArray(record.hashtags)
+    ? record.hashtags.map((item) => String(item || "").trim()).filter(Boolean)
+    : typeof record.hashtags === "string"
+      ? record.hashtags
+          .split(/[\s,]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+  const media = Array.isArray(record.media)
+    ? record.media
+        .map((item) => {
+          if (typeof item === "string") {
+            return {
+              url: item,
+              type: "IMAGE",
+            };
+          }
+
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const url = String(item.url ?? item.mediaUrl ?? item.publicUrl ?? "").trim();
+
+          if (!url) {
+            return null;
+          }
+
+          return {
+            id: getEntityId(item),
+            url,
+            type: String(item.type ?? item.mediaType ?? "IMAGE").toUpperCase(),
+            mimeType: String(item.mimeType ?? item.contentType ?? "").trim() || undefined,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    ...record,
+    id,
+    _id: id,
+    status: String(record.status || "READY").toUpperCase(),
+    mode: String(record.mode || "EDITORIAL").toUpperCase(),
+    postType: String(record.postType || "FEED").toUpperCase(),
+    generateImage: Boolean(record.generateImage),
+    generateVideo: Boolean(record.generateVideo),
+    durationSeconds:
+      record.durationSeconds === 4 || record.durationSeconds === 6 || record.durationSeconds === 8
+        ? record.durationSeconds
+        : undefined,
+    imagePrompt: String(record.imagePrompt || ""),
+    videoPrompt: String(record.videoPrompt || ""),
+    prompt: String(record.prompt || ""),
+    topic: String(record.topic || ""),
+    briefing: String(record.briefing || ""),
+    targetAudience: String(record.targetAudience || ""),
+    callToAction: String(record.callToAction || ""),
+    caption: String(record.caption || record.publishPreview || ""),
+    hashtags,
+    publishPreview: String(record.publishPreview || record.caption || ""),
+    media: media as AiPostMediaItem[],
+    timezone: String(record.timezone || "America/Sao_Paulo"),
+    scheduledAt: record.scheduledAt ? String(record.scheduledAt) : undefined,
+    createdAt: record.createdAt ? String(record.createdAt) : undefined,
+    updatedAt: record.updatedAt ? String(record.updatedAt) : undefined,
+    campaignId: String(record.campaignId ?? record.campaign?.id ?? record.campaign?._id ?? ""),
+    campaign: normalizeCampaign(record.campaign),
+  };
+}
+
 function normalizeCampaignPayload(payload: Record<string, any>) {
-  const normalizeThreshold = (value: unknown) => {
-    if (value === "" || value === null || value === undefined) {
-      return undefined;
+  const normalizeReward = (value: unknown) => String(value || "").trim();
+  const normalizeQuantity = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return Math.trunc(value);
     }
 
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      const parsed = Number(trimmed.replace(",", "."));
+      return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : undefined;
+    }
+
+    return undefined;
   };
+  const normalizedType = normalizeCampaignType(payload?.type);
+  const enabledModalities =
+    normalizedType === "all"
+      ? ["story", "feed", "reels"]
+      : [normalizedType];
+  const isModalityEnabled = (modality: string) => enabledModalities.includes(modality);
+  const storyBaseReward = normalizeReward(payload?.storyBaseReward);
+  const storyMaxReward = normalizeReward(payload?.storyMaxReward);
+  const feedBaseReward = normalizeReward(payload?.feedBaseReward);
+  const feedMaxReward = normalizeReward(payload?.feedMaxReward);
+  const reelsBaseReward = normalizeReward(payload?.reelsBaseReward);
+  const reelsMaxReward = normalizeReward(payload?.reelsMaxReward);
+  const storyBaseQuantity = normalizeQuantity(payload?.storyBaseQuantity);
+  const storyMaxQuantity = normalizeQuantity(payload?.storyMaxQuantity);
+  const feedBaseQuantity = normalizeQuantity(payload?.feedBaseQuantity);
+  const feedMaxQuantity = normalizeQuantity(payload?.feedMaxQuantity);
+  const reelsBaseQuantity = normalizeQuantity(payload?.reelsBaseQuantity);
+  const reelsMaxQuantity = normalizeQuantity(payload?.reelsMaxQuantity);
 
   return {
     ...payload,
     type: toBackendCampaignType(payload?.type),
-    baseLikesRequired: normalizeThreshold(payload?.baseLikesRequired) ?? 0,
-    maxLikesRequired: normalizeThreshold(payload?.maxLikesRequired),
+    storyBaseReward: isModalityEnabled("story") ? storyBaseReward : undefined,
+    storyBaseQuantity: isModalityEnabled("story") ? storyBaseQuantity : undefined,
+    storyMaxReward:
+      isModalityEnabled("story") && storyMaxReward && storyMaxQuantity !== undefined
+        ? storyMaxReward
+        : undefined,
+    storyMaxQuantity:
+      isModalityEnabled("story") && storyMaxReward && storyMaxQuantity !== undefined
+        ? storyMaxQuantity
+        : undefined,
+    feedBaseReward: isModalityEnabled("feed") ? feedBaseReward : undefined,
+    feedBaseQuantity: isModalityEnabled("feed") ? feedBaseQuantity : undefined,
+    feedMaxReward:
+      isModalityEnabled("feed") && feedMaxReward && feedMaxQuantity !== undefined
+        ? feedMaxReward
+        : undefined,
+    feedMaxQuantity:
+      isModalityEnabled("feed") && feedMaxReward && feedMaxQuantity !== undefined
+        ? feedMaxQuantity
+        : undefined,
+    reelsBaseReward: isModalityEnabled("reels") ? reelsBaseReward : undefined,
+    reelsBaseQuantity: isModalityEnabled("reels") ? reelsBaseQuantity : undefined,
+    reelsMaxReward:
+      isModalityEnabled("reels") && reelsMaxReward && reelsMaxQuantity !== undefined
+        ? reelsMaxReward
+        : undefined,
+    reelsMaxQuantity:
+      isModalityEnabled("reels") && reelsMaxReward && reelsMaxQuantity !== undefined
+        ? reelsMaxQuantity
+        : undefined,
+    rewardByType: undefined,
+    storyReward: undefined,
+    feedReward: undefined,
+    reelsReward: undefined,
+    baseLikesRequired: undefined,
+    maxLikesRequired: undefined,
+    baseReward: undefined,
+    maxReward: undefined,
     badges: Array.isArray(payload?.badges) ? payload.badges.filter(Boolean) : [],
     rules: Array.isArray(payload?.rules) ? payload.rules.filter(Boolean) : [],
   };
@@ -201,8 +389,8 @@ export const establishmentApi = {
     return normalizeEstablishment(data);
   },
 
-  getMetrics: async (): Promise<Metric> => {
-    const { data } = await api.get("/api/dashboard/metrics");
+  getMetrics: async (params?: AnalyticsScopeParams): Promise<Metric> => {
+    const { data } = await api.get("/api/dashboard/metrics", { params });
     return {
       activeCampaigns: Number(data?.activeCampaigns || 0),
       totalPosts: Number(data?.totalParticipations ?? data?.totalPosts ?? 0),
@@ -212,7 +400,7 @@ export const establishmentApi = {
     };
   },
 
-  getCharts: async (params?: { startDate?: string; endDate?: string }) => {
+  getCharts: async (params?: AnalyticsScopeParams) => {
     const { data } = await api.get("/api/dashboard/charts", { params });
     return normalizeDashboardCharts(data);
   },
@@ -276,7 +464,7 @@ export const establishmentApi = {
 
   approveParticipation: async (
     id: string,
-    payload?: { rewardTier?: "BASE" | "MAX"; discountEarned?: string },
+    payload?: Record<string, any>,
   ) => {
     const { data } = await api.post(`/api/participations/${id}/approve`, payload);
     return data;
@@ -316,8 +504,8 @@ export const establishmentApi = {
     return data;
   },
 
-  getAnalyticsRoi: async () => {
-    const { data } = await api.get("/api/analytics/roi");
+  getAnalyticsRoi: async (params?: AnalyticsScopeParams) => {
+    const { data } = await api.get("/api/analytics/roi", { params });
     return {
       ...data,
       roi: formatPercentage(data?.estimatedRoiPercentage),
@@ -326,8 +514,8 @@ export const establishmentApi = {
     };
   },
 
-  getAnalyticsConversion: async () => {
-    const { data } = await api.get("/api/analytics/conversion");
+  getAnalyticsConversion: async (params?: AnalyticsScopeParams) => {
+    const { data } = await api.get("/api/analytics/conversion", { params });
     return {
       ...data,
       approvalRate: Number(data?.rates?.approvalRate || 0),
@@ -337,12 +525,97 @@ export const establishmentApi = {
     };
   },
 
-  getAnalyticsInsights: async () => {
-    const { data } = await api.get("/api/analytics/insights");
+  getAnalyticsInsights: async (params?: AnalyticsScopeParams) => {
+    const { data } = await api.get("/api/analytics/insights", { params });
     return {
       ...data,
       cards: Array.isArray(data?.cards) ? data.cards : [],
     };
+  },
+
+  generateAiPost: async (payload: {
+    mode: AiPostMode;
+    campaignId?: string;
+    postType: AiPostType;
+    prompt: string;
+    topic?: string;
+    briefing?: string;
+    targetAudience?: string;
+    callToAction?: string;
+    timezone?: string;
+    generateImage?: boolean;
+    generateVideo?: boolean;
+    durationSeconds?: AiVideoDurationSeconds;
+    imagePrompt?: string;
+    videoPrompt?: string;
+  }) => {
+    const { data } = await api.post("/api/ai-posts/generate", payload);
+    return normalizeAiPost(data);
+  },
+
+  getAiPosts: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    mode?: string;
+    postType?: string;
+  }) => {
+    const { data } = await api.get("/api/ai-posts", { params });
+    return {
+      ...data,
+      items: Array.isArray(data?.items)
+        ? data.items.map((item: any) => normalizeAiPost(item)).filter(Boolean)
+        : [],
+      total: Number(data?.total || 0),
+    };
+  },
+
+  getAiPost: async (id: string) => {
+    const { data } = await api.get(`/api/ai-posts/${id}`);
+    return normalizeAiPost(data);
+  },
+
+  updateAiPost: async (
+    id: string,
+    payload: {
+      mode?: AiPostMode;
+      campaignId?: string;
+      postType?: AiPostType;
+      prompt?: string;
+      topic?: string;
+      briefing?: string;
+      targetAudience?: string;
+      callToAction?: string;
+      generateImage?: boolean;
+      generateVideo?: boolean;
+      durationSeconds?: AiVideoDurationSeconds;
+      imagePrompt?: string;
+      videoPrompt?: string;
+      caption?: string;
+      hashtags?: string[];
+      timezone?: string;
+    },
+  ) => {
+    const { data } = await api.patch(`/api/ai-posts/${id}`, payload);
+    return normalizeAiPost(data);
+  },
+
+  publishAiPostNow: async (id: string) => {
+    const { data } = await api.post(`/api/ai-posts/${id}/publish-now`);
+    return normalizeAiPost(data);
+  },
+
+  scheduleAiPost: async (
+    id: string,
+    payload: { scheduledAt: string; timezone?: string },
+  ) => {
+    const { data } = await api.post(`/api/ai-posts/${id}/schedule`, payload);
+    return normalizeAiPost(data);
+  },
+
+  cancelAiPost: async (id: string) => {
+    const { data } = await api.post(`/api/ai-posts/${id}/cancel`);
+    return normalizeAiPost(data);
   },
 
   getSettings: async () => {

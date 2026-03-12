@@ -1,13 +1,48 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Camera, Heart, Tag, Search, Filter, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { publicApi } from '@/services/public-api';
 
+const filters = ['Recentes', 'Mais Curtidos', 'Restaurantes', 'Lojas'] as const;
+
+type GalleryFilter = (typeof filters)[number];
+
+function normalizeText(value?: string | null) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isRestaurantCategory(category?: string | null) {
+  const normalizedCategory = normalizeText(category);
+
+  return [
+    'restaurante',
+    'cafeteria',
+    'hamburgueria',
+    'pizzaria',
+    'lanchonete',
+    'bar',
+    'food'
+  ].some(keyword => normalizedCategory.includes(keyword));
+}
+
+function getCreatedAtTimestamp(value?: string | null) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 export default function GaleriaPage() {
-  const [activeFilter, setActiveFilter] = useState('Recentes');
-  const filters = ['Recentes', 'Mais Curtidos', 'Restaurantes', 'Lojas'];
+  const [activeFilter, setActiveFilter] = useState<GalleryFilter>('Recentes');
+  const [brokenImageUrls, setBrokenImageUrls] = useState<string[]>([]);
 
   const { data: galleryData, isLoading } = useQuery({
     queryKey: ['public-gallery'],
@@ -15,7 +50,50 @@ export default function GaleriaPage() {
   });
 
   const posts = galleryData?.items || [];
-  const topPosts = [...posts].sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 3);
+
+  const filteredPosts = useMemo(() => {
+    const items = [...posts];
+
+    switch (activeFilter) {
+      case 'Mais Curtidos':
+        return items.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+      case 'Restaurantes':
+        return items.filter((post: any) => isRestaurantCategory(post.establishment?.category));
+      case 'Lojas':
+        return items.filter((post: any) => {
+          const category = normalizeText(post.establishment?.category);
+          return Boolean(category) && !isRestaurantCategory(category);
+        });
+      case 'Recentes':
+      default:
+        return items.sort(
+          (a, b) => getCreatedAtTimestamp(b.createdAt) - getCreatedAtTimestamp(a.createdAt)
+        );
+    }
+  }, [activeFilter, posts]);
+
+  const visiblePosts = useMemo(
+    () =>
+      filteredPosts.filter(
+        (post: any) => Boolean(post.imageUrl) && !brokenImageUrls.includes(post.imageUrl)
+      ),
+    [brokenImageUrls, filteredPosts]
+  );
+
+  const topPosts = useMemo(
+    () => [...visiblePosts].sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 3),
+    [visiblePosts]
+  );
+
+  const handleBrokenPostImage = (imageUrl?: string | null) => {
+    if (!imageUrl) {
+      return;
+    }
+
+    setBrokenImageUrls((current) =>
+      current.includes(imageUrl) ? current : [...current, imageUrl]
+    );
+  };
 
   return (
     <div className="bg-slate-50 min-h-screen pb-24">
@@ -55,17 +133,22 @@ export default function GaleriaPage() {
             <div className="col-span-full flex justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
             </div>
-          ) : posts.length === 0 ? (
+          ) : visiblePosts.length === 0 ? (
             <div className="col-span-full text-center py-12 text-slate-500">
               Nenhuma participação encontrada.
             </div>
-          ) : posts.map((post: any) => {
+          ) : visiblePosts.map((post: any) => {
             const est = post.establishment || { name: 'Estabelecimento', avatar: 'https://ui-avatars.com/api/?name=EP' };
             
             return (
                <div key={post.id} className="break-inside-avoid bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all group">
                  <div className="relative">
-                   <img src={post.imageUrl} alt="Post do usuário" className="w-full h-auto object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+                   <img
+                     src={post.imageUrl}
+                     alt="Post do usuário"
+                     className="w-full h-auto object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                     onError={() => handleBrokenPostImage(post.imageUrl)}
+                   />
                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5">
                      <Camera className="w-3.5 h-3.5" /> {post.type === 'story' ? 'Story' : 'Post'}
                    </div>

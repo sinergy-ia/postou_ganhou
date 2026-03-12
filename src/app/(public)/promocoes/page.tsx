@@ -11,6 +11,7 @@ import {
   filterPublicSponsoredCards,
 } from '@/lib/sponsored-highlights-public';
 import { sponsoredHighlightsApi } from '@/services/sponsored-highlights-api';
+import { buildCampaignRewardSummary } from '@/services/marque-e-ganhe-normalizers';
 
 interface PromotionEstablishment {
   id?: string;
@@ -26,7 +27,8 @@ interface PromotionCard {
   _id?: string;
   title: string;
   description?: string;
-  baseReward?: string;
+  type?: string;
+  rewardSummary?: string;
   badges?: string[];
   establishment?: PromotionEstablishment;
 }
@@ -218,14 +220,21 @@ export default function PromocoesPage() {
                 <h3 className="font-semibold text-sm text-slate-800 mb-3">Tipo de post</h3>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer group">
-                    <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-600" />
+                    <input type="checkbox" checked readOnly className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-600" />
                     <span className="group-hover:text-primary-600 transition-colors">Story</span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer group">
-                    <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-600" />
-                    <span className="group-hover:text-primary-600 transition-colors">Post no Feed</span>
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" checked readOnly className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-600" />
+                    <span>Feed</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" checked readOnly className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-600" />
+                    <span>Reels</span>
                   </label>
                 </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  As campanhas podem trabalhar com story, feed, reels ou combinar modalidades no mesmo cupom.
+                </p>
               </div>
 
               <div className="pt-4 border-t border-slate-100">
@@ -328,7 +337,9 @@ export default function PromocoesPage() {
                           </div>
                           <span className="text-sm font-medium text-slate-700">Recompensa</span>
                         </div>
-                        <span className="font-bold text-primary-700">{promo.baseReward}</span>
+                        <span className="max-w-[220px] text-right font-bold text-primary-700">
+                          {promo.rewardSummary || buildCampaignRewardSummary(promo)}
+                        </span>
                       </div>
                       
                       {promoId ? (
