@@ -93,7 +93,29 @@ const modalitySections = [
     maxRewardKey: 'reelsMaxReward',
     maxQuantityKey: 'reelsMaxQuantity',
   },
-] as const;
+] as Array<{
+  key: 'story' | 'feed' | 'reels';
+  label: string;
+  quantityLabelSingular: string;
+  quantityLabelPlural: string;
+  campaignTypes: CampaignTypeOption[];
+  baseRewardKey:
+    | 'storyBaseReward'
+    | 'feedBaseReward'
+    | 'reelsBaseReward';
+  baseQuantityKey:
+    | 'storyBaseQuantity'
+    | 'feedBaseQuantity'
+    | 'reelsBaseQuantity';
+  maxRewardKey:
+    | 'storyMaxReward'
+    | 'feedMaxReward'
+    | 'reelsMaxReward';
+  maxQuantityKey:
+    | 'storyMaxQuantity'
+    | 'feedMaxQuantity'
+    | 'reelsMaxQuantity';
+}>;
 
 function getActiveModalitySections(type: string) {
   return modalitySections.filter((section) =>
