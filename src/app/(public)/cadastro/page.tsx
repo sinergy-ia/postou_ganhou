@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { establishmentApi } from '@/services/establishment-api';
-import { Loader2, Facebook, Store, User, Mail, Lock } from 'lucide-react';
+import { Loader2, Store, User, Mail, Lock } from 'lucide-react';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -19,19 +19,6 @@ export default function CadastroPage() {
   // Real registration via API
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-
-  const fbLoginMutation = useMutation({
-    mutationFn: () =>
-      establishmentApi.getFacebookLoginUrl({
-        frontendOrigin:
-          typeof window !== 'undefined' ? window.location.origin : undefined,
-      }),
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    }
-  });
 
   const registerMutation = useMutation({
     mutationFn: establishmentApi.register,
@@ -211,25 +198,6 @@ export default function CadastroPage() {
                   Seu cadastro já começa no plano <span className="font-bold text-slate-700">Free</span>, sem custo fixo para validar a estratégia.
                 </p>
               </div>
-              
-              <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-slate-50 text-slate-500">Ou cadastre-se com</span>
-                </div>
-              </div>
-              
-              <button 
-                type="button" 
-                onClick={() => fbLoginMutation.mutate()}
-                disabled={fbLoginMutation.isPending}
-                className="w-full py-4 bg-[#1877F2] hover:bg-[#1877F2]/90 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {fbLoginMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Facebook className="w-5 h-5" />}
-                Continuar com Facebook
-              </button>
             </form>
           )}
           
