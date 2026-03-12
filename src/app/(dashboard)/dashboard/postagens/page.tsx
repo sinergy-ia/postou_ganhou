@@ -240,6 +240,22 @@ export default function PostagensPage() {
     selectedPost?.discountEarned ||
     selectedModalityConfig.baseReward ||
     'Benefício configurado no backend';
+  const checklistRules = (() => {
+    const baseRules = Array.isArray(selectedPost?.campaign?.rules)
+      ? selectedPost.campaign.rules
+      : [];
+
+    if (selectedPost?.type !== 'story') {
+      return baseRules;
+    }
+
+    const storyRules = [
+      'Na modalidade Story, por enquanto a postagem deve ser apenas com imagem. Videos em story ainda nao entram nesse fluxo.',
+      'A hashtag e o arroba do estabelecimento precisam estar visiveis no story. Nao pode ser escrita transparente, branca, escondida ou muito pequena.',
+    ];
+
+    return [...baseRules, ...storyRules.filter((rule) => !baseRules.includes(rule))];
+  })();
   const hasReachedMonthlyParticipationLimit = Boolean(
     hasMonthlyParticipationLimit &&
       monthlyParticipationLimit !== null &&
@@ -499,8 +515,8 @@ export default function PostagensPage() {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Checklist de Regras</div>
                 <div className="space-y-2">
-                  {(selectedPost.campaign?.rules || []).length > 0 ? (
-                    (selectedPost.campaign?.rules || []).map((rule: string, index: number) => (
+                  {checklistRules.length > 0 ? (
+                    checklistRules.map((rule: string, index: number) => (
                       <label key={`${rule}-${index}`} className="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" defaultChecked className="text-primary-600 rounded focus:ring-primary-600" />
                         {rule}
