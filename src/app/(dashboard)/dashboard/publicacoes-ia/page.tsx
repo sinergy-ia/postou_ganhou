@@ -80,6 +80,10 @@ type CampaignSelectorItem = {
 
 type VideoLanguageOption = "pt-BR" | "en";
 type AiPostsSection = "generate" | "library";
+type FieldSuggestion = {
+  label: string;
+  value: string;
+};
 
 const DEFAULT_TIMEZONE = "America/Sao_Paulo";
 const VIDEO_DURATION_OPTIONS: AiVideoDurationSeconds[] = [4, 6, 8];
@@ -157,6 +161,11 @@ function createDraftStateFromPost(post?: AiPostRecord | null): DraftState {
   }
 
   const parsedVideoPrompt = parseVideoPromptWithLanguage(post.videoPrompt);
+  const mediaConfig = normalizeMediaSelection(
+    String(post.postType || "FEED").toUpperCase() as AiPostType,
+    Boolean(post.generateImage),
+    Boolean(post.generateVideo),
+  );
 
   return {
     postId: post.id,
@@ -170,8 +179,8 @@ function createDraftStateFromPost(post?: AiPostRecord | null): DraftState {
     briefing: post.briefing || "",
     targetAudience: post.targetAudience || "",
     callToAction: post.callToAction || "",
-    generateImage: Boolean(post.generateImage),
-    generateVideo: Boolean(post.generateVideo),
+    generateImage: mediaConfig.generateImage,
+    generateVideo: mediaConfig.generateVideo,
     durationSeconds: post.durationSeconds || 6,
     videoLanguage: parsedVideoPrompt.videoLanguage,
     imagePrompt: post.imagePrompt || "",
@@ -204,6 +213,35 @@ function getDefaultMediaConfig(postType: AiPostType) {
   }
 }
 
+function normalizeMediaSelection(
+  postType: AiPostType,
+  generateImage: boolean,
+  generateVideo: boolean,
+) {
+  if (postType === "REELS") {
+    return {
+      generateImage: false,
+      generateVideo: true,
+    };
+  }
+
+  if (generateImage && generateVideo) {
+    return {
+      generateImage: true,
+      generateVideo: false,
+    };
+  }
+
+  if (!generateImage && !generateVideo) {
+    return getDefaultMediaConfig(postType);
+  }
+
+  return {
+    generateImage,
+    generateVideo,
+  };
+}
+
 const defaultGenerateForm: GenerateFormState = {
   mode: "EDITORIAL",
   campaignId: "",
@@ -221,6 +259,154 @@ const defaultGenerateForm: GenerateFormState = {
   imagePrompt: "",
   videoPrompt: "",
 };
+
+const PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Captar clientes",
+    value:
+      "Crie uma campanha para atrair novos clientes da regiao, destacar o principal beneficio do servico e fechar com CTA forte para WhatsApp ou agendamento.",
+  },
+  {
+    label: "Oferta limitada",
+    value:
+      "Crie uma campanha promocional com senso de urgencia, valor claro, quebra de objecao e chamada direta para aproveitar a oferta hoje.",
+  },
+  {
+    label: "Prova social",
+    value:
+      "Crie uma campanha baseada em resultado real de cliente, reforcando confianca, transformacao percebida e convite para entrar em contato.",
+  },
+  {
+    label: "Gerar autoridade",
+    value:
+      "Crie uma campanha educativa que mostre autoridade no segmento, entregue valor rapido e leve o publico a pedir mais informacoes.",
+  },
+];
+
+const IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Arte de conversao",
+    value:
+      "Crie uma arte vertical para Instagram com titulo curto de alto impacto, hierarquia visual forte, contraste alto, cores da marca e CTA bem visivel.",
+  },
+  {
+    label: "Oferta premium",
+    value:
+      "Crie uma arte promocional premium com foco total na oferta, selo de urgencia, composicao limpa e acabamento profissional para gerar clique e contato.",
+  },
+  {
+    label: "Prova social",
+    value:
+      "Crie uma arte com prova social, visual confiavel, destaque para resultado do cliente e frase curta que transmita credibilidade imediata.",
+  },
+  {
+    label: "Carrossel forte",
+    value:
+      "Crie um layout de carrossel moderno com capa chamativa, blocos de leitura facil no mobile e fechamento visual com chamada para acao.",
+  },
+];
+
+const TOPIC_SUGGESTIONS: FieldSuggestion[] = [
+  { label: "Captacao", value: "captacao de novos clientes na regiao" },
+  { label: "Promocao", value: "oferta limitada com beneficio imediato" },
+  { label: "Autoridade", value: "dica especializada que gera confianca" },
+  { label: "Resultado", value: "resultado real e prova social" },
+];
+
+const CTA_SUGGESTIONS: FieldSuggestion[] = [
+  { label: "WhatsApp", value: "Chame no WhatsApp para agendar agora" },
+  { label: "Vaga", value: "Garanta sua vaga hoje" },
+  { label: "Orcamento", value: "Peca seu orcamento agora" },
+  { label: "Direct", value: "Fale com nossa equipe no direct" },
+];
+
+const TARGET_AUDIENCE_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Novos clientes",
+    value: "pessoas da regiao prontas para contratar nas proximas semanas",
+  },
+  {
+    label: "Seguidores mornos",
+    value: "seguidores que demonstraram interesse, mas ainda nao converteram",
+  },
+  {
+    label: "Comparando opcoes",
+    value: "pessoas que estao comparando opcoes e buscam seguranca para decidir",
+  },
+  {
+    label: "Publico premium",
+    value: "publico que valoriza qualidade, praticidade e atendimento confiavel",
+  },
+];
+
+const BRIEFING_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Conversao",
+    value:
+      "Tom persuasivo, humano e direto, com foco em beneficio claro, baixa friccao e CTA forte no fechamento.",
+  },
+  {
+    label: "Premium",
+    value:
+      "Tom premium e confiavel, destacando valor percebido, exclusividade e atendimento diferenciado.",
+  },
+  {
+    label: "Acolhedor",
+    value:
+      "Tom acolhedor com prova social, reduzindo objecoes e transmitindo seguranca para o primeiro contato.",
+  },
+  {
+    label: "Autoridade",
+    value:
+      "Tom didatico e estrategico, informando com clareza, gerando autoridade e convertendo sem parecer venda agressiva.",
+  },
+];
+
+const VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Alta conversao",
+    value:
+      "Crie um video vertical de alta conversao com gancho forte nos primeiros segundos, cenas dinamicas, texto na tela, beneficio principal bem claro e CTA final para contato.",
+  },
+  {
+    label: "Antes e depois",
+    value:
+      "Crie um video estilo antes e depois com abertura emocional, evidencia visual do resultado e encerramento convidando a chamar no WhatsApp.",
+  },
+  {
+    label: "Oferta urgente",
+    value:
+      "Crie um video promocional com ritmo acelerado, destaque da oferta, reforco de valor percebido, urgencia elegante e fechamento com CTA direto.",
+  },
+  {
+    label: "Video educativo",
+    value:
+      "Crie um video educativo com 3 pontos curtos, legendas claras, cortes limpos, visual profissional e CTA final para pedir mais informacoes.",
+  },
+];
+
+function SuggestionButtons({
+  suggestions,
+  onSelect,
+}: {
+  suggestions: FieldSuggestion[];
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-2">
+      {suggestions.map((suggestion) => (
+        <button
+          key={`${suggestion.label}-${suggestion.value}`}
+          type="button"
+          onClick={() => onSelect(suggestion.value)}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+        >
+          {suggestion.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const statusFilters = [
   { label: "Todos", value: "" },
@@ -272,6 +458,18 @@ function getAiPostsGenerationLimit(planType?: string | null) {
 
   if (planType === "scale") {
     return 40;
+  }
+
+  return 0;
+}
+
+function getAiPostsVideoGenerationLimit(planType?: string | null) {
+  if (planType === "pro") {
+    return 5;
+  }
+
+  if (planType === "scale") {
+    return 10;
   }
 
   return 0;
@@ -364,7 +562,7 @@ function getMediaRecommendation(postType: AiPostType) {
       return "Reels exige vídeo, então mantenha a geração de vídeo ativa.";
     case "FEED":
     default:
-      return "Feed pode sair como imagem, vídeo ou ambos, dependendo da estratégia.";
+      return "Feed pode sair como imagem ou video, de acordo com a estrategia.";
   }
 }
 
@@ -420,6 +618,20 @@ function isVideoMedia(item?: AiPostRecord["media"][number]) {
     url.endsWith(".mp4") ||
     url.endsWith(".mov") ||
     url.endsWith(".webm")
+  );
+}
+
+function isVideoGenerationPost(post?: AiPostRecord | null) {
+  if (!post) {
+    return false;
+  }
+
+  return (
+    Boolean(post.generateVideo) ||
+    post.postType === "REELS" ||
+    Boolean(post.durationSeconds) ||
+    Boolean(String(post.videoPrompt || "").trim()) ||
+    post.media.some((item) => isVideoMedia(item))
   );
 }
 
@@ -489,7 +701,7 @@ export default function PublicacoesIaPage() {
     queryFn: () =>
       establishmentApi.getAiPosts({
         page: 1,
-        limit: 1,
+        limit: 100,
       }),
     enabled: isAiPostsPlanEligible,
   });
@@ -528,10 +740,21 @@ export default function PublicacoesIaPage() {
     ? (campaignsData.items as CampaignSelectorItem[])
     : [];
   const totalAiGenerations = Number(aiPostsUsageData?.total || 0);
+  const totalAiVideoGenerations = Array.isArray(aiPostsUsageData?.items)
+    ? (aiPostsUsageData.items as AiPostRecord[]).filter((post) =>
+        isVideoGenerationPost(post),
+      ).length
+    : 0;
+  const aiPostsVideoGenerationLimit = getAiPostsVideoGenerationLimit(planType);
   const hasReachedAiPostsGenerationLimit = Boolean(
     isAiPostsPlanEligible &&
       aiPostsGenerationLimit > 0 &&
       totalAiGenerations >= aiPostsGenerationLimit,
+  );
+  const hasReachedAiPostsVideoGenerationLimit = Boolean(
+    isAiPostsPlanEligible &&
+      aiPostsVideoGenerationLimit > 0 &&
+      totalAiVideoGenerations >= aiPostsVideoGenerationLimit,
   );
   const draftCampaign =
     currentDraft.mode === "CAMPAIGN"
@@ -563,6 +786,12 @@ export default function PublicacoesIaPage() {
         );
       }
 
+      if (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit) {
+        throw new Error(
+          `Seu plano atingiu o limite de ${aiPostsVideoGenerationLimit} gerações de vídeo.`,
+        );
+      }
+
       if (generateForm.mode === "CAMPAIGN" && !generateForm.campaignId) {
         throw new Error("Selecione uma campanha para gerar uma publicação vinculada.");
       }
@@ -571,8 +800,10 @@ export default function PublicacoesIaPage() {
         throw new Error("Descreva o que a IA deve gerar antes de continuar.");
       }
 
-      if (!generateForm.generateImage && !generateForm.generateVideo) {
-        throw new Error("Ative pelo menos imagem ou vídeo para gerar a publicação.");
+      if (generateForm.generateImage === generateForm.generateVideo) {
+        throw new Error(
+          "Selecione apenas um formato de mídia para gerar: imagem ou vídeo.",
+        );
       }
 
       if (generateForm.postType === "REELS" && !generateForm.generateVideo) {
@@ -777,10 +1008,10 @@ export default function PublicacoesIaPage() {
       return false;
     }
 
-    if (!currentDraft.generateImage && !currentDraft.generateVideo) {
+    if (currentDraft.generateImage === currentDraft.generateVideo) {
       setFeedback({
         type: "error",
-        message: "Ative pelo menos imagem ou vídeo no rascunho.",
+        message: "Selecione apenas um formato de mídia no rascunho: imagem ou vídeo.",
       });
       return false;
     }
@@ -891,7 +1122,7 @@ export default function PublicacoesIaPage() {
         <FeatureUpgradeNotice
           badge="Recurso Pro e Scale"
           title="Publicações IA disponíveis apenas nos planos Pro e Scale"
-          description="O plano Pro libera até 20 gerações de publicação com IA. O plano Scale libera até 40 gerações. Faça upgrade para gerar, revisar, publicar e agendar conteúdos no Instagram conectado."
+          description="O plano Pro libera até 20 gerações de publicação com IA, sendo até 5 vídeos. O plano Scale libera até 40 gerações, sendo até 10 vídeos. Faça upgrade para gerar, revisar, publicar e agendar conteúdos no Instagram conectado."
           ctaLabel="Ver planos"
           ctaHref="/para-estabelecimentos#planos"
         />
@@ -911,7 +1142,7 @@ export default function PublicacoesIaPage() {
             estabelecimento.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
             <div className="font-semibold text-slate-900">
               Conta conectada: {isMetaConnected ? "sim" : "nao"}
@@ -927,6 +1158,15 @@ export default function PublicacoesIaPage() {
             <div className="mt-1">
               {totalAiGenerations} / {aiPostsGenerationLimit} utilizadas no plano{" "}
               {me?.plan || (planType === "pro" ? "Pro" : "Scale")}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">
+              Videos do plano
+            </div>
+            <div className="mt-1">
+              {totalAiVideoGenerations} / {aiPostsVideoGenerationLimit} utilizadas no
+              plano {me?.plan || (planType === "pro" ? "Pro" : "Scale")}
             </div>
           </div>
         </div>
@@ -970,6 +1210,14 @@ export default function PublicacoesIaPage() {
           O plano atual atingiu o limite de {aiPostsGenerationLimit} gerações de
           publicação com IA. Você ainda pode revisar os rascunhos existentes, mas
           novas gerações exigem upgrade de plano.
+        </div>
+      ) : null}
+
+      {generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          O plano atual atingiu o limite de {aiPostsVideoGenerationLimit} gerações de
+          vídeo. Você ainda pode gerar publicações com imagem, mas novos vídeos
+          exigem upgrade de plano.
         </div>
       ) : null}
 
@@ -1083,19 +1331,22 @@ export default function PublicacoesIaPage() {
             <div className="mb-3">
               <div className="text-sm font-bold text-slate-900">Mídia a gerar</div>
               <div className="mt-1 text-xs text-slate-500">
-                {getMediaRecommendation(generateForm.postType)}
+                {getMediaRecommendation(generateForm.postType)} Escolha apenas um
+                formato por vez.
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name="generate-media-type"
                   checked={generateForm.generateImage}
-                  onChange={(event) =>
+                  onChange={() =>
                     setGenerateForm((current) => ({
                       ...current,
-                      generateImage: event.target.checked,
+                      generateImage: true,
+                      generateVideo: false,
                     }))
                   }
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
@@ -1108,12 +1359,14 @@ export default function PublicacoesIaPage() {
 
               <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name="generate-media-type"
                   checked={generateForm.generateVideo}
-                  onChange={(event) =>
+                  onChange={() =>
                     setGenerateForm((current) => ({
                       ...current,
-                      generateVideo: event.target.checked,
+                      generateImage: false,
+                      generateVideo: true,
                     }))
                   }
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
@@ -1155,6 +1408,15 @@ export default function PublicacoesIaPage() {
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Prompt principal
             </label>
+            <SuggestionButtons
+              suggestions={PROMPT_SUGGESTIONS}
+              onSelect={(value) =>
+                setGenerateForm((current) => ({
+                  ...current,
+                  prompt: value,
+                }))
+              }
+            />
             <textarea
               rows={3}
               value={generateForm.prompt}
@@ -1164,7 +1426,7 @@ export default function PublicacoesIaPage() {
                   prompt: event.target.value,
                 }))
               }
-              placeholder="Ex: divulgar aula experimental com foco em conversao para novos alunos"
+              placeholder="Ex: campanha para atrair novos clientes com CTA no WhatsApp"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -1174,6 +1436,15 @@ export default function PublicacoesIaPage() {
               <label className="mb-1.5 block text-sm font-bold text-slate-700">
                 Prompt da imagem
               </label>
+              <SuggestionButtons
+                suggestions={IMAGE_PROMPT_SUGGESTIONS}
+                onSelect={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    imagePrompt: value,
+                  }))
+                }
+              />
               <textarea
                 rows={2}
                 value={generateForm.imagePrompt}
@@ -1244,6 +1515,15 @@ export default function PublicacoesIaPage() {
               <label className="mb-1.5 block text-sm font-bold text-slate-700">
                 Prompt do vídeo
               </label>
+              <SuggestionButtons
+                suggestions={VIDEO_PROMPT_SUGGESTIONS}
+                onSelect={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    videoPrompt: value,
+                  }))
+                }
+              />
               <textarea
                 rows={2}
                 value={generateForm.videoPrompt}
@@ -1263,6 +1543,15 @@ export default function PublicacoesIaPage() {
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Tópico
             </label>
+            <SuggestionButtons
+              suggestions={TOPIC_SUGGESTIONS}
+              onSelect={(value) =>
+                setGenerateForm((current) => ({
+                  ...current,
+                  topic: value,
+                }))
+              }
+            />
             <input
               type="text"
               value={generateForm.topic}
@@ -1281,6 +1570,15 @@ export default function PublicacoesIaPage() {
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Chamada para ação
             </label>
+            <SuggestionButtons
+              suggestions={CTA_SUGGESTIONS}
+              onSelect={(value) =>
+                setGenerateForm((current) => ({
+                  ...current,
+                  callToAction: value,
+                }))
+              }
+            />
             <input
               type="text"
               value={generateForm.callToAction}
@@ -1299,6 +1597,15 @@ export default function PublicacoesIaPage() {
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Público alvo
             </label>
+            <SuggestionButtons
+              suggestions={TARGET_AUDIENCE_SUGGESTIONS}
+              onSelect={(value) =>
+                setGenerateForm((current) => ({
+                  ...current,
+                  targetAudience: value,
+                }))
+              }
+            />
             <input
               type="text"
               value={generateForm.targetAudience}
@@ -1334,6 +1641,15 @@ export default function PublicacoesIaPage() {
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Briefing
             </label>
+            <SuggestionButtons
+              suggestions={BRIEFING_SUGGESTIONS}
+              onSelect={(value) =>
+                setGenerateForm((current) => ({
+                  ...current,
+                  briefing: value,
+                }))
+              }
+            />
             <textarea
               rows={3}
               value={generateForm.briefing}
@@ -1360,7 +1676,8 @@ export default function PublicacoesIaPage() {
             disabled={
               generateMutation.isPending ||
               !canEditAiPosts ||
-              hasReachedAiPostsGenerationLimit
+              hasReachedAiPostsGenerationLimit ||
+              (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit)
             }
             className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -1675,10 +1992,14 @@ export default function PublicacoesIaPage() {
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                               <input
-                                type="checkbox"
+                                type="radio"
+                                name={`draft-media-type-${selectedPost?.id || "default"}`}
                                 checked={currentDraft.generateImage}
-                                onChange={(event) =>
-                                  updateDraft({ generateImage: event.target.checked })
+                                onChange={() =>
+                                  updateDraft({
+                                    generateImage: true,
+                                    generateVideo: false,
+                                  })
                                 }
                                 disabled={!canEditAiPosts}
                                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
@@ -1693,10 +2014,14 @@ export default function PublicacoesIaPage() {
 
                             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                               <input
-                                type="checkbox"
+                                type="radio"
+                                name={`draft-media-type-${selectedPost?.id || "default"}`}
                                 checked={currentDraft.generateVideo}
-                                onChange={(event) =>
-                                  updateDraft({ generateVideo: event.target.checked })
+                                onChange={() =>
+                                  updateDraft({
+                                    generateImage: false,
+                                    generateVideo: true,
+                                  })
                                 }
                                 disabled={!canEditAiPosts}
                                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
@@ -1949,7 +2274,7 @@ export default function PublicacoesIaPage() {
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
                         <ImageIcon className="h-4 w-4 text-slate-500" />
-                        Midea gerada
+                        Mídia gerada
                       </div>
                       {selectedPost.media.length === 0 ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
