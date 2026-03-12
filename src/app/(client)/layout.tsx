@@ -5,7 +5,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { clientApi } from '@/services/client-api';
-import { Bell, User, Wallet, LogOut, ChevronDown, Menu, X, Loader2 } from 'lucide-react';
+import { Bell, User, Wallet, LogOut, Menu, X, Loader2 } from 'lucide-react';
+
+type ClientNotification = {
+  id: string;
+  title?: string;
+  message?: string;
+  read?: boolean;
+  createdAt?: string;
+};
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -33,12 +41,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }, [error, router]);
 
-  const notifications: Array<Record<string, any>> = notificationsData?.items || [];
+  const notifications: ClientNotification[] = Array.isArray(notificationsData?.items)
+    ? notificationsData.items
+    : [];
   const unreadCount = notificationsData?.unreadCount ?? notifications.length;
 
   const handleLogout = () => {
     import('@/services/api').then(({ setAuthToken }) => {
-      setAuthToken(undefined);
+      setAuthToken(undefined, 'client');
       router.push('/');
     });
   };
@@ -86,7 +96,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                     {notifications.length === 0 ? (
                       <div className="p-4 text-center text-slate-500 text-sm">Nenhuma notificação</div>
                     ) : (
-                      notifications.map((n: any) => (
+                      notifications.map((n) => (
                         <div key={n.id} className={`p-4 border-b border-slate-50 text-sm ${!n.read ? 'bg-primary-50' : 'bg-white'}`}>
                           <div className="font-medium text-slate-900 mb-1">{n.title}</div>
                           <div className="text-slate-600">{n.message}</div>

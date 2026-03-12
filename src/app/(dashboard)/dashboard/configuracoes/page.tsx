@@ -14,6 +14,7 @@ import {
   Loader2,
   MapPin,
   Save,
+  Settings,
   Store,
   UploadCloud,
 } from "lucide-react";
@@ -76,28 +77,6 @@ const baseConfigSections: Array<{
     available: true,
   },
 ];
-
-const INSTAGRAM_PROFESSIONAL_CONNECT_URL =
-  (() => {
-    const clientId = process.env.NEXT_PUBLIC_META_APP_CLIENT_ID;
-    const redirectUri = process.env.NEXT_PUBLIC_META_AUTH_REDIRECT_URI;
-
-    if (!clientId || !redirectUri) {
-      return null;
-    }
-
-    const url = new URL("https://www.instagram.com/oauth/authorize");
-    url.searchParams.set("force_reauth", "true");
-    url.searchParams.set("client_id", clientId);
-    url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set(
-      "scope",
-      "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights",
-    );
-
-    return url.toString();
-  })();
 
 function resolvePlanUserLimit(planType?: "free" | "start" | "pro" | "scale") {
   switch (planType) {
@@ -281,29 +260,21 @@ export default function ConfiguracoesPage() {
 
   const connectInstagramMutation = useMutation({
     mutationFn: async () => {
-      if (!INSTAGRAM_PROFESSIONAL_CONNECT_URL) {
-        throw new Error(
-          "Defina NEXT_PUBLIC_META_APP_CLIENT_ID e NEXT_PUBLIC_META_AUTH_REDIRECT_URI no arquivo .env.",
-        );
-      }
-
-      const url = new URL(INSTAGRAM_PROFESSIONAL_CONNECT_URL);
       const frontendOrigin =
-        typeof window !== 'undefined' ? window.location.origin : '';
+        typeof window !== "undefined" ? window.location.origin : undefined;
+      const response = await establishmentApi.getFacebookLoginUrl({
+        establishmentId: establishmentId ? String(establishmentId) : undefined,
+        provider: "instagram",
+        frontendOrigin,
+      });
 
-      if (establishmentId) {
-        url.searchParams.set(
-          "state",
-          `instagram:${String(establishmentId)}:${encodeURIComponent(frontendOrigin)}`,
-        );
-      } else {
-        url.searchParams.set(
-          "state",
-          `instagram::${encodeURIComponent(frontendOrigin)}`,
+      if (!response?.url) {
+        throw new Error(
+          "Nao foi possivel montar a URL de conexao do Instagram profissional.",
         );
       }
 
-      return url.toString();
+      return response.url;
     },
     onSuccess: (url) => {
       setError("");
@@ -358,25 +329,30 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading font-bold text-3xl text-slate-900">
-            Configurações da Loja
-          </h1>
-          <p className="text-slate-500 mt-1">
-            Atualize as informações públicas do seu estabelecimento.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+            <Settings className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <h1 className="font-heading font-bold text-xl text-slate-900">
+              Configurações
+            </h1>
+            <p className="text-sm text-slate-500">
+              {activeSectionMeta.label}
+            </p>
+          </div>
         </div>
         <button
           disabled={updateMutation.isPending || !canSaveCurrentSection}
           onClick={() => updateMutation.mutate(formData)}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {updateMutation.isPending ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <Save className="w-5 h-5" />
+            <Save className="w-4 h-4" />
           )}{" "}
           Salvar Alterações
         </button>
@@ -394,8 +370,9 @@ export default function ConfiguracoesPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-2">
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
           {configSections.map((section) => {
             const isActive = section.id === activeSection;
 
@@ -404,7 +381,7 @@ export default function ConfiguracoesPage() {
                 key={section.id}
                 type="button"
                 onClick={() => setActiveSection(section.id)}
-                className={`w-full text-left px-5 py-3 rounded-xl font-medium text-sm transition-colors ${
+                className={`w-full text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                   isActive
                     ? "bg-slate-900 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -427,18 +404,10 @@ export default function ConfiguracoesPage() {
               </button>
             );
           })}
+          </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-8">
-          <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <h2 className="font-heading font-bold text-xl text-slate-900 mb-2">
-              {activeSectionMeta.label}
-            </h2>
-            <p className="text-sm text-slate-500">
-              {activeSectionMeta.description}
-            </p>
-          </section>
-
+        <div className="space-y-6">
           {activeSection === "profile" ? (
             <>
               <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">

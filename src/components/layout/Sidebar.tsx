@@ -9,6 +9,7 @@ import {
   Megaphone, 
   Image as ImageIcon, 
   Sparkles,
+  Star,
   Ticket, 
   Settings,
   Store
@@ -20,12 +21,17 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function canUseAiPosts(planType?: string) {
+  return planType === "pro" || planType === "scale";
+}
+
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Destaques', href: '/dashboard/destaques-patrocinados', icon: Sparkles, superAdminOnly: true },
   { name: 'Campanhas', href: '/dashboard/campanhas', icon: Megaphone },
   { name: 'Postagens', href: '/dashboard/postagens', icon: ImageIcon },
   { name: 'Cupons', href: '/dashboard/cupons', icon: Ticket },
+  { name: 'Destaques', href: '/dashboard/destaques-patrocinados', icon: Star, superAdminOnly: true },
+  { name: 'Publicações IA', href: '/dashboard/publicacoes-ia', icon: Sparkles, proScaleOnly: true },
   { name: 'Resultados', href: '/dashboard/resultados', icon: BarChart3, requiredFeature: 'advancedAnalytics' }, // Using BarChart3 again or LineChart
   { name: 'Configurações', href: '/dashboard/configuracoes', icon: Settings },
 ];
@@ -43,6 +49,8 @@ export default function Sidebar() {
   const currentUserRole = user?.currentUser?.role || 'owner';
   const isSuperAdmin = Boolean(user?.superAdmin || user?.currentUser?.superAdmin);
   const planName = user?.plan || 'Free';
+  const planType = user?.planAccess?.planType || "free";
+  const hasAiPostsPlan = canUseAiPosts(planType);
   const visibleNavigation = navigation.filter((item) => {
     if (item.superAdminOnly) {
       return isSuperAdmin;
@@ -68,23 +76,39 @@ export default function Sidebar() {
               item.href === '/dashboard'
                 ? pathname === item.href
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isPlanLocked = Boolean(item.proScaleOnly && !hasAiPostsPlan);
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
                   isActive ? 'bg-primary-600 text-white' : 'hover:bg-slate-800 hover:text-white',
-                  'group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors'
+                  isPlanLocked && !isActive ? 'text-slate-400' : '',
+                  'group flex items-center justify-between gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors'
                 )}
               >
-                <item.icon
-                  className={cn(
-                    isActive ? 'text-white' : 'text-slate-400 group-hover:text-white',
-                    'mr-3 flex-shrink-0 h-5 w-5 transition-colors'
-                  )}
-                  aria-hidden="true"
-                />
-                {item.name}
+                <span className="flex min-w-0 items-center">
+                  <item.icon
+                    className={cn(
+                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-white',
+                      'mr-3 flex-shrink-0 h-5 w-5 transition-colors'
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{item.name}</span>
+                </span>
+                {isPlanLocked ? (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                      isActive
+                        ? "bg-white/15 text-white"
+                        : "bg-slate-800 text-slate-400"
+                    )}
+                  >
+                    Pro/Scale
+                  </span>
+                ) : null}
               </Link>
             );
           })}

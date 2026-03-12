@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import PaginationControls from '@/components/dashboard/PaginationControls';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { establishmentApi } from '@/services/establishment-api';
-import { Search, Check, X, MessageSquare, Tag, Heart, Loader2 } from 'lucide-react';
+import {
+  formatCampaignQuantityLabel,
+  getCampaignModalityConfig,
+  getCampaignTypeLabel,
+} from '@/services/marque-e-ganhe-normalizers';
+import { Search, Check, X, MessageSquare, Tag, Heart, Loader2, ImageOff } from 'lucide-react';
 
-const PAGE_SIZE = 100;
+const MONTHLY_COUNT_PAGE_SIZE = 100;
+const LIST_PAGE_SIZE = 20;
 
 interface MonthlyParticipationPage {
   items: Array<{
@@ -18,10 +25,20 @@ interface MonthlyParticipationPage {
 interface PostCampaign {
   title?: string;
   rules?: string[];
-  baseReward?: string;
-  baseLikesRequired?: number;
-  maxReward?: string;
-  maxLikesRequired?: number;
+  type?: string;
+  storyBaseReward?: string;
+  storyBaseQuantity?: number;
+  storyMaxReward?: string;
+  storyMaxQuantity?: number;
+  feedBaseReward?: string;
+  feedBaseQuantity?: number;
+  feedMaxReward?: string;
+  feedMaxQuantity?: number;
+  reelsBaseReward?: string;
+  reelsBaseQuantity?: number;
+  reelsMaxReward?: string;
+  reelsMaxQuantity?: number;
+  rewardSummary?: string;
 }
 
 interface PostItem {
@@ -31,7 +48,7 @@ interface PostItem {
   userAvatar?: string;
   userName?: string;
   discountEarned?: string;
-  type: string;
+  type: 'story' | 'feed' | 'reels' | string;
   likes?: number;
   status?: 'pending' | 'approved' | 'redeemed' | 'rejected' | string;
   createdAt?: string;
@@ -39,6 +56,57 @@ interface PostItem {
     name?: string;
   } | null;
   campaign?: PostCampaign | null;
+}
+
+function normalizeSearchValue(value?: string | null) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return parsedDate.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
+function PostImageFallback({
+  src,
+  alt,
+  className,
+  fallbackClassName,
+  iconClassName,
+}: {
+  src?: string;
+  alt: string;
+  className: string;
+  fallbackClassName: string;
+  iconClassName: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!src || hasError) {
+    return (
+      <div className={fallbackClassName}>
+        <ImageOff className={iconClassName} />
+      </div>
+    );
+  }
+
+  return <img src={src} className={className} alt={alt} onError={() => setHasError(true)} />;
 }
 
 function isCurrentMonth(value?: string | null) {
@@ -60,35 +128,39 @@ function isCurrentMonth(value?: string | null) {
   );
 }
 
-async function fetchAllParticipationPages() {
-  const firstPage = (await establishmentApi.getParticipations({
-    page: 1,
-    limit: PAGE_SIZE,
-  })) as MonthlyParticipationPage;
-  const totalPages = Math.max(
-    1,
-    Math.ceil((firstPage.total || firstPage.items.length) / PAGE_SIZE),
-  );
+async function fetchCurrentMonthParticipationCount() {
+  let page = 1;
+  let totalCurrentMonthItems = 0;
+  let shouldContinue = true;
 
-  if (totalPages === 1) {
-    return firstPage.items;
+  while (shouldContinue) {
+    const response = (await establishmentApi.getParticipations({
+      page,
+      limit: MONTHLY_COUNT_PAGE_SIZE,
+    })) as MonthlyParticipationPage;
+    const items = Array.isArray(response.items) ? response.items : [];
+
+    if (items.length === 0) {
+      break;
+    }
+
+    const currentMonthItems = items.filter((item) => isCurrentMonth(item.createdAt));
+    totalCurrentMonthItems += currentMonthItems.length;
+
+    // Stop as soon as this page no longer contains only items from the current month.
+    shouldContinue =
+      items.length === MONTHLY_COUNT_PAGE_SIZE && currentMonthItems.length === items.length;
+    page += 1;
   }
 
-  const otherPages = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) =>
-      establishmentApi.getParticipations({
-        page: index + 2,
-        limit: PAGE_SIZE,
-      }) as Promise<MonthlyParticipationPage>,
-    ),
-  );
-
-  return [firstPage, ...otherPages].flatMap((page) => page.items);
+  return totalCurrentMonthItems;
 }
 
 export default function PostagensPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Pendentes');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
   const tabs = ['Todas', 'Pendentes', 'Aprovadas', 'Reprovadas'];
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
@@ -108,13 +180,35 @@ export default function PostagensPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ['participations', activeTab],
-    queryFn: () => establishmentApi.getParticipations({ status: getStatus(activeTab) })
+    queryKey: ['participations', activeTab, page],
+    queryFn: () =>
+      establishmentApi.getParticipations({
+        page,
+        limit: LIST_PAGE_SIZE,
+        status: getStatus(activeTab),
+      })
   });
 
-  const posts: PostItem[] = data?.items || [];
+  const posts = useMemo<PostItem[]>(
+    () => (Array.isArray(data?.items) ? (data.items as PostItem[]) : []),
+    [data],
+  );
+  const filteredPosts = useMemo(() => {
+    const normalizedSearch = normalizeSearchValue(searchTerm);
+
+    if (!normalizedSearch) {
+      return posts;
+    }
+
+    return posts.filter((post) => {
+      const handle = normalizeSearchValue(post.userHandle);
+      const userName = normalizeSearchValue(post.userName);
+      const clientName = normalizeSearchValue(post.client?.name);
+
+      return [handle, userName, clientName].some((value) => value.includes(normalizedSearch));
+    });
+  }, [posts, searchTerm]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [selectedRewardTierByPostId, setSelectedRewardTierByPostId] = useState<Record<string, 'BASE' | 'MAX'>>({});
 
   const { data: metrics } = useQuery({
     queryKey: ['dashboard-metrics'],
@@ -128,36 +222,24 @@ export default function PostagensPage() {
 
   const { data: monthlyParticipationCount = 0, isLoading: isLoadingMonthlyParticipations } = useQuery({
     queryKey: ['participations-monthly-usage'],
-    queryFn: async () => {
-      const items = await fetchAllParticipationPages();
-      return items.filter((item) => isCurrentMonth(item.createdAt)).length;
-    },
+    queryFn: fetchCurrentMonthParticipationCount,
     enabled: hasMonthlyParticipationLimit,
   });
 
-  const selectedPost = posts.find(p => p.id === selectedPostId) || posts[0];
+  const selectedPost = filteredPosts.find(p => p.id === selectedPostId) || filteredPosts[0];
   const campaign = selectedPost?.campaign || {};
   const actualLikes = Number(selectedPost?.likes || 0);
-  const baseLikesRequired = Number(campaign?.baseLikesRequired ?? 0);
-  const maxLikesRequired = campaign?.maxLikesRequired !== undefined && campaign?.maxLikesRequired !== null
-    ? Number(campaign.maxLikesRequired)
-    : undefined;
-  const selectedRewardTier = selectedPost
-    ? selectedRewardTierByPostId[selectedPost.id] || 'BASE'
-    : 'BASE';
-  const meetsBaseThresholdOnCurrentPost = actualLikes >= baseLikesRequired;
-  const meetsMaxThresholdOnCurrentPost = Boolean(
-    campaign?.maxReward &&
-      (maxLikesRequired === undefined || actualLikes >= maxLikesRequired),
-  );
+  const selectedModality =
+    selectedPost?.type === 'story'
+      ? 'story'
+      : selectedPost?.type === 'reels'
+        ? 'reels'
+        : 'feed';
+  const selectedModalityConfig = getCampaignModalityConfig(campaign, selectedModality);
   const selectedRewardValue =
-    selectedRewardTier === 'MAX' && campaign?.maxReward
-      ? campaign.maxReward
-      : campaign?.baseReward || selectedPost?.discountEarned || 'Brinde';
-  const selectedTierReachedOnCurrentPost =
-    selectedRewardTier === 'MAX'
-      ? meetsMaxThresholdOnCurrentPost
-      : meetsBaseThresholdOnCurrentPost;
+    selectedPost?.discountEarned ||
+    selectedModalityConfig.baseReward ||
+    'Benefício configurado no backend';
   const hasReachedMonthlyParticipationLimit = Boolean(
     hasMonthlyParticipationLimit &&
       monthlyParticipationLimit !== null &&
@@ -165,8 +247,7 @@ export default function PostagensPage() {
   );
 
   const approveMutation = useMutation({
-    mutationFn: ({ id, rewardTier }: { id: string; rewardTier: 'BASE' | 'MAX' }) =>
-      establishmentApi.approveParticipation(id, { rewardTier }),
+    mutationFn: ({ id }: { id: string }) => establishmentApi.approveParticipation(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['participations'] });
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
@@ -181,7 +262,7 @@ export default function PostagensPage() {
     }
   });
 
-  if (isLoadingMe || (hasMonthlyParticipationLimit && isLoadingMonthlyParticipations)) {
+  if (isLoadingMe) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
@@ -211,16 +292,16 @@ export default function PostagensPage() {
       {hasMonthlyParticipationLimit ? (
         <div
           className={`rounded-2xl border px-5 py-4 text-sm font-medium ${
-            hasReachedMonthlyParticipationLimit
+            !isLoadingMonthlyParticipations && hasReachedMonthlyParticipationLimit
               ? 'border-amber-200 bg-amber-50 text-amber-900'
               : 'border-slate-200 bg-white text-slate-700'
           }`}
         >
           Participações deste mês:{" "}
           <span className="font-bold">
-            {monthlyParticipationCount} / {monthlyParticipationLimit}
+            {isLoadingMonthlyParticipations ? 'calculando...' : monthlyParticipationCount} / {monthlyParticipationLimit}
           </span>
-          {hasReachedMonthlyParticipationLimit ? (
+          {!isLoadingMonthlyParticipations && hasReachedMonthlyParticipationLimit ? (
             <span>
               {" "}
               O limite do seu plano foi atingido. Novas aprovações ficam bloqueadas
@@ -255,7 +336,10 @@ export default function PostagensPage() {
               {tabs.map(tab => (
                 <button 
                   key={tab} 
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    setPage(1);
+                  }}
                   className={`px-3 py-1.5 font-medium text-xs rounded-lg whitespace-nowrap transition-colors ${
                     activeTab === tab 
                       ? 'bg-slate-900 text-white' 
@@ -271,6 +355,11 @@ export default function PostagensPage() {
               <input 
                 type="text" 
                 placeholder="Buscar por @usuario..." 
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value);
+                  setPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 caret-primary-600 outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -281,25 +370,31 @@ export default function PostagensPage() {
               <div className="flex justify-center p-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
               </div>
-            ) : posts.length === 0 ? (
+            ) : filteredPosts.length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-sm">
-                Nenhuma postagem encontrada para esta aba.
+                {searchTerm ? 'Nenhuma postagem encontrada para esse usuario.' : 'Nenhuma postagem encontrada para esta aba.'}
               </div>
             ) : (
-              posts.map((post) => (
+              filteredPosts.map((post) => (
                 <button 
                   key={post.id} 
                   onClick={() => setSelectedPostId(post.id)}
                   className={`w-full text-left p-4 border-b border-slate-50 transition-colors flex gap-3 group outline-none ${selectedPost?.id === post.id ? 'bg-primary-50 border-l-4 border-l-primary-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
                 >
                   <div className="w-12 h-12 rounded-lg bg-slate-200 overflow-hidden shrink-0 relative">
-                    <img src={post.imageUrl} className="w-full h-full object-cover" alt="" />
+                    <PostImageFallback
+                      src={post.imageUrl}
+                      alt={post.userName || post.userHandle || 'Postagem'}
+                      className="w-full h-full object-cover"
+                      fallbackClassName="flex h-full w-full items-center justify-center bg-slate-100"
+                      iconClassName="w-5 h-5 text-slate-400"
+                    />
                     {post.status === 'pending' && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white"></div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-0.5">
                       <span className="font-bold text-sm text-slate-900 truncate">{post.userHandle}</span>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-BR') : ''}</span>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{formatDateTime(post.createdAt)}</span>
                     </div>
                     <div className="text-xs text-slate-500 truncate mb-1.5">{post.discountEarned}</div>
                     <div className="flex items-center gap-2">
@@ -313,6 +408,15 @@ export default function PostagensPage() {
               ))
             )}
           </div>
+
+          <PaginationControls
+            page={page}
+            limit={LIST_PAGE_SIZE}
+            total={Number(data?.total || 0)}
+            isLoading={isLoading}
+            itemLabel="postagens"
+            onPageChange={setPage}
+          />
         </div>
         
         {/* Main detail view */}
@@ -350,7 +454,7 @@ export default function PostagensPage() {
                     </span>
                   )}
                   <div className="text-xs text-slate-500">
-                    Postado em {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleDateString('pt-BR') : ''}
+                    Postado em {formatDateTime(selectedPost.createdAt)}
                   </div>
                 </div>
               </div>
@@ -358,11 +462,13 @@ export default function PostagensPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 {/* Image Preview */}
                 <div className="bg-slate-200 rounded-2xl aspect-[4/5] relative overflow-hidden shadow-inner flex items-center justify-center">
-                  {selectedPost.imageUrl ? (
-                    <img src={selectedPost.imageUrl} className="w-full h-full object-cover" alt="Post" />
-                  ) : (
-                    <span className="text-slate-400">Sem imagem provida</span>
-                  )}
+                  <PostImageFallback
+                    src={selectedPost.imageUrl}
+                    alt={selectedPost.userName || selectedPost.userHandle || 'Postagem'}
+                    className="w-full h-full object-cover"
+                    fallbackClassName="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-100 text-slate-500"
+                    iconClassName="w-12 h-12 text-slate-300"
+                  />
                   <div className="absolute top-4 left-4 bg-black/60 backdrop-blur rounded-lg px-3 py-1.5 text-white text-xs font-bold flex items-center gap-1.5">
                     <Heart className="w-3.5 h-3.5 fill-white" /> {selectedPost.likes || 0} likes
                   </div>
@@ -378,11 +484,11 @@ export default function PostagensPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Tipo Exigido</span>
-                    <span className="font-medium text-slate-900 capitalize">{selectedPost.type}</span>
+                    <span className="font-medium text-slate-900">{getCampaignTypeLabel(selectedPost.type)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Recompensa</span>
-                    <span className="font-bold text-primary-600 flex items-center gap-1"><Tag className="w-3 h-3"/> {selectedPost.discountEarned || 'Brinde'}</span>
+                    <span className="font-bold text-primary-600 flex items-center gap-1"><Tag className="w-3 h-3"/> {selectedRewardValue}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Likes desta postagem</span>
@@ -411,85 +517,46 @@ export default function PostagensPage() {
               {selectedPost.status === 'pending' && (
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                   <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
-                    Variações de Recompensa por Likes
+                    Regra da Modalidade
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedRewardTierByPostId((prev) => ({
-                        ...prev,
-                        [selectedPost.id]: 'BASE',
-                      }))
-                    }
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
-                      selectedRewardTier === 'BASE'
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                    }`}
-                  >
+                  <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <div className="font-bold text-slate-900">
-                          Recompensa Base
+                          {getCampaignTypeLabel(selectedPost.type)}
                         </div>
                         <div className="text-sm text-slate-600">
-                          {campaign?.baseReward || 'Brinde'}
+                          Recompensa base: {selectedModalityConfig.baseReward || 'não configurada'}
                         </div>
-                      </div>
+                    </div>
                       <div className="text-right text-xs text-slate-500">
-                        <div>Meta: {baseLikesRequired} likes</div>
-                        <div className={meetsBaseThresholdOnCurrentPost ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
-                          {meetsBaseThresholdOnCurrentPost
-                            ? 'Nesta postagem: meta atingida'
-                            : 'Nesta postagem: abaixo da meta'}
+                        <div>
+                          Meta base:{' '}
+                          {selectedModalityConfig.baseQuantity
+                            ? formatCampaignQuantityLabel(
+                                selectedModality,
+                                selectedModalityConfig.baseQuantity,
+                              )
+                            : 'não configurada'}
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
 
-                  {campaign?.maxReward ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedRewardTierByPostId((prev) => ({
-                          ...prev,
-                          [selectedPost.id]: 'MAX',
-                        }))
-                      }
-                      className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
-                        selectedRewardTier === 'MAX'
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="font-bold text-slate-900">
-                            Recompensa Máxima
-                          </div>
-                          <div className="text-sm text-slate-600">
-                            {campaign.maxReward}
-                          </div>
-                        </div>
-                        <div className="text-right text-xs text-slate-500">
-                          <div>
-                            Meta: {maxLikesRequired !== undefined ? `${maxLikesRequired} likes` : 'sem meta configurada'}
-                          </div>
-                          <div className={meetsMaxThresholdOnCurrentPost ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
-                            {meetsMaxThresholdOnCurrentPost
-                              ? 'Nesta postagem: meta atingida'
-                              : 'Nesta postagem: abaixo da meta'}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ) : null}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    {selectedModalityConfig.maxReward && selectedModalityConfig.maxQuantity
+                      ? `Ao atingir ${formatCampaignQuantityLabel(
+                          selectedModality,
+                          selectedModalityConfig.maxQuantity,
+                        )}, o backend atualiza o mesmo cupom para ${selectedModalityConfig.maxReward}.`
+                      : 'Essa modalidade opera apenas com a meta base configurada para a campanha.'}
+                  </div>
 
                   <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                    A aprovacao continua manual, mas a validacao final e feita no backend
-                    com os likes acumulados do cliente na campanha. Os likes exibidos aqui
-                    representam apenas esta postagem.
+                    A aprovação continua manual, mas o backend recalcula o benefício usando
+                    o total aprovado do cliente nesta campanha e nesta modalidade. Os likes
+                    exibidos aqui servem apenas para analytics da postagem.
                   </div>
                 </div>
               )}
@@ -517,21 +584,20 @@ export default function PostagensPage() {
                     onClick={() =>
                       approveMutation.mutate({
                         id: selectedPost.id,
-                        rewardTier: selectedRewardTier,
                       })
                     }
                     className="flex items-center justify-center gap-2 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-colors shadow-md shadow-green-200 disabled:opacity-50"
                   >
-                    {approveMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Aprovar com {selectedRewardValue}
+                    {approveMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Aprovar e recalcular cupom
                   </button>
                 </div>
               )}
 
-              {selectedPost.status === 'pending' && !selectedTierReachedOnCurrentPost ? (
+              {selectedPost.status === 'pending' ? (
                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  {selectedRewardTier === 'MAX'
-                    ? `Esta postagem isolada ainda nao atingiu a meta de ${maxLikesRequired ?? 0} likes para a recompensa maxima, mas o backend considera o total acumulado do cliente na campanha ao aprovar.`
-                    : `Esta postagem isolada ainda nao atingiu a meta minima de ${baseLikesRequired} likes, mas o backend considera o total acumulado do cliente na campanha ao aprovar.`}
+                  O cupom é calculado no backend com base na progressão acumulada do cliente
+                  dentro da campanha. Ao aprovar esta participação, o sistema pode liberar a
+                  recompensa base ou promover o mesmo cupom para o nível máximo da modalidade.
                 </div>
               ) : null}
 

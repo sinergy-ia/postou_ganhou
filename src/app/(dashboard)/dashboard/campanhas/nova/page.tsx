@@ -11,15 +11,25 @@ type CampaignFormState = {
   title: string;
   description: string;
   type: string;
-  baseReward: string;
-  baseLikesRequired: string;
-  maxReward: string;
-  maxLikesRequired: string;
+  storyBaseReward: string;
+  storyBaseQuantity: string;
+  storyMaxReward: string;
+  storyMaxQuantity: string;
+  feedBaseReward: string;
+  feedBaseQuantity: string;
+  feedMaxReward: string;
+  feedMaxQuantity: string;
+  reelsBaseReward: string;
+  reelsBaseQuantity: string;
+  reelsMaxReward: string;
+  reelsMaxQuantity: string;
   autoApproveParticipations: boolean;
   hashtagRequired: string;
   expiresAt: string;
   isActive: boolean;
 };
+
+type CampaignTypeOption = 'story' | 'feed' | 'reels' | 'all';
 
 type ActiveCampaignListItem = {
   id?: string;
@@ -31,15 +41,125 @@ const defaultFormData: CampaignFormState = {
   title: '',
   description: '',
   type: 'story',
-  baseReward: '',
-  baseLikesRequired: '0',
-  maxReward: '',
-  maxLikesRequired: '',
+  storyBaseReward: '',
+  storyBaseQuantity: '',
+  storyMaxReward: '',
+  storyMaxQuantity: '',
+  feedBaseReward: '',
+  feedBaseQuantity: '',
+  feedMaxReward: '',
+  feedMaxQuantity: '',
+  reelsBaseReward: '',
+  reelsBaseQuantity: '',
+  reelsMaxReward: '',
+  reelsMaxQuantity: '',
   autoApproveParticipations: false,
   hashtagRequired: '',
   expiresAt: '',
   isActive: true,
 };
+
+const modalitySections = [
+  {
+    key: 'story',
+    label: 'Story',
+    quantityLabelSingular: 'story aprovado',
+    quantityLabelPlural: 'stories aprovados',
+    campaignTypes: ['story', 'all'],
+    baseRewardKey: 'storyBaseReward',
+    baseQuantityKey: 'storyBaseQuantity',
+    maxRewardKey: 'storyMaxReward',
+    maxQuantityKey: 'storyMaxQuantity',
+  },
+  {
+    key: 'feed',
+    label: 'Feed',
+    quantityLabelSingular: 'post feed aprovado',
+    quantityLabelPlural: 'posts feed aprovados',
+    campaignTypes: ['feed', 'all'],
+    baseRewardKey: 'feedBaseReward',
+    baseQuantityKey: 'feedBaseQuantity',
+    maxRewardKey: 'feedMaxReward',
+    maxQuantityKey: 'feedMaxQuantity',
+  },
+  {
+    key: 'reels',
+    label: 'Reels',
+    quantityLabelSingular: 'reel aprovado',
+    quantityLabelPlural: 'reels aprovados',
+    campaignTypes: ['reels', 'all'],
+    baseRewardKey: 'reelsBaseReward',
+    baseQuantityKey: 'reelsBaseQuantity',
+    maxRewardKey: 'reelsMaxReward',
+    maxQuantityKey: 'reelsMaxQuantity',
+  },
+] as const;
+
+function getActiveModalitySections(type: string) {
+  return modalitySections.filter((section) =>
+    section.campaignTypes.includes(type as CampaignTypeOption),
+  );
+}
+
+function formatQuantityDescription(
+  singularLabel: string,
+  pluralLabel: string,
+  quantity: number,
+) {
+  return `${quantity} ${quantity === 1 ? singularLabel : pluralLabel}`;
+}
+
+function buildCampaignRules(formData: CampaignFormState) {
+  const typeLabelMap: Record<string, string> = {
+    story: 'story',
+    feed: 'post no feed',
+    reels: 'reel',
+    all: 'story, feed ou reel',
+  };
+
+  const rules = [
+    `Publique um ${typeLabelMap[formData.type] || 'conteudo'} marcando o estabelecimento.`,
+    `Use a hashtag ${formData.hashtagRequired}.`,
+  ];
+
+  for (const section of getActiveModalitySections(formData.type)) {
+    const baseReward = formData[section.baseRewardKey].trim();
+    const baseQuantity = Number(formData[section.baseQuantityKey] || 0);
+    const maxReward = formData[section.maxRewardKey].trim();
+    const maxQuantity = Number(formData[section.maxQuantityKey] || 0);
+
+    if (!baseReward || !baseQuantity) {
+      continue;
+    }
+
+    const baseLine = `${section.label}: ao atingir ${formatQuantityDescription(
+      section.quantityLabelSingular,
+      section.quantityLabelPlural,
+      baseQuantity,
+    )}, libera ${baseReward}.`;
+
+    if (!maxReward || !maxQuantity) {
+      rules.push(baseLine);
+      continue;
+    }
+
+    rules.push(
+      `${baseLine} Ao atingir ${formatQuantityDescription(
+        section.quantityLabelSingular,
+        section.quantityLabelPlural,
+        maxQuantity,
+      )}, o mesmo cupom sobe para ${maxReward}.`,
+    );
+  }
+
+  if (formData.type === 'all') {
+    rules.push(
+      'Cada modalidade aprovada acumula no mesmo cupom do cliente durante a campanha.',
+    );
+  }
+
+  return rules;
+}
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (
@@ -71,13 +191,18 @@ function buildInitialFormData(campaignToEdit?: Awaited<ReturnType<typeof establi
     title: campaignToEdit.title || '',
     description: campaignToEdit.description || '',
     type: campaignToEdit.type || 'story',
-    baseReward: campaignToEdit.baseReward || '',
-    baseLikesRequired: String(campaignToEdit.baseLikesRequired ?? 0),
-    maxReward: campaignToEdit.maxReward || '',
-    maxLikesRequired:
-      campaignToEdit.maxLikesRequired !== undefined
-        ? String(campaignToEdit.maxLikesRequired)
-        : '',
+    storyBaseReward: String(campaignToEdit.storyBaseReward || ''),
+    storyBaseQuantity: String(campaignToEdit.storyBaseQuantity || ''),
+    storyMaxReward: String(campaignToEdit.storyMaxReward || ''),
+    storyMaxQuantity: String(campaignToEdit.storyMaxQuantity || ''),
+    feedBaseReward: String(campaignToEdit.feedBaseReward || ''),
+    feedBaseQuantity: String(campaignToEdit.feedBaseQuantity || ''),
+    feedMaxReward: String(campaignToEdit.feedMaxReward || ''),
+    feedMaxQuantity: String(campaignToEdit.feedMaxQuantity || ''),
+    reelsBaseReward: String(campaignToEdit.reelsBaseReward || ''),
+    reelsBaseQuantity: String(campaignToEdit.reelsBaseQuantity || ''),
+    reelsMaxReward: String(campaignToEdit.reelsMaxReward || ''),
+    reelsMaxQuantity: String(campaignToEdit.reelsMaxQuantity || ''),
     autoApproveParticipations: Boolean(campaignToEdit.autoApproveParticipations),
     hashtagRequired: String(campaignToEdit.hashtagRequired || ''),
     expiresAt: campaignToEdit.expiresAt
@@ -99,9 +224,6 @@ function CampaignForm() {
     queryKey: ['establishment-me'],
     queryFn: establishmentApi.getMe,
   });
-  const canUseProgressiveRewards = Boolean(
-    me?.planAccess?.features?.progressiveRewards,
-  );
   const canUseAutoApproval = Boolean(me?.planAccess?.features?.autoApproval);
   const maxActiveCampaigns = me?.planAccess?.limits?.maxActiveCampaigns ?? null;
   const [draftFormData, setDraftFormData] = useState<CampaignFormState | null>(null);
@@ -177,6 +299,51 @@ function CampaignForm() {
       return;
     }
 
+    for (const section of getActiveModalitySections(formData.type)) {
+      const baseReward = formData[section.baseRewardKey].trim();
+      const baseQuantity = Number(formData[section.baseQuantityKey] || 0);
+      const maxReward = formData[section.maxRewardKey].trim();
+      const maxQuantityRaw = formData[section.maxQuantityKey].trim();
+      const maxQuantity = Number(maxQuantityRaw || 0);
+
+      if (!baseReward || !baseQuantity) {
+        setError(
+          `Preencha recompensa base e quantidade base de ${section.label.toLowerCase()} para continuar.`,
+        );
+        return;
+      }
+
+      if (!Number.isFinite(baseQuantity) || baseQuantity <= 0) {
+        setError(`A quantidade base de ${section.label.toLowerCase()} deve ser maior que zero.`);
+        return;
+      }
+
+      const hasAnyMaxField = Boolean(maxReward || maxQuantityRaw);
+      if (hasAnyMaxField && (!maxReward || !maxQuantityRaw)) {
+        setError(
+          `Quando configurar a regra máxima de ${section.label.toLowerCase()}, informe recompensa e quantidade.`,
+        );
+        return;
+      }
+
+      if (hasAnyMaxField && (!Number.isFinite(maxQuantity) || maxQuantity <= 0)) {
+        setError(`A quantidade máxima de ${section.label.toLowerCase()} deve ser maior que zero.`);
+        return;
+      }
+
+      if (hasAnyMaxField && maxQuantity < baseQuantity) {
+        setError(
+          `A quantidade máxima de ${section.label.toLowerCase()} deve ser maior ou igual à quantidade base.`,
+        );
+        return;
+      }
+    }
+
+    if (!formData.hashtagRequired.trim()) {
+      setError('Informe a hashtag obrigatória da campanha.');
+      return;
+    }
+
     // Prepare JSON payload
     let expiresAtDate = new Date();
     if (formData.expiresAt) {
@@ -188,11 +355,12 @@ function CampaignForm() {
 
     const payload = {
       ...formData,
-      baseLikesRequired: formData.baseLikesRequired || '0',
-      maxLikesRequired: formData.maxReward ? formData.maxLikesRequired : '',
+      allowedPostTypes: getActiveModalitySections(formData.type).map((section) =>
+        section.key.toUpperCase(),
+      ),
       expiresAt: expiresAtDate.toISOString(),
       badges: ["nova"],
-      rules: ["Marcar o estabelecimento no story e usar a hashtag da promoção"]
+      rules: buildCampaignRules(formData),
     };
 
     if (isEditing) {
@@ -292,9 +460,13 @@ function CampaignForm() {
                 className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               >
                 <option value="story">Apenas Stories</option>
-                <option value="post" disabled>Post no Feed / Reels - Em breve</option>
-                <option value="both" disabled>Story ou Feed - Em breve</option>
+                <option value="feed">Apenas Feed</option>
+                <option value="reels">Apenas Reels</option>
+                <option value="all">Todas as modalidades</option>
               </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Escolha se a campanha vai contar story, feed, reels ou combinar tudo no mesmo cupom.
+              </p>
             </div>
 
             <div>
@@ -311,62 +483,115 @@ function CampaignForm() {
               <p className="text-xs text-slate-500 mt-1">Essa hashtag sera usada no tracking automatico da campanha.</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Recompensa Base</label>
-              <input 
-                required
-                type="text" 
-                name="baseReward"
-                value={formData.baseReward}
-                onChange={handleChange}
-                placeholder="Ex: 10% OFF, Sobremesa grátis" 
-                className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-              />
-            </div>
+            <div className="md:col-span-2 space-y-4">
+              {modalitySections.map((section) => {
+                const isEnabled = section.campaignTypes.includes(
+                  formData.type as CampaignTypeOption,
+                );
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Likes mínimos para Recompensa Base</label>
-              <input 
-                type="number" 
-                min="0"
-                name="baseLikesRequired"
-                value={formData.baseLikesRequired}
-                onChange={handleChange}
-                placeholder="0"
-                className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-              />
-            </div>
+                return (
+                  <div
+                    key={section.key}
+                    className={`rounded-2xl border p-5 ${
+                      isEnabled
+                        ? 'border-slate-200 bg-slate-50/70'
+                        : 'border-slate-100 bg-slate-50/30 opacity-70'
+                    }`}
+                  >
+                    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="font-bold text-slate-900">{section.label}</h3>
+                        <p className="text-sm text-slate-500">
+                          {isEnabled
+                            ? 'Configure a progressão base e, se quiser, a progressão máxima da modalidade.'
+                            : 'Essa modalidade não participa do tipo de campanha selecionado.'}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                          isEnabled
+                            ? 'border border-primary-200 bg-primary-50 text-primary-700'
+                            : 'border border-slate-200 bg-white text-slate-500'
+                        }`}
+                      >
+                        {isEnabled ? 'Ativa na campanha' : 'Fora da campanha'}
+                      </span>
+                    </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Recompensa Máxima (Opcional)</label>
-              <input 
-                type="text" 
-                name="maxReward"
-                value={formData.maxReward}
-                onChange={handleChange}
-                placeholder="Ex: 30% OFF (Para perfis grandes)" 
-                disabled={!canUseProgressiveRewards}
-                className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                {canUseProgressiveRewards
-                  ? 'A moderacao so libera essa recompensa manualmente quando a meta configurada for atingida.'
-                  : 'Recompensas progressivas por likes estao disponiveis a partir do plano Pro.'}
-              </p>
-            </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                          Recompensa Base
+                        </label>
+                        <input
+                          type="text"
+                          name={section.baseRewardKey}
+                          value={formData[section.baseRewardKey]}
+                          onChange={handleChange}
+                          placeholder="Ex: 10% OFF"
+                          disabled={!isEnabled}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Likes mínimos para Recompensa Máxima</label>
-              <input 
-                type="number" 
-                min="0"
-                name="maxLikesRequired"
-                value={formData.maxLikesRequired}
-                onChange={handleChange}
-                placeholder="Ex: 100"
-                disabled={!canUseProgressiveRewards}
-                className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-              />
+                      <div>
+                        <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                          Quantidade Base
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          name={section.baseQuantityKey}
+                          value={formData[section.baseQuantityKey]}
+                          onChange={handleChange}
+                          placeholder="Ex: 1"
+                          disabled={!isEnabled}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                          Recompensa Máxima
+                        </label>
+                        <input
+                          type="text"
+                          name={section.maxRewardKey}
+                          value={formData[section.maxRewardKey]}
+                          onChange={handleChange}
+                          placeholder="Ex: 20% OFF"
+                          disabled={!isEnabled}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                          Quantidade Máxima
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          name={section.maxQuantityKey}
+                          value={formData[section.maxQuantityKey]}
+                          onChange={handleChange}
+                          placeholder="Ex: 5"
+                          disabled={!isEnabled}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-xs text-slate-500">
+                      {isEnabled
+                        ? 'A regra base é obrigatória. A regra máxima é opcional, mas quando usada precisa informar recompensa e quantidade juntas.'
+                        : 'Ao trocar o tipo da campanha para incluir essa modalidade, os campos voltam a ficar editáveis.'}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
             <div>

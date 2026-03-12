@@ -6,6 +6,26 @@ import { useParams } from 'next/navigation';
 import {ArrowLeft, MapPin, Tag, Share2, Info, CheckCircle2, Navigation, Loader2} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { publicApi } from '@/services/public-api';
+import {
+  buildCampaignRewardSummary,
+  formatCampaignQuantityLabel,
+  getCampaignModalityConfig,
+  getCampaignTypeLabel,
+  getEnabledCampaignModalities,
+} from '@/services/marque-e-ganhe-normalizers';
+
+type GalleryItem = {
+  id?: string;
+  imageUrl?: string;
+  userName?: string;
+  userHandle?: string;
+  discountEarned?: string;
+};
+
+type PromotionStats = {
+  participants?: number;
+  avgLikes?: number;
+};
 
 export default function PromocaoDetalhes() {
   const params = useParams<{ id?: string | string[] }>();
@@ -36,13 +56,22 @@ export default function PromocaoDetalhes() {
   if (!promo) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">Promoção não encontrada</div>;
 
   const est = promo.establishment || { name: 'Estabelecimento', avatar: 'https://ui-avatars.com/api/?name=EP', cover: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&h=300&fit=crop', address: 'Endereço', category: 'Local', description: '' };
-  const galleryItems: Array<Record<string, any>> = galleryData?.items || [];
-  const visibleGalleryItems = galleryItems.filter((item: any) => Boolean(item.imageUrl));
+  const galleryItems: GalleryItem[] = Array.isArray(galleryData?.items) ? galleryData.items : [];
+  const visibleGalleryItems = galleryItems.filter((item) => Boolean(item.imageUrl));
+  const promoStats: PromotionStats =
+    promo.stats && typeof promo.stats === 'object' ? promo.stats : {};
   const instagramHandle = String(est.instagramHandle || '').replace(/^@+/, '').trim();
+  const rewardConfigurations = getEnabledCampaignModalities(promo).map((modality) =>
+    getCampaignModalityConfig(promo, modality),
+  );
   const hasValidCoordinates =
     Number.isFinite(Number(est.lat)) &&
     Number.isFinite(Number(est.lng)) &&
     !(Number(est.lat) === 0 && Number(est.lng) === 0);
+  const participationTypeLabel =
+    promo.type === 'all'
+      ? 'story, feed ou reel'
+      : getCampaignTypeLabel(promo.type).toLowerCase();
   const mapsDestination = hasValidCoordinates
     ? `${est.lat},${est.lng}`
     : [est.address, est.name].filter(Boolean).join(' ');
@@ -84,7 +113,7 @@ export default function PromocaoDetalhes() {
       setActionFeedback({
         type: 'info',
         message:
-          'Abrimos o Instagram do estabelecimento. Publique um story marcando o perfil e usando a hashtag da promoção.',
+          `Abrimos o Instagram do estabelecimento. Publique um conteúdo no formato ${participationTypeLabel} marcando o perfil e usando a hashtag da promoção.`,
       });
     } finally {
       setIsParticipating(false);
@@ -125,7 +154,7 @@ export default function PromocaoDetalhes() {
     try {
       const payload = {
         title: `${promo.title} | ${est.name}`,
-        text: `Olha essa promoção: ${promo.title}${promo.baseReward ? ` - ${promo.baseReward}` : ''}`,
+        text: `Olha essa promoção: ${promo.title} - ${buildCampaignRewardSummary(promo)}`,
         url: shareUrl,
       };
 
@@ -151,8 +180,8 @@ export default function PromocaoDetalhes() {
         type: 'error',
         message: 'Seu navegador não suporta compartilhamento nesta página.',
       });
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException) || error.name !== 'AbortError') {
         setActionFeedback({
           type: 'error',
           message: 'Não foi possível compartilhar a promoção agora.',
@@ -213,28 +242,33 @@ export default function PromocaoDetalhes() {
               <p className="text-slate-600 text-lg leading-relaxed">{promo.description}</p>
               
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-primary-50 border border-primary-100 rounded-2xl">
-                  <div className="text-primary-600 mb-1 font-medium text-sm">Recompensa Inicial</div>
-                  <div className="font-bold text-xl text-primary-900 flex items-center gap-2">
-                    <Tag className="w-5 h-5" /> {promo.baseReward}
+                {rewardConfigurations.map((config) => (
+                  <div
+                    key={config.key}
+                    className="rounded-2xl border border-primary-100 bg-primary-50 p-4"
+                  >
+                    <div className="mb-1 text-sm font-medium text-primary-600">
+                      {config.label}
+                    </div>
+                    <div className="flex items-center gap-2 text-xl font-bold text-primary-900">
+                      <Tag className="h-5 w-5" /> {config.baseReward || 'Sem recompensa base'}
+                    </div>
+                    <div className="mt-2 text-xs text-primary-700">
+                      Meta base:{' '}
+                      {config.baseQuantity
+                        ? formatCampaignQuantityLabel(config.key, config.baseQuantity)
+                        : 'não configurada'}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-primary-200 bg-white/60 px-3 py-2 text-xs text-primary-800">
+                      {config.maxReward && config.maxQuantity
+                        ? `Ao atingir ${formatCampaignQuantityLabel(
+                            config.key,
+                            config.maxQuantity,
+                          )}, o mesmo cupom sobe para ${config.maxReward}.`
+                        : 'Essa modalidade trabalha apenas com o nível base.'}
+                    </div>
                   </div>
-                  <div className="mt-2 text-xs text-primary-700">
-                    Meta de likes: {promo.baseLikesRequired ?? 0}
-                  </div>
-                </div>
-                <div className="p-4 bg-secondary-50 border border-secondary-100 rounded-2xl">
-                  <div className="text-secondary-600 mb-1 font-medium text-sm">Recompensa Máxima ✨</div>
-                  <div className="font-bold text-xl text-secondary-900 flex items-center gap-2">
-                    {promo.maxReward || 'Sem recompensa máxima adicional'}
-                  </div>
-                  <div className="mt-2 text-xs text-secondary-700">
-                    {promo.maxReward && promo.maxLikesRequired !== undefined
-                      ? `Meta de likes: ${promo.maxLikesRequired}`
-                      : promo.maxReward
-                        ? 'Meta maxima definida pelo lojista na moderacao'
-                        : 'A campanha trabalha apenas com a recompensa base'}
-                  </div>
-                </div>
+                ))}
               </div>
             </section>
 
@@ -256,7 +290,7 @@ export default function PromocaoDetalhes() {
                <h3 className="font-heading font-bold text-2xl text-slate-900 mb-6">Galeria de Participantes</h3>
                {visibleGalleryItems.length > 0 ? (
                  <div className="grid grid-cols-3 gap-4">
-                   {visibleGalleryItems.map((item: any) => (
+                   {visibleGalleryItems.map((item) => (
                      <div key={item.id} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
                        <img src={item.imageUrl} alt={item.userName || item.userHandle} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-3 pt-6 text-white text-xs font-medium">
@@ -280,12 +314,12 @@ export default function PromocaoDetalhes() {
                 <h3 className="font-bold text-slate-900 text-lg mb-1">Estatísticas</h3>
                 <div className="flex items-center justify-center gap-4 text-sm mt-4">
                   <div className="text-center px-4">
-                    <div className="font-black text-2xl text-primary-600">{(promo.stats as any)?.participants || 0}</div>
+                    <div className="font-black text-2xl text-primary-600">{promoStats.participants || 0}</div>
                     <div className="text-slate-500 text-xs">Participaram</div>
                   </div>
                   <div className="w-px h-8 bg-slate-200"></div>
                   <div className="text-center px-4">
-                    <div className="font-black text-2xl text-secondary-500">{(promo.stats as any)?.avgLikes || 0}</div>
+                    <div className="font-black text-2xl text-secondary-500">{promoStats.avgLikes || 0}</div>
                     <div className="text-slate-500 text-xs">Média Likes</div>
                   </div>
                 </div>

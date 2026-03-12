@@ -64,7 +64,7 @@ export default function Home() {
               Poste, ganhe <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-500">descontos</span> e descubra lugares incríveis
             </h1>
             <p className="text-lg text-slate-600 max-w-xl mx-auto lg:mx-0">
-              A primeira plataforma onde seus stories e posts valem cupons e recompensas exclusivas nos melhores restaurantes e lojas da cidade.
+              A primeira plataforma onde seus stories valem cupons e recompensas exclusivas nos melhores restaurantes e lojas da cidade.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
               <Link href="/promocoes" className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-full transition-all shadow-lg shadow-primary-200 flex items-center justify-center gap-2 group">
@@ -157,7 +157,7 @@ export default function Home() {
                 <Camera className="w-8 h-8" />
               </div>
               <h3 className="font-bold text-xl mb-3">2. Poste nas Redes</h3>
-              <p className="text-slate-600">Faça um Story ou Post caprichado marcando o estabelecimento.</p>
+              <p className="text-slate-600">Faça um Story caprichado marcando o estabelecimento.</p>
             </div>
             
             <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 text-center flex flex-col items-center group hover:-translate-y-2 transition-transform duration-300 relative">

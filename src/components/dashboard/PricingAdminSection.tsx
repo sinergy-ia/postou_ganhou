@@ -3,27 +3,353 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BarChart3,
   BadgeDollarSign,
+  CalendarRange,
   CheckCircle2,
+  Download,
   Loader2,
   Plus,
   Search,
   ShieldCheck,
   ShieldOff,
   Sparkles,
+  Ticket,
+  TrendingUp,
   X,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   establishmentApi,
   type PricingEstablishmentAssignment,
 } from "@/services/establishment-api";
 
+type InsightCard = {
+  title?: string;
+  description?: string;
+};
+
 function formatCurrency(value?: number | null) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Number(value || 0));
+}
+
+function formatPercentageValue(value?: number | null) {
+  return `${Number(value || 0)}%`;
+}
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthStart() {
+  const now = new Date();
+  return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function getToday() {
+  return toDateInputValue(new Date());
+}
+
+function formatDatePtBr(value?: string | null) {
+  if (!value) {
+    return "--";
+  }
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return String(value);
+  }
+
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function formatDateTimePtBr(value: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(value);
+}
+
+function escapeHtml(value?: string | number | null) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sanitizeFileName(value?: string | null) {
+  return String(value || "estabelecimento")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
+function buildInvoiceHtml(payload: {
+  invoiceNumber: string;
+  generatedAt: string;
+  establishmentName: string;
+  establishmentEmail: string;
+  category: string;
+  planName: string;
+  billingCycle: string;
+  periodLabel: string;
+  redeemedCoupons: number;
+  issuedCoupons: number;
+  totalParticipations: number;
+  conversionRate: string;
+  approvalRate: string;
+  roi: string;
+  unitFee: string;
+  totalAmount: string;
+}) {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fatura ${escapeHtml(payload.invoiceNumber)}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #4f46e5;
+      --accent: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px;
+    }
+    .sheet {
+      max-width: 920px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 32px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+    }
+    .brand {
+      font-size: 14px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      opacity: 0.75;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 34px;
+      font-weight: 800;
+      margin: 0 0 8px;
+    }
+    .subtitle {
+      margin: 0;
+      color: rgba(255,255,255,0.75);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .meta {
+      min-width: 260px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 20px;
+    }
+    .meta-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+    .meta-value {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+    .content {
+      padding: 32px;
+      display: grid;
+      gap: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      background: #fff;
+    }
+    .card h3 {
+      margin: 0 0 14px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+    }
+    .line:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .line strong {
+      color: var(--text);
+    }
+    .summary {
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-end;
+    }
+    .summary-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #4338ca;
+      font-weight: 700;
+    }
+    .summary-total {
+      font-size: 40px;
+      font-weight: 900;
+      color: #312e81;
+      line-height: 1;
+      margin-top: 8px;
+    }
+    .summary-note {
+      max-width: 340px;
+      color: #4338ca;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .footer {
+      padding: 0 32px 32px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    @media print {
+      body {
+        padding: 0;
+        background: #fff;
+      }
+      .sheet {
+        box-shadow: none;
+        border: 0;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <section class="header">
+      <div>
+        <div class="brand">Marque &amp; Ganhe</div>
+        <h1 class="title">Fatura de cobrança</h1>
+        <p class="subtitle">Documento gerado pelo painel administrativo para conferência de cobrança por resgates de cupons no período selecionado.</p>
+      </div>
+      <aside class="meta">
+        <div class="meta-label">Número da fatura</div>
+        <div class="meta-value">${escapeHtml(payload.invoiceNumber)}</div>
+        <div class="meta-label">Gerado em</div>
+        <div class="meta-value">${escapeHtml(payload.generatedAt)}</div>
+      </aside>
+    </section>
+
+    <section class="content">
+      <div class="grid">
+        <section class="card">
+          <h3>Estabelecimento</h3>
+          <div class="line"><span>Nome</span><strong>${escapeHtml(payload.establishmentName)}</strong></div>
+          <div class="line"><span>E-mail</span><strong>${escapeHtml(payload.establishmentEmail)}</strong></div>
+          <div class="line"><span>Categoria</span><strong>${escapeHtml(payload.category)}</strong></div>
+        </section>
+
+        <section class="card">
+          <h3>Plano e período</h3>
+          <div class="line"><span>Plano</span><strong>${escapeHtml(payload.planName)}</strong></div>
+          <div class="line"><span>Ciclo</span><strong>${escapeHtml(payload.billingCycle)}</strong></div>
+          <div class="line"><span>Período</span><strong>${escapeHtml(payload.periodLabel)}</strong></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h3>Resumo de performance</h3>
+        <div class="line"><span>Participações no período</span><strong>${escapeHtml(payload.totalParticipations)}</strong></div>
+        <div class="line"><span>Cupons emitidos</span><strong>${escapeHtml(payload.issuedCoupons)}</strong></div>
+        <div class="line"><span>Cupons resgatados</span><strong>${escapeHtml(payload.redeemedCoupons)}</strong></div>
+        <div class="line"><span>Taxa de conversão</span><strong>${escapeHtml(payload.conversionRate)}</strong></div>
+        <div class="line"><span>Taxa de aprovação</span><strong>${escapeHtml(payload.approvalRate)}</strong></div>
+        <div class="line"><span>ROI estimado</span><strong>${escapeHtml(payload.roi)}</strong></div>
+        <div class="line"><span>Taxa unitária por resgate</span><strong>${escapeHtml(payload.unitFee)}</strong></div>
+      </section>
+
+      <section class="summary">
+        <div>
+          <div class="summary-label">Valor total estimado</div>
+          <div class="summary-total">${escapeHtml(payload.totalAmount)}</div>
+        </div>
+        <div class="summary-note">
+          Total calculado com base na quantidade de cupons resgatados multiplicada pela taxa unitária de resgate do plano vigente do estabelecimento.
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer">
+      Esta fatura possui caráter administrativo e foi gerada automaticamente pelo painel do super admin.
+      Caso necessário, abra o arquivo no navegador e utilize a impressão do sistema para salvar em PDF.
+    </footer>
+  </main>
+</body>
+</html>`;
 }
 
 function getPlanTone(planType: string) {
@@ -83,6 +409,12 @@ const defaultAdminCreateForm: AdminCreateForm = {
 export default function PricingAdminSection() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [selectedAnalyticsEstablishmentId, setSelectedAnalyticsEstablishmentId] =
+    useState("");
+  const [analyticsFilters, setAnalyticsFilters] = useState({
+    startDate: getCurrentMonthStart(),
+    endDate: getToday(),
+  });
   const [draftPlans, setDraftPlans] = useState<
     Record<
       string,
@@ -195,6 +527,121 @@ export default function PricingAdminSection() {
         .includes(normalizedSearch),
     );
   }, [establishments, search]);
+  const selectedAnalyticsEstablishment = useMemo(
+    () =>
+      (establishments || []).find(
+        (item) => item.id === selectedAnalyticsEstablishmentId,
+      ) || null,
+    [establishments, selectedAnalyticsEstablishmentId],
+  );
+  const selectedPricingPlan = useMemo(
+    () =>
+      (pricingPlans || []).find(
+        (plan) => plan.type === selectedAnalyticsEstablishment?.pricingPlanType,
+      ) || null,
+    [pricingPlans, selectedAnalyticsEstablishment],
+  );
+  const analyticsParams = useMemo(() => {
+    if (!selectedAnalyticsEstablishmentId) {
+      return undefined;
+    }
+
+    return {
+      establishmentId: selectedAnalyticsEstablishmentId,
+      startDate: analyticsFilters.startDate || undefined,
+      endDate: analyticsFilters.endDate || undefined,
+    };
+  }, [analyticsFilters.endDate, analyticsFilters.startDate, selectedAnalyticsEstablishmentId]);
+
+  const { data: analyticsMetrics, isLoading: isLoadingAnalyticsMetrics } = useQuery({
+    queryKey: ["super-admin", "analytics", "metrics", analyticsParams],
+    queryFn: () => establishmentApi.getMetrics(analyticsParams),
+    enabled: Boolean(analyticsParams),
+  });
+
+  const { data: analyticsCharts, isLoading: isLoadingAnalyticsCharts } = useQuery({
+    queryKey: ["super-admin", "analytics", "charts", analyticsParams],
+    queryFn: () => establishmentApi.getCharts(analyticsParams),
+    enabled: Boolean(analyticsParams),
+  });
+
+  const { data: analyticsRoi, isLoading: isLoadingAnalyticsRoi } = useQuery({
+    queryKey: ["super-admin", "analytics", "roi", analyticsParams],
+    queryFn: () => establishmentApi.getAnalyticsRoi(analyticsParams),
+    enabled: Boolean(analyticsParams),
+  });
+
+  const { data: analyticsConversion, isLoading: isLoadingAnalyticsConversion } = useQuery({
+    queryKey: ["super-admin", "analytics", "conversion", analyticsParams],
+    queryFn: () => establishmentApi.getAnalyticsConversion(analyticsParams),
+    enabled: Boolean(analyticsParams),
+  });
+
+  const { data: analyticsInsights, isLoading: isLoadingAnalyticsInsights } = useQuery({
+    queryKey: ["super-admin", "analytics", "insights", analyticsParams],
+    queryFn: () => establishmentApi.getAnalyticsInsights(analyticsParams),
+    enabled: Boolean(analyticsParams),
+  });
+  const estimatedRedemptionCharge =
+    Number(analyticsMetrics?.couponsRedeemed || 0) *
+    Number(selectedPricingPlan?.redemptionFee || 0);
+  const isLoadingAnalyticsPanel =
+    isLoadingAnalyticsMetrics ||
+    isLoadingAnalyticsCharts ||
+    isLoadingAnalyticsRoi ||
+    isLoadingAnalyticsConversion ||
+    isLoadingAnalyticsInsights;
+
+  function handleDownloadInvoice() {
+    if (!selectedAnalyticsEstablishment) {
+      return;
+    }
+
+    const generatedAt = new Date();
+    const invoiceNumber = `FAT-${generatedAt
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "")}-${String(selectedAnalyticsEstablishment.id || "")
+      .slice(-6)
+      .toUpperCase()}`;
+    const fileName = `fatura-${sanitizeFileName(
+      selectedAnalyticsEstablishment.name,
+    )}-${analyticsFilters.endDate || getToday()}.html`;
+    const html = buildInvoiceHtml({
+      invoiceNumber,
+      generatedAt: formatDateTimePtBr(generatedAt),
+      establishmentName: selectedAnalyticsEstablishment.name,
+      establishmentEmail:
+        selectedAnalyticsEstablishment.email || "Sem e-mail cadastrado",
+      category: selectedAnalyticsEstablishment.category || "Sem categoria",
+      planName: selectedAnalyticsEstablishment.plan,
+      billingCycle:
+        selectedAnalyticsEstablishment.pricingBillingCycle === "annual"
+          ? "Anual"
+          : "Mensal",
+      periodLabel: `${formatDatePtBr(analyticsFilters.startDate)} até ${formatDatePtBr(
+        analyticsFilters.endDate,
+      )}`,
+      redeemedCoupons: Number(analyticsMetrics?.couponsRedeemed || 0),
+      issuedCoupons: Number(analyticsMetrics?.couponsIssued || 0),
+      totalParticipations: Number(analyticsMetrics?.totalPosts || 0),
+      conversionRate: analyticsConversion?.rate || "0%",
+      approvalRate: formatPercentageValue(analyticsConversion?.approvalRate),
+      roi: analyticsRoi?.roi || "0%",
+      unitFee: formatCurrency(selectedPricingPlan?.redemptionFee || 0),
+      totalAmount: formatCurrency(estimatedRedemptionCharge),
+    });
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
 
   function getDraft(establishment: PricingEstablishmentAssignment) {
     return (
@@ -316,6 +763,319 @@ export default function PricingAdminSection() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Visão por estabelecimento
+            </div>
+            <h2 className="mt-4 font-heading font-bold text-2xl text-slate-900">
+              Cobrança e performance
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Selecione um estabelecimento e um período para acompanhar resgates,
+              cupons emitidos, conversão e estimativa de cobrança individual.
+            </p>
+          </div>
+
+          <div className="grid w-full gap-4 md:grid-cols-2 xl:max-w-4xl xl:grid-cols-[minmax(340px,1.4fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
+            <div className="md:col-span-2 xl:col-span-1 xl:min-w-[340px]">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Estabelecimento
+              </label>
+              <select
+                value={selectedAnalyticsEstablishmentId}
+                onChange={(event) =>
+                  setSelectedAnalyticsEstablishmentId(event.target.value)
+                }
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-200"
+              >
+                <option value="">Selecione um estabelecimento</option>
+                {(establishments || []).map((item) => (
+                  <option key={`analytics-${item.id}`} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Data inicial
+              </label>
+              <input
+                type="date"
+                value={analyticsFilters.startDate}
+                onChange={(event) =>
+                  setAnalyticsFilters((current) => ({
+                    ...current,
+                    startDate: event.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-200"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Data final
+              </label>
+              <input
+                type="date"
+                value={analyticsFilters.endDate}
+                min={analyticsFilters.startDate || undefined}
+                onChange={(event) =>
+                  setAnalyticsFilters((current) => ({
+                    ...current,
+                    endDate: event.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-200"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleDownloadInvoice}
+            disabled={!selectedAnalyticsEstablishment || isLoadingAnalyticsPanel}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Baixar fatura
+          </button>
+        </div>
+
+        {!selectedAnalyticsEstablishment ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+            Escolha um estabelecimento acima para carregar o dashboard de cobrança e
+            performance no período selecionado.
+          </div>
+        ) : isLoadingAnalyticsPanel ? (
+          <div className="mt-6 flex h-56 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+          </div>
+        ) : (
+          <div className="mt-6 space-y-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Sparkles className="h-4 w-4 text-primary-600" />
+                  Resgates
+                </div>
+                <div className="mt-3 text-3xl font-black text-slate-900">
+                  {analyticsMetrics?.couponsRedeemed || 0}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Cupons efetivamente utilizados no período.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Ticket className="h-4 w-4 text-primary-600" />
+                  Cupons emitidos
+                </div>
+                <div className="mt-3 text-3xl font-black text-slate-900">
+                  {analyticsMetrics?.couponsIssued || 0}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Base para comparar geração versus resgate.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <TrendingUp className="h-4 w-4 text-primary-600" />
+                  Conversão
+                </div>
+                <div className="mt-3 text-3xl font-black text-slate-900">
+                  {analyticsConversion?.rate || "0%"}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Taxa de resgate a partir das aprovações do período.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-primary-200 bg-primary-50 px-5 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary-900">
+                  <BadgeDollarSign className="h-4 w-4 text-primary-700" />
+                  Cobrança estimada
+                </div>
+                <div className="mt-3 text-3xl font-black text-primary-900">
+                  {formatCurrency(estimatedRedemptionCharge)}
+                </div>
+                <p className="mt-2 text-xs text-primary-700">
+                  {formatCurrency(selectedPricingPlan?.redemptionFee || 0)} por resgate no
+                  plano {selectedAnalyticsEstablishment.plan}.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Estabelecimento selecionado
+                </div>
+                <div className="mt-2 text-lg font-bold text-slate-900">
+                  {selectedAnalyticsEstablishment.name}
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedAnalyticsEstablishment.category || "Sem categoria"} •{" "}
+                  {selectedAnalyticsEstablishment.email || "Sem e-mail"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Plano e ciclo
+                </div>
+                <div className="mt-2 text-lg font-bold text-slate-900">
+                  {selectedAnalyticsEstablishment.plan}
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedAnalyticsEstablishment.pricingBillingCycle === "annual"
+                    ? "Anual"
+                    : "Mensal"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  <CalendarRange className="h-4 w-4" />
+                  Período consultado
+                </div>
+                <div className="mt-2 text-lg font-bold text-slate-900">
+                  {formatDatePtBr(analyticsFilters.startDate)} até{" "}
+                  {formatDatePtBr(analyticsFilters.endDate)}
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Participações: {analyticsMetrics?.totalPosts || 0} • Aprovação:{" "}
+                  {formatPercentageValue(analyticsConversion?.approvalRate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="font-heading text-xl font-bold text-slate-900">
+                  Evolução de postagens e resgates
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Acompanhe o comportamento diário para validar cobrança e sazonalidade.
+                </p>
+
+                <div className="mt-6 h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={analyticsCharts || []}
+                      margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#e2e8f0"
+                      />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "#f8fafc" }}
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "none",
+                          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                        }}
+                      />
+                      <Bar
+                        dataKey="posts"
+                        name="Postagens"
+                        fill="#9333ea"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="resgates"
+                        name="Resgates"
+                        fill="#0f766e"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="font-heading text-xl font-bold text-slate-900">
+                  Resumo executivo
+                </h3>
+                <div className="mt-5 space-y-4">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      ROI estimado
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900">
+                      {analyticsRoi?.roi || "0%"}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Likes totais: {analyticsRoi?.totalLikes || "0"}.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Participações aprovadas e resgate
+                    </div>
+                    <p className="mt-2 text-sm text-slate-700">
+                      Aprovação {formatPercentageValue(analyticsConversion?.approvalRate)} •
+                      Resgate {analyticsConversion?.rate || "0%"}.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Use esse bloco para justificar cobrança, retenção e ajuste de plano.
+                    </p>
+                  </div>
+
+                  {((analyticsInsights?.cards || []) as InsightCard[]).length > 0 ? (
+                    <div className="space-y-3">
+                      {((analyticsInsights?.cards || []) as InsightCard[]).map(
+                        (card, index) => (
+                          <div
+                            key={`${card.title}-${index}`}
+                            className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3"
+                          >
+                            <p className="text-sm font-bold text-slate-900">
+                              {card.title}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-600">
+                              {card.description}
+                            </p>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                      Nenhum insight automático retornado para o filtro atual.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">

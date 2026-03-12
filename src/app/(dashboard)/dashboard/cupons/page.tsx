@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import PaginationControls from '@/components/dashboard/PaginationControls';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { downloadCsvFile } from '@/lib/csv';
 import { establishmentApi } from '@/services/establishment-api';
@@ -29,11 +30,14 @@ interface CouponDetails {
   } | null;
 }
 
+const PAGE_SIZE = 20;
+
 export default function CuponsPage() {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('Todos');
   const filters = ['Todos', 'Ativos', 'Usados', 'Expirados'];
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedCoupon, setSelectedCoupon] = useState<CouponDetails | null>(null);
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
@@ -70,8 +74,14 @@ export default function CuponsPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ['coupons', activeFilter, search],
-    queryFn: () => establishmentApi.getCoupons({ status: getStatus(activeFilter), search })
+    queryKey: ['coupons', activeFilter, search, page],
+    queryFn: () =>
+      establishmentApi.getCoupons({
+        page,
+        limit: PAGE_SIZE,
+        status: getStatus(activeFilter),
+        search,
+      })
   });
   
   const coupons: CouponDetails[] = data?.items || [];
@@ -94,6 +104,30 @@ export default function CuponsPage() {
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
     }
   });
+
+  const closeSelectedCouponModal = () => {
+    setSelectedCoupon(null);
+  };
+
+  useEffect(() => {
+    if (!selectedCoupon) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedCoupon(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [selectedCoupon]);
 
   const handleExportCoupons = () => {
     downloadCsvFile(
@@ -182,7 +216,10 @@ export default function CuponsPage() {
             {filters.map(filter => (
               <button 
                 key={filter} 
-                onClick={() => setActiveFilter(filter)}
+                onClick={() => {
+                  setActiveFilter(filter);
+                  setPage(1);
+                }}
                 className={`px-4 py-2 font-medium text-sm rounded-lg whitespace-nowrap transition-colors ${
                   activeFilter === filter 
                     ? 'bg-primary-50 text-primary-700 font-bold border border-primary-200 shadow-sm' 
@@ -201,7 +238,10 @@ export default function CuponsPage() {
                 type="text" 
                 placeholder="Buscar código ou cliente..." 
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full md:w-64 rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 caret-primary-600 outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -297,6 +337,7 @@ export default function CuponsPage() {
                       )}
 
                       <button
+                        type="button"
                         onClick={() => setSelectedCoupon(coupon)}
                         className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                         title="Ver detalhes"
@@ -310,11 +351,33 @@ export default function CuponsPage() {
             </tbody>
           </table>
         </div>
+
+        <PaginationControls
+          page={page}
+          limit={PAGE_SIZE}
+          total={Number(data?.total || 0)}
+          isLoading={isLoading}
+          itemLabel="cupons"
+          onPageChange={setPage}
+        />
       </div>
 
       {selectedCoupon ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSelectedCouponModal();
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
             {(() => {
               const linkedParticipationIds = getParticipationIds(selectedCoupon);
               const isAccumulatedCoupon = linkedParticipationIds.length > 1;
@@ -339,7 +402,8 @@ export default function CuponsPage() {
                 ) : null}
               </div>
               <button
-                onClick={() => setSelectedCoupon(null)}
+                type="button"
+                onClick={closeSelectedCouponModal}
                 className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                 aria-label="Fechar detalhes do cupom"
               >
@@ -376,7 +440,8 @@ export default function CuponsPage() {
 
             <div className="flex justify-end border-t border-slate-100 px-6 py-4">
               <button
-                onClick={() => setSelectedCoupon(null)}
+                type="button"
+                onClick={closeSelectedCouponModal}
                 className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800"
               >
                 Fechar

@@ -226,17 +226,207 @@ export function normalizeClient(
   };
 }
 
-type UiCampaignType = "story" | "post" | "both";
+type UiCampaignType = "story" | "feed" | "reels" | "all";
 type UiCampaignStatus = "active" | "scheduled" | "paused" | "ended";
+export type CampaignModalityKey = Exclude<UiCampaignType, "all">;
+
+export interface CampaignModalityConfig {
+  key: CampaignModalityKey;
+  label: string;
+  enabled: boolean;
+  baseReward: string;
+  baseQuantity?: number;
+  maxReward: string;
+  maxQuantity?: number;
+}
+
+const CAMPAIGN_MODALITY_META: Record<
+  CampaignModalityKey,
+  { label: string; singularLabel: string; pluralLabel: string }
+> = {
+  story: {
+    label: "Story",
+    singularLabel: "story",
+    pluralLabel: "stories",
+  },
+  feed: {
+    label: "Feed",
+    singularLabel: "post feed",
+    pluralLabel: "posts feed",
+  },
+  reels: {
+    label: "Reels",
+    singularLabel: "reel",
+    pluralLabel: "reels",
+  },
+};
+
+function normalizeCampaignQuantity(value: unknown) {
+  const parsed = parseNumber(value);
+  if (parsed === null || parsed <= 0) {
+    return undefined;
+  }
+
+  return Math.trunc(parsed);
+}
+
+function getLegacyRewardFallback(
+  record: AnyRecord,
+  modality: CampaignModalityKey,
+  level: "base" | "max",
+) {
+  if (normalizeCampaignType(record?.type) !== modality) {
+    return "";
+  }
+
+  return ensureText(level === "base" ? record?.baseReward : record?.maxReward);
+}
+
+function resolveCampaignModalityReward(
+  record: AnyRecord,
+  modality: CampaignModalityKey,
+  level: "base" | "max",
+) {
+  const prefix = modality;
+  const normalizedLevel = level === "base" ? "Base" : "Max";
+  const explicitReward = ensureText(record?.[`${prefix}${normalizedLevel}Reward`]);
+
+  if (explicitReward) {
+    return explicitReward;
+  }
+
+  if (level === "base") {
+    const legacyRewardByType = ensureText(
+      record?.[`${prefix}Reward`] ?? record?.rewardByType?.[modality],
+    );
+
+    if (legacyRewardByType) {
+      return legacyRewardByType;
+    }
+  }
+
+  return getLegacyRewardFallback(record, modality, level);
+}
+
+export function getCampaignModalityLabel(modality: CampaignModalityKey) {
+  return CAMPAIGN_MODALITY_META[modality].label;
+}
+
+export function formatCampaignQuantityLabel(
+  modality: CampaignModalityKey,
+  quantity?: number | null,
+) {
+  const normalizedQuantity = Number(quantity || 0);
+  const { singularLabel, pluralLabel } = CAMPAIGN_MODALITY_META[modality];
+  const unitLabel = normalizedQuantity === 1 ? singularLabel : pluralLabel;
+
+  return `${normalizedQuantity} ${unitLabel}`;
+}
+
+export function getCampaignTypeLabel(value?: string | null) {
+  switch (normalizeCampaignType(value)) {
+    case "story":
+      return "Story";
+    case "feed":
+      return "Feed";
+    case "reels":
+      return "Reels";
+    case "all":
+      return "Todas as modalidades";
+    default:
+      return "Story";
+  }
+}
+
+export function getCampaignModalityConfig(
+  record: AnyRecord | null | undefined,
+  modality: CampaignModalityKey,
+): CampaignModalityConfig {
+  const safeRecord = record || {};
+  const normalizedType = normalizeCampaignType(safeRecord?.type);
+  const baseReward = resolveCampaignModalityReward(safeRecord, modality, "base");
+  const maxReward = resolveCampaignModalityReward(safeRecord, modality, "max");
+  const baseQuantity = normalizeCampaignQuantity(
+    safeRecord?.[`${modality}BaseQuantity`],
+  );
+  const maxQuantity = normalizeCampaignQuantity(
+    safeRecord?.[`${modality}MaxQuantity`],
+  );
+  const enabled =
+    normalizedType === "all" ||
+    normalizedType === modality ||
+    Boolean(baseReward || maxReward || baseQuantity || maxQuantity);
+
+  return {
+    key: modality,
+    label: getCampaignModalityLabel(modality),
+    enabled,
+    baseReward,
+    baseQuantity,
+    maxReward,
+    maxQuantity,
+  };
+}
+
+export function getEnabledCampaignModalities(
+  record: AnyRecord | null | undefined,
+): CampaignModalityKey[] {
+  return (Object.keys(CAMPAIGN_MODALITY_META) as CampaignModalityKey[]).filter(
+    (modality) => getCampaignModalityConfig(record, modality).enabled,
+  );
+}
+
+export function buildCampaignRewardLines(record: AnyRecord | null | undefined) {
+  return getEnabledCampaignModalities(record)
+    .map((modality) => {
+      const config = getCampaignModalityConfig(record, modality);
+
+      if (!config.baseReward) {
+        return "";
+      }
+
+      const baseLine = `${config.label}: ${config.baseReward}${
+        config.baseQuantity
+          ? ` em ${formatCampaignQuantityLabel(modality, config.baseQuantity)}`
+          : ""
+      }`;
+
+      if (!config.maxReward || !config.maxQuantity) {
+        return baseLine;
+      }
+
+      return `${baseLine} • até ${config.maxReward} em ${formatCampaignQuantityLabel(
+        modality,
+        config.maxQuantity,
+      )}`;
+    })
+    .filter(Boolean);
+}
+
+export function buildCampaignRewardSummary(record: AnyRecord | null | undefined) {
+  const rewardLines = buildCampaignRewardLines(record);
+
+  if (rewardLines.length === 0) {
+    return ensureText(record?.baseReward, "Campanha configurada");
+  }
+
+  return rewardLines.join(" + ");
+}
 
 export function normalizeCampaignType(value?: string | null): UiCampaignType {
   switch (String(value || "").toUpperCase()) {
     case "STORY":
       return "story";
+    case "FEED":
+    case "POST":
+      return "feed";
+    case "REELS":
+      return "reels";
+    case "ALL":
     case "BOTH":
-      return "both";
+      return "all";
     default:
-      return "post";
+      return "story";
   }
 }
 
@@ -244,10 +434,14 @@ export function toBackendCampaignType(value?: string | null) {
   switch (normalizeCampaignType(value)) {
     case "story":
       return "STORY";
-    case "both":
-      return "BOTH";
+    case "feed":
+      return "FEED";
+    case "reels":
+      return "REELS";
+    case "all":
+      return "ALL";
     default:
-      return "POST";
+      return "STORY";
   }
 }
 
@@ -277,6 +471,10 @@ export function normalizeCampaign(
   }
 
   const id = getEntityId(record);
+  const storyConfig = getCampaignModalityConfig(record, "story");
+  const feedConfig = getCampaignModalityConfig(record, "feed");
+  const reelsConfig = getCampaignModalityConfig(record, "reels");
+  const rewardSummary = buildCampaignRewardSummary(record);
 
   return {
     ...record,
@@ -292,6 +490,31 @@ export function normalizeCampaign(
     rules: Array.isArray(record.rules)
       ? record.rules.filter((rule) => !shouldHideCampaignRule(rule))
       : [],
+    baseReward: ensureText(record.baseReward, rewardSummary),
+    maxReward: ensureText(record.maxReward),
+    storyReward: storyConfig.baseReward,
+    feedReward: feedConfig.baseReward,
+    reelsReward: reelsConfig.baseReward,
+    storyBaseReward: storyConfig.baseReward,
+    storyBaseQuantity: storyConfig.baseQuantity,
+    storyMaxReward: storyConfig.maxReward,
+    storyMaxQuantity: storyConfig.maxQuantity,
+    feedBaseReward: feedConfig.baseReward,
+    feedBaseQuantity: feedConfig.baseQuantity,
+    feedMaxReward: feedConfig.maxReward,
+    feedMaxQuantity: feedConfig.maxQuantity,
+    reelsBaseReward: reelsConfig.baseReward,
+    reelsBaseQuantity: reelsConfig.baseQuantity,
+    reelsMaxReward: reelsConfig.maxReward,
+    reelsMaxQuantity: reelsConfig.maxQuantity,
+    rewardSummary,
+    rewardLines: buildCampaignRewardLines(record),
+    enabledModalities: getEnabledCampaignModalities(record),
+    modalities: {
+      story: storyConfig,
+      feed: feedConfig,
+      reels: reelsConfig,
+    },
     baseLikesRequired: parseNumber(record.baseLikesRequired) ?? 0,
     maxLikesRequired: parseNumber(record.maxLikesRequired) ?? undefined,
     autoApproveParticipations: Boolean(record.autoApproveParticipations),
@@ -308,11 +531,21 @@ export function normalizeCampaign(
   };
 }
 
-type UiParticipationType = "story" | "post";
+type UiParticipationType = "story" | "feed" | "reels";
 type UiParticipationStatus = "pending" | "approved" | "rejected" | "redeemed";
 
 export function normalizeParticipationType(value?: string | null): UiParticipationType {
-  return String(value || "").toUpperCase() === "STORY" ? "story" : "post";
+  switch (String(value || "").toUpperCase()) {
+    case "STORY":
+      return "story";
+    case "REELS":
+    case "REEL":
+      return "reels";
+    case "FEED":
+    case "POST":
+    default:
+      return "feed";
+  }
 }
 
 export function normalizeParticipationStatus(

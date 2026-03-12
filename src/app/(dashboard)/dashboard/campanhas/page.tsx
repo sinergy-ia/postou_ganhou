@@ -14,9 +14,14 @@ import {
   Tag,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import PaginationControls from "@/components/dashboard/PaginationControls";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
 import { normalizeSponsoredHref } from "@/lib/sponsored-highlights-public";
 import { establishmentApi } from "@/services/establishment-api";
+import {
+  buildCampaignRewardLines,
+  getCampaignTypeLabel,
+} from "@/services/marque-e-ganhe-normalizers";
 import {
   sponsoredHighlightsApi,
   type SponsoredCampaign,
@@ -29,11 +34,9 @@ interface RegularCampaign {
   title?: string;
   expiresAt?: string;
   autoApproveParticipations?: boolean;
-  type?: "story" | "post" | "both" | string;
-  baseReward?: string;
-  baseLikesRequired?: number;
-  maxReward?: string;
-  maxLikesRequired?: number;
+  type?: "story" | "feed" | "reels" | "all" | string;
+  rewardSummary?: string;
+  rewardLines?: string[];
   stats?: {
     participants?: number;
   };
@@ -46,6 +49,8 @@ interface BoostStatusDescriptor {
   className: string;
   disabled: boolean;
 }
+
+const PAGE_SIZE = 10;
 
 function getPlanCampaignLimitMessage(limit: number | null) {
   if (limit === null) {
@@ -159,6 +164,7 @@ export default function CampanhasPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("Todas");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [boostFeedback, setBoostFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -184,10 +190,28 @@ export default function CampanhasPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["campaigns", search],
+    queryKey: ["campaigns", activeTab, search, page],
     queryFn: () =>
       establishmentApi.getCampaigns({
+        page,
+        limit: PAGE_SIZE,
+        status:
+          activeTab === "Ativas"
+            ? "ACTIVE"
+            : activeTab === "Encerradas"
+              ? "ENDED"
+              : undefined,
         search: search || undefined,
+      }),
+  });
+
+  const { data: activeCampaignsCountData } = useQuery({
+    queryKey: ["campaigns", "active-count"],
+    queryFn: () =>
+      establishmentApi.getCampaigns({
+        page: 1,
+        limit: 1,
+        status: "ACTIVE",
       }),
   });
 
@@ -206,8 +230,7 @@ export default function CampanhasPage() {
 
     return true;
   });
-  const allCampaigns: RegularCampaign[] = (data?.items || []) as RegularCampaign[];
-  const activeCampaignsCount = allCampaigns.filter((campaign) => campaign.status === "active").length;
+  const activeCampaignsCount = Number(activeCampaignsCountData?.total || 0);
   const hasReachedActiveCampaignLimit = Boolean(
     maxActiveCampaigns !== null && activeCampaignsCount >= maxActiveCampaigns,
   );
@@ -397,7 +420,10 @@ export default function CampanhasPage() {
             {tabs.map(tab => (
               <button 
                 key={tab} 
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setPage(1);
+                }}
                 className={`px-4 py-2 font-medium text-sm rounded-lg whitespace-nowrap transition-colors ${
                   activeTab === tab 
                     ? 'bg-slate-900 text-white shadow-sm' 
@@ -415,7 +441,10 @@ export default function CampanhasPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Buscar campanha..."
                 className="w-full md:w-64 rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 caret-primary-600 outline-none focus:ring-2 focus:ring-primary-500"
               />
@@ -480,38 +509,34 @@ export default function CampanhasPage() {
                         ) : null}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 font-medium rounded-md text-xs">
-                          {promo.type === "both"
-                            ? "Story + Post"
-                            : promo.type === "story"
-                              ? "Story"
-                              : "Post Feed"}
+                        <div className="flex flex-col gap-2">
+                          <div className="inline-flex w-fit items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 font-medium rounded-md text-xs">
+                            {getCampaignTypeLabel(promo.type)}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-slate-700 text-xs font-medium bg-primary-50 px-2 py-1 rounded w-fit border border-primary-100">
-                            <Tag className="w-3 h-3 text-primary-600" /> {promo.baseReward}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            Base: {promo.baseLikesRequired ?? 0} likes
-                          </div>
-                          {promo.maxReward && (
-                            <>
-                              <div
-                                className="text-[10px] text-slate-500 max-w-[150px] truncate"
-                                title={promo.maxReward}
-                              >
-                                Até {promo.maxReward}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                Máxima:{" "}
-                                {promo.maxLikesRequired !== undefined
-                                  ? `${promo.maxLikesRequired} likes`
-                                  : "sem meta"}
-                              </div>
-                            </>
-                          )}
+                          {(
+                            promo.rewardLines?.length
+                              ? promo.rewardLines
+                              : buildCampaignRewardLines(promo)
+                          ).concat(
+                            !(
+                              promo.rewardLines?.length ||
+                              buildCampaignRewardLines(promo).length
+                            ) && promo.rewardSummary
+                              ? [promo.rewardSummary]
+                              : [],
+                          ).map((line) => (
+                            <div
+                              key={line}
+                              className="flex items-center gap-1.5 text-slate-700 text-xs font-medium bg-primary-50 px-2 py-1 rounded w-fit border border-primary-100"
+                              title={line}
+                            >
+                              <Tag className="w-3 h-3 text-primary-600" /> {line}
+                            </div>
+                          ))}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -635,6 +660,15 @@ export default function CampanhasPage() {
             </tbody>
           </table>
         </div>
+
+        <PaginationControls
+          page={page}
+          limit={PAGE_SIZE}
+          total={Number(data?.total || 0)}
+          isLoading={isLoading}
+          itemLabel="campanhas"
+          onPageChange={setPage}
+        />
         
         {/* Empty State Mock for future use */}
         {/* <div className="p-12 text-center flex flex-col items-center">
