@@ -467,6 +467,11 @@ function CampaignForm() {
               <p className="text-xs text-slate-500 mt-1">
                 Escolha se a campanha vai contar story, feed, reels ou combinar tudo no mesmo cupom.
               </p>
+              {formData.type === 'story' || formData.type === 'all' ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Na modalidade Story, por enquanto a postagem deve ser apenas com imagem. Vídeos em story ainda não entram nesse fluxo.
+                </div>
+              ) : null}
             </div>
 
             <div>
