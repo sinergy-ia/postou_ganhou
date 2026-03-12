@@ -88,7 +88,7 @@ export default function CuponsPage() {
 
   const { data: metrics } = useQuery({
     queryKey: ['dashboard-metrics'],
-    queryFn: establishmentApi.getMetrics
+    queryFn: () => establishmentApi.getMetrics(),
   });
 
   const redeemMutation = useMutation({

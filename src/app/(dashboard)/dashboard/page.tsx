@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ["dashboard-metrics"],
-    queryFn: establishmentApi.getMetrics,
+    queryFn: () => establishmentApi.getMetrics(),
   });
 
   const { data: chartData, isLoading: isLoadingCharts } = useQuery({
@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   const { data: insightsData, isLoading: isLoadingInsights } = useQuery({
     queryKey: ["dashboard-insights"],
-    queryFn: establishmentApi.getAnalyticsInsights,
+    queryFn: () => establishmentApi.getAnalyticsInsights(),
     enabled: hasManagementDashboard,
   });
 

@@ -212,7 +212,7 @@ export default function PostagensPage() {
 
   const { data: metrics } = useQuery({
     queryKey: ['dashboard-metrics'],
-    queryFn: establishmentApi.getMetrics
+    queryFn: () => establishmentApi.getMetrics(),
   });
 
   const { data: conversionData } = useQuery({

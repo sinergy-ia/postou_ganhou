@@ -217,6 +217,7 @@ const defaultGenerateForm: GenerateFormState = {
   generateImage: true,
   generateVideo: false,
   durationSeconds: 6,
+  videoLanguage: "pt-BR",
   imagePrompt: "",
   videoPrompt: "",
 };
@@ -1519,10 +1520,9 @@ export default function PublicacoesIaPage() {
                       {post.scheduledAt ? (
                         <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
                           {isScheduledSoon ? (
-                            <Clock3
-                              className="h-3.5 w-3.5 text-amber-500"
-                              title="Publicação agendada para menos de 1 hora"
-                            />
+                            <span title="Publicação agendada para menos de 1 hora">
+                              <Clock3 className="h-3.5 w-3.5 text-amber-500" />
+                            </span>
                           ) : null}
                           <span>
                             Agendado para{" "}

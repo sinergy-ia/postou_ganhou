@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Edit2,
   Filter,
@@ -24,7 +24,6 @@ import {
 } from "@/services/marque-e-ganhe-normalizers";
 import {
   sponsoredHighlightsApi,
-  type SponsoredCampaign,
   type SponsoredCampaignStatus,
 } from "@/services/sponsored-highlights-api";
 
@@ -110,21 +109,6 @@ function pickDefaultSponsoredFormat(
   );
 }
 
-function extractOriginalCampaignId(campaign: SponsoredCampaign) {
-  const landingPage = normalizeSponsoredHref(campaign.landingPage);
-  const landingPageMatch = landingPage.match(/^\/promocoes\/([^/?#]+)/);
-
-  if (landingPageMatch?.[1]) {
-    return landingPageMatch[1];
-  }
-
-  const notesMatch = String(campaign.internalNotes || "").match(
-    /Campaign ID original:\s*([^\n\r]+)/i,
-  );
-
-  return notesMatch?.[1]?.trim() || "";
-}
-
 function getBoostStatusDescriptor(status?: SponsoredCampaignStatus | null): BoostStatusDescriptor {
   switch (status) {
     case "pending_payment":
@@ -169,6 +153,9 @@ export default function CampanhasPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [localBoostStatuses, setLocalBoostStatuses] = useState<
+    Record<string, SponsoredCampaignStatus>
+  >({});
   const tabs = ["Todas", "Ativas", "Agendadas", "Encerradas"];
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ["establishment-me"],
@@ -177,16 +164,10 @@ export default function CampanhasPage() {
   const canManageCampaigns = (me?.currentUser?.role || "owner") !== "viewer";
   const maxActiveCampaigns = me?.planAccess?.limits?.maxActiveCampaigns ?? null;
 
-  const { data: sponsoredLookups } = useQuery({
-    queryKey: ["sponsored-highlights", "boost-lookups"],
-    queryFn: sponsoredHighlightsApi.getLookups,
+  const { data: sponsoredFormats } = useQuery({
+    queryKey: ["sponsored-highlights", "formats", "active"],
+    queryFn: () => sponsoredHighlightsApi.getFormats({ active: true }),
     enabled: canManageCampaigns,
-  });
-
-  const { data: sponsoredRequestsData } = useQuery({
-    queryKey: ["sponsored-highlights", "boost-requests", me?.id || me?._id || ""],
-    queryFn: () => sponsoredHighlightsApi.getCampaigns({ limit: 100 }),
-    enabled: canManageCampaigns && Boolean(me?.id || me?._id),
   });
 
   const { data, isLoading } = useQuery({
@@ -234,42 +215,6 @@ export default function CampanhasPage() {
   const hasReachedActiveCampaignLimit = Boolean(
     maxActiveCampaigns !== null && activeCampaignsCount >= maxActiveCampaigns,
   );
-  const sponsoredRequestsByCampaignId = useMemo(() => {
-    const establishmentId = String(me?.id || me?._id || "");
-    const items = (sponsoredRequestsData?.items || []).filter(
-      (campaign) => campaign.establishmentId === establishmentId,
-    );
-
-    const statusPriority: Record<SponsoredCampaignStatus, number> = {
-      active: 5,
-      scheduled: 4,
-      pending_payment: 3,
-      paused: 2,
-      ended: 1,
-      cancelled: 1,
-      expired: 1,
-    };
-
-    return items.reduce<Record<string, SponsoredCampaign>>((accumulator, campaign) => {
-      const originalCampaignId = extractOriginalCampaignId(campaign);
-
-      if (!originalCampaignId) {
-        return accumulator;
-      }
-
-      const current = accumulator[originalCampaignId];
-
-      if (
-        !current ||
-        statusPriority[campaign.status] > statusPriority[current.status]
-      ) {
-        accumulator[originalCampaignId] = campaign;
-      }
-
-      return accumulator;
-    }, {});
-  }, [me, sponsoredRequestsData]);
-
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       establishmentApi.updateCampaign(id, { isActive }),
@@ -289,7 +234,7 @@ export default function CampanhasPage() {
   const requestBoostMutation = useMutation({
     mutationFn: async (promo: RegularCampaign) => {
       const establishmentId = String(me?.id || me?._id || "");
-      const defaultFormat = pickDefaultSponsoredFormat(sponsoredLookups?.formats);
+      const defaultFormat = pickDefaultSponsoredFormat(sponsoredFormats);
 
       if (!establishmentId) {
         throw new Error("Nao foi possivel identificar o estabelecimento para solicitar o impulsionamento.");
@@ -324,7 +269,16 @@ export default function CampanhasPage() {
         initialStatus: "pending_payment",
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, promo) => {
+      const promoId = String(promo.id || promo._id || "");
+
+      if (promoId) {
+        setLocalBoostStatuses((current) => ({
+          ...current,
+          [promoId]: "pending_payment",
+        }));
+      }
+
       setBoostFeedback({
         type: "success",
         message:
@@ -333,7 +287,6 @@ export default function CampanhasPage() {
 
       queryClient.invalidateQueries({ queryKey: ["sponsored-highlights", "campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["sponsored-highlights", "overview"] });
-      queryClient.invalidateQueries({ queryKey: ["sponsored-highlights", "boost-requests"] });
     },
     onError: (error) => {
       setBoostFeedback({
@@ -484,10 +437,8 @@ export default function CampanhasPage() {
               ) : (
                 campaigns.map((promo, index: number) => {
                   const promoId = String(promo.id || promo._id || "");
-                  const linkedSponsoredCampaign =
-                    sponsoredRequestsByCampaignId[promoId] || null;
                   const boostStatus = getBoostStatusDescriptor(
-                    linkedSponsoredCampaign?.status || null,
+                    localBoostStatuses[promoId] || null,
                   );
 
                   return (
@@ -627,7 +578,7 @@ export default function CampanhasPage() {
                                 disabled={
                                   requestBoostMutation.isPending ||
                                   boostStatus.disabled ||
-                                  !sponsoredLookups?.formats?.length ||
+                                  !sponsoredFormats?.length ||
                                   !promoId
                                 }
                                 className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${boostStatus.className} ${

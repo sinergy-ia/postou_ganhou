@@ -180,6 +180,10 @@ export default function ConfiguracoesPage() {
     e: React.ChangeEvent<HTMLInputElement>,
     type: "cover" | "avatar",
   ) => {
+    if (!canEditSettings) {
+      return;
+    }
+
     const file = e.target.files?.[0];
 
     if (!file) {
@@ -211,19 +215,25 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const { data: me } = useQuery({
+  const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ["establishment-me"],
     queryFn: establishmentApi.getMe,
   });
 
-  const { data: settings, isLoading } = useQuery({
+  const currentUserRole = String(me?.currentUser?.role || "");
+  const isSuperAdmin = Boolean(me?.superAdmin || me?.currentUser?.superAdmin);
+  const canLoadSensitiveSettings = currentUserRole === "owner" || isSuperAdmin;
+
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ["settings"],
     queryFn: () => establishmentApi.getSettings(),
+    enabled: canLoadSensitiveSettings,
   });
   const establishment = settings || me;
   const isMetaConnected = Boolean(establishment?.metaConnected);
   const establishmentId = establishment?.id || establishment?._id;
-  const canEditSettings = (establishment?.currentUserRole || "owner") === "owner";
+  const canEditSettings = currentUserRole === "owner";
+  const canConnectInstagram = canEditSettings && Boolean(establishmentId);
   const configSections = useMemo(
     () => baseConfigSections,
     [],
@@ -242,11 +252,16 @@ export default function ConfiguracoesPage() {
       activeSection === "social");
 
   const updateMutation = useMutation({
-    mutationFn: (payload: ConfigFormData) =>
-      establishmentApi.updateSettings({
+    mutationFn: (payload: ConfigFormData) => {
+      if (!canEditSettings) {
+        throw new Error("Apenas o owner pode alterar as configuracoes da loja.");
+      }
+
+      return establishmentApi.updateSettings({
         ...payload,
         category: normalizeCategoryValue(payload.category),
-      }),
+      });
+    },
     onSuccess: () => {
       setError("");
       queryClient.invalidateQueries({ queryKey: ["settings"] });
@@ -260,6 +275,10 @@ export default function ConfiguracoesPage() {
 
   const connectInstagramMutation = useMutation({
     mutationFn: async () => {
+      if (!canEditSettings) {
+        throw new Error("Apenas o owner pode conectar ou reconectar o Instagram.");
+      }
+
       const frontendOrigin =
         typeof window !== "undefined" ? window.location.origin : undefined;
       const response = await establishmentApi.getFacebookLoginUrl({
@@ -306,6 +325,10 @@ export default function ConfiguracoesPage() {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
+    if (!canEditSettings) {
+      return;
+    }
+
     const { name, value } = e.target;
 
     setError("");
@@ -320,7 +343,7 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingMe || (canLoadSensitiveSettings && isLoadingSettings)) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
@@ -425,6 +448,7 @@ export default function ConfiguracoesPage() {
                         type="file"
                         className="hidden"
                         accept="image/*"
+                        disabled={!canEditSettings}
                         onChange={(e) => handleImageChange(e, "cover")}
                       />
                       {coverPreview ? (
@@ -451,6 +475,7 @@ export default function ConfiguracoesPage() {
                       type="url"
                       name="coverUrl"
                       value={formData.coverUrl}
+                        disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       placeholder="Ou cole a URL da capa"
                       className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
@@ -479,6 +504,7 @@ export default function ConfiguracoesPage() {
                             type="file"
                             className="hidden"
                             accept="image/*"
+                            disabled={!canEditSettings}
                             onChange={(e) => handleImageChange(e, "avatar")}
                           />
                           <span className="text-sm font-medium">
@@ -490,6 +516,7 @@ export default function ConfiguracoesPage() {
                           type="url"
                           name="avatarUrl"
                           value={formData.avatarUrl}
+                          disabled={!canEditSettings}
                           onChange={handleTextFieldChange}
                           placeholder="Ou cole a URL da logo"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
@@ -516,6 +543,7 @@ export default function ConfiguracoesPage() {
                         type="text"
                         name="name"
                         value={formData.name}
+                        disabled={!canEditSettings}
                         onChange={handleTextFieldChange}
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                       />
@@ -529,6 +557,7 @@ export default function ConfiguracoesPage() {
                     <select
                       name="category"
                       value={formData.category}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                     >
@@ -561,6 +590,7 @@ export default function ConfiguracoesPage() {
                       type="text"
                       name="cnpj"
                       value={formData.cnpj}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       placeholder="00.000.000/0000-00"
                       className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
@@ -575,6 +605,7 @@ export default function ConfiguracoesPage() {
                       rows={3}
                       name="description"
                       value={formData.description}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none resize-none"
                     ></textarea>
@@ -605,6 +636,7 @@ export default function ConfiguracoesPage() {
                       type="text"
                       name="address"
                       value={formData.address}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                     />
@@ -659,7 +691,7 @@ export default function ConfiguracoesPage() {
                             </span>{" "}
                             {establishment?.instagramHandle || "Conectado"}
                           </div>
-                          {establishment?.facebookPageId ? (
+                          {canLoadSensitiveSettings && establishment?.facebookPageId ? (
                             <div>
                               <span className="font-bold text-slate-800">
                                 Página Facebook:
@@ -674,9 +706,7 @@ export default function ConfiguracoesPage() {
                     <button
                       type="button"
                       onClick={() => connectInstagramMutation.mutate()}
-                      disabled={
-                        connectInstagramMutation.isPending || !establishmentId
-                      }
+                      disabled={!canConnectInstagram || connectInstagramMutation.isPending}
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {connectInstagramMutation.isPending ? (
@@ -699,6 +729,7 @@ export default function ConfiguracoesPage() {
                       type="text"
                       name="instagramHandle"
                       value={formData.instagramHandle}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                     />
@@ -714,6 +745,7 @@ export default function ConfiguracoesPage() {
                       type="url"
                       name="website"
                       value={formData.website}
+                      disabled={!canEditSettings}
                       onChange={handleTextFieldChange}
                       placeholder="https://..."
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"

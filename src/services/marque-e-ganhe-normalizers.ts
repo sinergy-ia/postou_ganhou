@@ -175,6 +175,7 @@ export function normalizeEstablishment(
     ...record,
     id,
     _id: id,
+    currentUserRole: ensureText(record.currentUserRole ?? record.currentUser?.role),
     name,
     category: ensureText(record.category, "Sem categoria"),
     avatar: avatarUrl,
