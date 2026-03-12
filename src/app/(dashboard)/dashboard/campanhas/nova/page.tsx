@@ -151,6 +151,15 @@ function buildCampaignRules(formData: CampaignFormState) {
     `Use a hashtag ${formData.hashtagRequired}.`,
   ];
 
+  if (formData.type === 'story' || formData.type === 'all') {
+    rules.push(
+      'Na modalidade Story, por enquanto a postagem deve ser apenas com imagem. Videos em story ainda nao entram nesse fluxo.',
+    );
+    rules.push(
+      'A hashtag e o arroba do estabelecimento precisam estar visiveis no story. Nao pode ser escrita transparente, branca, escondida ou muito pequena.',
+    );
+  }
+
   for (const section of getActiveModalitySections(formData.type)) {
     const baseReward = formData[section.baseRewardKey].trim();
     const baseQuantity = Number(formData[section.baseQuantityKey] || 0);
@@ -499,8 +508,13 @@ function CampaignForm() {
                 No momento, campanhas com story estao disponiveis. Feed, reels e combinacao de modalidades entram em breve.
               </p>
               {formData.type === 'story' || formData.type === 'all' ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Na modalidade Story, por enquanto a postagem deve ser apenas com imagem. Vídeos em story ainda não entram nesse fluxo.
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Na modalidade Story, por enquanto a postagem deve ser apenas com imagem. Videos em story ainda nao entram nesse fluxo.
+                  </div>
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    Como premissa, a hashtag e o arroba do estabelecimento precisam ficar visiveis no story. Nao pode ser escrita transparente, branca, escondida ou muito pequena.
+                  </div>
                 </div>
               ) : null}
             </div>
