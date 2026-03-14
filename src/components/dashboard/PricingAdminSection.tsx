@@ -766,7 +766,7 @@ export default function PricingAdminSection() {
       </section>
 
       <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
               <BarChart3 className="h-3.5 w-3.5" />
@@ -781,8 +781,8 @@ export default function PricingAdminSection() {
             </p>
           </div>
 
-          <div className="grid w-full gap-4 md:grid-cols-2 xl:max-w-4xl xl:grid-cols-[minmax(340px,1.4fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
-            <div className="md:col-span-2 xl:col-span-1 xl:min-w-[340px]">
+          <div className="grid w-full gap-4 sm:grid-cols-2 2xl:max-w-4xl 2xl:grid-cols-[minmax(320px,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="min-w-0 sm:col-span-2 2xl:col-span-1 2xl:min-w-[320px]">
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Estabelecimento
               </label>
@@ -802,7 +802,7 @@ export default function PricingAdminSection() {
               </select>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Data inicial
               </label>
@@ -819,7 +819,7 @@ export default function PricingAdminSection() {
               />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                 Data final
               </label>
@@ -839,12 +839,12 @@ export default function PricingAdminSection() {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={handleDownloadInvoice}
             disabled={!selectedAnalyticsEstablishment || isLoadingAnalyticsPanel}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <Download className="h-4 w-4" />
             Baixar fatura
@@ -1111,7 +1111,134 @@ export default function PricingAdminSection() {
           </div>
         </div>
 
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 space-y-4 xl:hidden">
+          {filteredEstablishments.map((item) => {
+            const draft = getDraft(item);
+            const isPlanPending =
+              assignPlanMutation.isPending &&
+              assignPlanMutation.variables?.establishmentId === item.id;
+            const isSuperAdminPending =
+              superAdminMutation.isPending &&
+              superAdminMutation.variables?.establishmentId === item.id;
+
+            return (
+              <article
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{item.name}</p>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      {item.email || "Sem e-mail"}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Categoria: {item.category || "-"}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getPlanTone(
+                        item.pricingPlanType,
+                      )}`}
+                    >
+                      {item.plan}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        superAdminMutation.mutate({
+                          establishmentId: item.id,
+                          superAdmin: !item.superAdmin,
+                        })
+                      }
+                      disabled={isSuperAdminPending}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                        item.superAdmin
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-white text-slate-600"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      {isSuperAdminPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : item.superAdmin ? (
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                      ) : (
+                        <ShieldOff className="h-3.5 w-3.5" />
+                      )}
+                      {item.superAdmin ? "Super admin" : "Padrão"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Novo plano
+                    </label>
+                    <select
+                      value={draft.planType}
+                      onChange={(event) =>
+                        updateDraft(item.id, {
+                          planType: event.target.value as "free" | "start" | "pro" | "scale",
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-200"
+                    >
+                      {(pricingPlans || []).map((plan) => (
+                        <option key={`${item.id}-${plan.id}`} value={plan.type}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Ciclo
+                    </label>
+                    <select
+                      value={draft.billingCycle}
+                      onChange={(event) =>
+                        updateDraft(item.id, {
+                          billingCycle: event.target.value as "monthly" | "annual",
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-200"
+                    >
+                      <option value="monthly">Mensal</option>
+                      <option value="annual">Anual</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      assignPlanMutation.mutate({
+                        establishmentId: item.id,
+                        payload: draft,
+                      })
+                    }
+                    disabled={isPlanPending}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  >
+                    {isPlanPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BadgeDollarSign className="h-4 w-4" />
+                    )}
+                    Aplicar
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 hidden overflow-x-auto xl:block">
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-slate-50/70 text-xs uppercase text-slate-500">
               <tr>
