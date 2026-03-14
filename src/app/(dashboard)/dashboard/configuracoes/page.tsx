@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { establishmentApi } from "@/services/establishment-api";
 import PricingAdminSection from "@/components/dashboard/PricingAdminSection";
 import TeamManagementSection from "@/components/dashboard/TeamManagementSection";
+import {
+  dashboardConfigSections,
+  isDashboardConfigSectionId,
+  type ConfigSectionId,
+} from "@/lib/dashboard-config-sections";
 import {
   BadgeDollarSign,
   CheckCircle2,
@@ -19,21 +25,8 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-type ConfigSectionId =
-  | "profile"
-  | "address"
-  | "social"
-  | "team"
-  | "hours"
-  | "notifications"
-  | "billing";
-
-const baseConfigSections: Array<{
-  id: ConfigSectionId;
-  label: string;
-  description: string;
-  available: boolean;
-}> = [
+const baseConfigSections = dashboardConfigSections;
+/*
   {
     id: "profile",
     label: "Perfil da Loja",
@@ -77,6 +70,7 @@ const baseConfigSections: Array<{
     available: true,
   },
 ];
+*/
 
 function resolvePlanUserLimit(planType?: "free" | "start" | "pro" | "scale") {
   switch (planType) {
@@ -144,29 +138,46 @@ function buildInitialFormData(current: Record<string, unknown> | null | undefine
   };
 }
 
-export default function ConfiguracoesPage() {
+function ConfiguracoesPageContent() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<ConfigSectionId>(() => {
-    if (typeof window === "undefined") {
-      return "profile";
-    }
-
-    const savedSection = window.sessionStorage.getItem("marque_e_ganhe_config_section");
-    return baseConfigSections.some((section) => section.id === savedSection)
-      ? (savedSection as ConfigSectionId)
-      : "profile";
-  });
   const [draftFormData, setDraftFormData] = useState<ConfigFormData | null>(null);
   const [error, setError] = useState("");
 
   const [draftCoverPreview, setDraftCoverPreview] = useState<string | null>(null);
   const [draftAvatarPreview, setDraftAvatarPreview] = useState<string | null>(null);
 
+  const searchParamsString = searchParams.toString();
+  const activeSection = useMemo<ConfigSectionId>(() => {
+    const sectionFromQuery = searchParams.get("section");
+    return isDashboardConfigSectionId(sectionFromQuery)
+      ? sectionFromQuery
+      : "profile";
+  }, [searchParams]);
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem("marque_e_ganhe_config_section");
+    if (typeof window === "undefined") {
+      return;
     }
-  }, []);
+
+    const savedSection = window.sessionStorage.getItem("marque_e_ganhe_config_section");
+
+    if (!isDashboardConfigSectionId(savedSection)) {
+      return;
+    }
+
+    window.sessionStorage.removeItem("marque_e_ganhe_config_section");
+
+    if (searchParams.get("section") === savedSection) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParamsString);
+    nextParams.set("section", savedSection);
+    router.replace(`${pathname}?${nextParams.toString()}`);
+  }, [pathname, router, searchParams, searchParamsString]);
 
   const readFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -234,10 +245,7 @@ export default function ConfiguracoesPage() {
   const establishmentId = establishment?.id || establishment?._id;
   const canEditSettings = currentUserRole === "owner";
   const canConnectInstagram = canEditSettings && Boolean(establishmentId);
-  const configSections = useMemo(
-    () => baseConfigSections,
-    [],
-  );
+  const configSections = useMemo(() => baseConfigSections, []);
   const activeSectionMeta =
     configSections.find((section) => section.id === activeSection) ||
     configSections[0];
@@ -393,44 +401,7 @@ export default function ConfiguracoesPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-          {configSections.map((section) => {
-            const isActive = section.id === activeSection;
-
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => setActiveSection(section.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  isActive
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span>{section.label}</span>
-                  {!section.available ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                        isActive
-                          ? "bg-white/15 text-white"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      em breve
-                    </span>
-                  ) : null}
-                </div>
-              </button>
-            );
-          })}
-          </div>
-        </div>
-
-        <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
           {activeSection === "profile" ? (
             <>
               <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
@@ -471,15 +442,6 @@ export default function ConfiguracoesPage() {
                         </>
                       )}
                     </label>
-                    <input
-                      type="url"
-                      name="coverUrl"
-                      value={formData.coverUrl}
-                        disabled={!canEditSettings}
-                      onChange={handleTextFieldChange}
-                      placeholder="Ou cole a URL da capa"
-                      className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-                    />
                   </div>
 
                   <div>
@@ -512,15 +474,6 @@ export default function ConfiguracoesPage() {
                           </span>
                           <span className="text-xs">400 x 400px mínimo</span>
                         </label>
-                        <input
-                          type="url"
-                          name="avatarUrl"
-                          value={formData.avatarUrl}
-                          disabled={!canEditSettings}
-                          onChange={handleTextFieldChange}
-                          placeholder="Ou cole a URL da logo"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-                        />
                       </div>
                     </div>
                   </div>
@@ -572,6 +525,9 @@ export default function ConfiguracoesPage() {
                       </option>
                       <option value="Moda" className="text-slate-900">
                         Moda
+                      </option>
+                      <option value="Academia" className="text-slate-900">
+                        Academia
                       </option>
                       <option value="Serviços" className="text-slate-900">
                         Serviços
@@ -847,8 +803,21 @@ export default function ConfiguracoesPage() {
               </div>
             </section>
           ) : null}
-        </div>
       </div>
     </div>
+  );
+}
+
+export default function ConfiguracoesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+        </div>
+      }
+    >
+      <ConfiguracoesPageContent />
+    </Suspense>
   );
 }
