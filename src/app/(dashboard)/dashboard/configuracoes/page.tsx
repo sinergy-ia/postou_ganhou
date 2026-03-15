@@ -4,6 +4,13 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { establishmentApi } from "@/services/establishment-api";
+import {
+  buildInvoiceNumber,
+  formatDateTimePtBr,
+  openInvoicePdf,
+} from "@/lib/billing-invoice";
+import DashboardDialog from "@/components/ui/DashboardDialog";
+import { publicApi } from "@/services/public-api";
 import PricingAdminSection from "@/components/dashboard/PricingAdminSection";
 import TeamManagementSection from "@/components/dashboard/TeamManagementSection";
 import {
@@ -14,6 +21,7 @@ import {
 import {
   BadgeDollarSign,
   CheckCircle2,
+  Download,
   Globe,
   Instagram,
   Link2,
@@ -86,6 +94,19 @@ function resolvePlanUserLimit(planType?: "free" | "start" | "pro" | "scale") {
   }
 }
 
+function formatCurrency(value?: number | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
+function formatPercentageValue(value?: number | null) {
+  return `${Number(value || 0)}%`;
+}
+
 function normalizeCategoryValue(value?: string | null) {
   const normalized = String(value || "").trim();
   return normalized === "Sem categoria" ? "" : normalized;
@@ -145,6 +166,7 @@ function ConfiguracoesPageContent() {
   const queryClient = useQueryClient();
   const [draftFormData, setDraftFormData] = useState<ConfigFormData | null>(null);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [draftCoverPreview, setDraftCoverPreview] = useState<string | null>(null);
   const [draftAvatarPreview, setDraftAvatarPreview] = useState<string | null>(null);
@@ -240,6 +262,26 @@ function ConfiguracoesPageContent() {
     queryFn: () => establishmentApi.getSettings(),
     enabled: canLoadSensitiveSettings,
   });
+  const { data: billingMetrics, isLoading: isLoadingBillingMetrics } = useQuery({
+    queryKey: ["billing-metrics-establishment"],
+    queryFn: () => establishmentApi.getMetrics(),
+    enabled: activeSection === "billing" && !isSuperAdmin,
+  });
+  const { data: pricingData, isLoading: isLoadingPricingData } = useQuery({
+    queryKey: ["public-pricing"],
+    queryFn: publicApi.getPricing,
+    enabled: activeSection === "billing" && !isSuperAdmin,
+  });
+  const { data: billingConversion, isLoading: isLoadingBillingConversion } = useQuery({
+    queryKey: ["billing-conversion-establishment"],
+    queryFn: () => establishmentApi.getAnalyticsConversion(),
+    enabled: activeSection === "billing" && !isSuperAdmin,
+  });
+  const { data: billingRoi, isLoading: isLoadingBillingRoi } = useQuery({
+    queryKey: ["billing-roi-establishment"],
+    queryFn: () => establishmentApi.getAnalyticsRoi(),
+    enabled: activeSection === "billing" && !isSuperAdmin,
+  });
   const establishment = settings || me;
   const isMetaConnected = Boolean(establishment?.metaConnected);
   const establishmentId = establishment?.id || establishment?._id;
@@ -253,6 +295,20 @@ function ConfiguracoesPageContent() {
   const formData = draftFormData ?? initialFormData;
   const coverPreview = draftCoverPreview ?? formData.coverUrl ?? null;
   const avatarPreview = draftAvatarPreview ?? formData.avatarUrl ?? null;
+  const currentPricingPlan =
+    pricingData?.plans?.find(
+      (plan) =>
+        plan.type ===
+        String(establishment?.pricingPlanType || establishment?.planAccess?.planType || "free"),
+    ) || null;
+  const estimatedOwnCharge =
+    Number(billingMetrics?.couponsRedeemed || 0) *
+    Number(currentPricingPlan?.redemptionFee || 0);
+  const isLoadingOwnBillingEstimate =
+    isLoadingBillingMetrics ||
+    isLoadingPricingData ||
+    isLoadingBillingConversion ||
+    isLoadingBillingRoi;
   const canSaveCurrentSection =
     canEditSettings &&
     (activeSection === "profile" ||
@@ -274,7 +330,7 @@ function ConfiguracoesPageContent() {
       setError("");
       queryClient.invalidateQueries({ queryKey: ["settings"] });
       queryClient.invalidateQueries({ queryKey: ["establishment-me"] });
-      alert("Configuracoes salvas com sucesso!");
+      setSuccessMessage("Configuracoes salvas com sucesso!");
     },
     onError: (mutationError) => {
       setError(getErrorMessage(mutationError, "Nao foi possivel salvar as configuracoes."));
@@ -349,6 +405,36 @@ function ConfiguracoesPageContent() {
     if (name === "avatarUrl") {
       setDraftAvatarPreview(value || null);
     }
+  };
+
+  const handleDownloadOwnInvoice = () => {
+    if (!establishment) {
+      return;
+    }
+
+    const generatedAt = new Date();
+
+    openInvoicePdf({
+      invoiceNumber: buildInvoiceNumber(establishmentId ? String(establishmentId) : "", generatedAt),
+      generatedAt: formatDateTimePtBr(generatedAt),
+      establishmentName: String(establishment?.name || "Estabelecimento"),
+      establishmentEmail: String(
+        establishment?.email || establishment?.currentUser?.email || "Sem e-mail cadastrado",
+      ),
+      category: String(establishment?.category || "Sem categoria"),
+      planName: String(establishment?.plan || "Free"),
+      billingCycle:
+        establishment?.pricingBillingCycle === "annual" ? "Anual" : "Mensal",
+      periodLabel: "Resumo atual do painel",
+      redeemedCoupons: Number(billingMetrics?.couponsRedeemed || 0),
+      issuedCoupons: Number(billingMetrics?.couponsIssued || 0),
+      totalParticipations: Number(billingMetrics?.totalPosts || 0),
+      conversionRate: billingConversion?.rate || "0%",
+      approvalRate: formatPercentageValue(billingConversion?.approvalRate),
+      roi: billingRoi?.roi || "0%",
+      unitFee: formatCurrency(currentPricingPlan?.redemptionFee || 0),
+      totalAmount: formatCurrency(estimatedOwnCharge),
+    });
   };
 
   if (isLoadingMe || (canLoadSensitiveSettings && isLoadingSettings)) {
@@ -766,28 +852,75 @@ function ConfiguracoesPageContent() {
               </div>
 
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-                <h2 className="font-heading font-bold text-xl text-slate-900 mb-4">
-                  Recursos liberados no seu plano
-                </h2>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(establishment?.planAccess?.features || {})
-                    .filter(([, enabled]) => Boolean(enabled))
-                    .map(([feature]) => (
-                      <span
-                        key={feature}
-                        className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700"
-                      >
-                        {feature}
-                      </span>
-                    ))}
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
+                      <BadgeDollarSign className="h-3.5 w-3.5" />
+                      Seu estabelecimento
+                    </div>
+                    <h2 className="mt-4 font-heading font-bold text-xl text-slate-900">
+                      Cobrança estimada
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Valor calculado apenas com os resgates da sua loja no painel.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadOwnInvoice}
+                    disabled={isLoadingOwnBillingEstimate}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar fatura em PDF
+                  </button>
                 </div>
+
+                {isLoadingOwnBillingEstimate ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary-500" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm text-slate-600">
+                        <div className="font-semibold text-slate-900">
+                          Cupons resgatados
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-slate-900">
+                          {billingMetrics?.couponsRedeemed || 0}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm text-slate-600">
+                        <div className="font-semibold text-slate-900">
+                          Taxa por resgate
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-slate-900">
+                          {formatCurrency(currentPricingPlan?.redemptionFee || 0)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-primary-200 bg-primary-50 px-5 py-4 text-sm text-primary-700">
+                        <div className="font-semibold text-primary-900">
+                          Total estimado
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-primary-900">
+                          {formatCurrency(estimatedOwnCharge)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      Essa estimativa considera somente os dados do seu estabelecimento e a taxa
+                      do plano atual ({establishment?.plan || "Free"}).
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-3xl px-6 py-5 text-sm text-amber-900 shadow-sm">
-                A alteração de plano é uma ação restrita ao super admin da plataforma.
-                Se você precisa de upgrade, downgrade ou white-label, entre em contato
-                com a equipe responsável pelo Marque &amp; Ganhe.
-              </div>
+
             </section>
           ) : null}
 
@@ -804,6 +937,22 @@ function ConfiguracoesPageContent() {
             </section>
           ) : null}
       </div>
+
+      <DashboardDialog
+        open={Boolean(successMessage)}
+        onClose={() => setSuccessMessage("")}
+        title="Alteracoes salvas"
+        description={successMessage}
+        footer={
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Entendi
+          </button>
+        }
+      />
     </div>
   );
 }

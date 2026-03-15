@@ -27,7 +27,7 @@ export const dashboardConfigSections: Array<{
   },
   {
     id: "social",
-    label: "Redes Sociais",
+    label: "Conectar Instagram",
     description: "Instagram e website do estabelecimento.",
     available: true,
   },

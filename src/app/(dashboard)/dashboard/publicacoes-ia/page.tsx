@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PaginationControls from "@/components/dashboard/PaginationControls";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
+import DashboardDialog from "@/components/ui/DashboardDialog";
+import {
+  canUseAiPostsPlan,
+  getAiPostsGenerationLimit,
+  getAiPostsVideoGenerationLimit,
+} from "@/lib/ai-posts-plan-limits";
 import {
   establishmentApi,
   type AiPostMode,
@@ -454,34 +460,6 @@ const aiPostsSections: Array<{
   },
 ];
 
-function canUseAiPostsPlan(planType?: string | null) {
-  return planType === "pro" || planType === "scale";
-}
-
-function getAiPostsGenerationLimit(planType?: string | null) {
-  if (planType === "pro") {
-    return 20;
-  }
-
-  if (planType === "scale") {
-    return 40;
-  }
-
-  return 0;
-}
-
-function getAiPostsVideoGenerationLimit(planType?: string | null) {
-  if (planType === "pro") {
-    return 5;
-  }
-
-  if (planType === "scale") {
-    return 10;
-  }
-
-  return 0;
-}
-
 function getErrorMessage(error: unknown, fallback: string) {
   if (
     typeof error === "object" &&
@@ -684,6 +662,8 @@ export default function PublicacoesIaPage() {
   const [postTypeFilter, setPostTypeFilter] = useState("");
   const [libraryPage, setLibraryPage] = useState(1);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isPostDetailModalOpen, setIsPostDetailModalOpen] = useState(false);
   const [generateForm, setGenerateForm] = useState<GenerateFormState>(defaultGenerateForm);
   const [draftState, setDraftState] = useState<DraftState>(createEmptyDraftState());
 
@@ -757,6 +737,37 @@ export default function PublicacoesIaPage() {
 
     return createDraftStateFromPost(selectedPost);
   }, [draftState, selectedPost]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const syncViewport = (matches: boolean) => {
+      setIsMobileViewport(matches);
+    };
+
+    syncViewport(mediaQuery.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncViewport(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  const handleSelectPost = (postId: string) => {
+    setSelectedPostId(postId);
+
+    if (isMobileViewport) {
+      setIsPostDetailModalOpen(true);
+    }
+  };
 
   const isMetaConnected = Boolean(me?.metaConnected);
   const campaigns = Array.isArray(campaignsData?.items)
@@ -873,6 +884,9 @@ export default function PublicacoesIaPage() {
       if (post?.id) {
         setSelectedPostId(post.id);
         setActiveSection("library");
+        if (isMobileViewport) {
+          setIsPostDetailModalOpen(true);
+        }
         queryClient.invalidateQueries({ queryKey: ["ai-post", post.id] });
       }
 
@@ -1126,6 +1140,624 @@ export default function PublicacoesIaPage() {
     scheduleMutation.mutate(selectedPost.id);
   };
 
+  const selectedPostReviewContent = selectedPost ? (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusMeta(selectedPost.status).className}`}
+            >
+              {getStatusMeta(selectedPost.status).label}
+            </span>
+            <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+              {getModeLabel(currentDraft.mode)}
+            </span>
+            <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+              {getPostTypeLabel(currentDraft.postType)}
+            </span>
+          </div>
+
+          <h3 className="mt-3 font-heading text-2xl font-bold text-slate-900">
+            Revisar publicacao
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Ajuste legenda, hashtags e agendamento antes de enviar ao
+            Instagram.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFeedback(null);
+            queryClient.invalidateQueries({ queryKey: ["ai-post", selectedPost.id] });
+            queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+          }}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Atualizar
+        </button>
+      </div>
+
+      {draftCampaign?.title ? (
+        <div className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+          <div className="font-semibold">
+            Vinculado a campanha: {draftCampaign.title}
+          </div>
+          {requiredCampaignHashtag ? (
+            <div className="mt-1">
+              A hashtag obrigatoria {requiredCampaignHashtag} precisa
+              permanecer na legenda final ou na lista de hashtags.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 font-bold text-slate-900">
+              Configuracao do rascunho
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Modo
+                </label>
+                <select
+                  value={currentDraft.mode}
+                  onChange={(event) =>
+                    updateDraft({
+                      mode: event.target.value as AiPostMode,
+                      campaignId:
+                        event.target.value === "CAMPAIGN"
+                          ? currentDraft.campaignId
+                          : "",
+                    })
+                  }
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="EDITORIAL">Editorial</option>
+                  <option value="CAMPAIGN">Campanha</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Tipo da publicacao
+                </label>
+                <select
+                  value={currentDraft.postType}
+                  onChange={(event) =>
+                    updateDraft({
+                      postType: event.target.value as AiPostType,
+                      ...getDefaultMediaConfig(event.target.value as AiPostType),
+                    })
+                  }
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="FEED">Feed</option>
+                  <option value="STORY">Story</option>
+                  <option value="REELS">Reels</option>
+                </select>
+              </div>
+
+              {currentDraft.mode === "CAMPAIGN" ? (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Campanha vinculada
+                  </label>
+                  <select
+                    value={currentDraft.campaignId}
+                    onChange={(event) =>
+                      updateDraft({ campaignId: event.target.value })
+                    }
+                    disabled={!canEditAiPosts}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    <option value="">Selecione uma campanha</option>
+                    {campaigns.map((campaign) => (
+                      <option
+                        key={String(campaign.id || campaign._id)}
+                        value={String(campaign.id || campaign._id)}
+                      >
+                        {campaign.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
+              <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <input
+                      type="radio"
+                      name={`draft-media-type-${selectedPost?.id || "default"}`}
+                      checked={currentDraft.generateImage}
+                      onChange={() =>
+                        updateDraft({
+                          generateImage: true,
+                          generateVideo: false,
+                        })
+                      }
+                      disabled={!canEditAiPosts}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-slate-700">
+                      <span className="block font-bold text-slate-900">
+                        Gerar imagem
+                      </span>
+                      Use quando quiser uma arte fixa para feed ou story. Em
+                      story, este e o formato disponivel neste fluxo.
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
+                      currentDraft.postType === "STORY"
+                        ? "cursor-not-allowed border-slate-200 bg-slate-100"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`draft-media-type-${selectedPost?.id || "default"}`}
+                      checked={currentDraft.generateVideo}
+                      disabled={
+                        currentDraft.postType === "STORY" || !canEditAiPosts
+                      }
+                      onChange={() =>
+                        updateDraft({
+                          generateImage: false,
+                          generateVideo: true,
+                        })
+                      }
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span
+                      className={`text-sm ${
+                        currentDraft.postType === "STORY"
+                          ? "text-slate-500"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      <span className="block font-bold text-slate-900">
+                        Gerar video
+                      </span>
+                      Ative para reels ou quando quiser motion no feed. Story
+                      ainda nao aceita video neste fluxo.
+                    </span>
+                  </label>
+                </div>
+
+                {currentDraft.postType === "STORY" ? (
+                  <StoryPremisesBalloons />
+                ) : null}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Prompt principal
+                </label>
+                <textarea
+                  rows={3}
+                  value={currentDraft.prompt}
+                  onChange={(event) => updateDraft({ prompt: event.target.value })}
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Topico
+                </label>
+                <input
+                  type="text"
+                  value={currentDraft.topic}
+                  onChange={(event) => updateDraft({ topic: event.target.value })}
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Chamada para acao
+                </label>
+                <input
+                  type="text"
+                  value={currentDraft.callToAction}
+                  onChange={(event) =>
+                    updateDraft({ callToAction: event.target.value })
+                  }
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Publico alvo
+                </label>
+                <input
+                  type="text"
+                  value={currentDraft.targetAudience}
+                  onChange={(event) =>
+                    updateDraft({ targetAudience: event.target.value })
+                  }
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Briefing
+                </label>
+                <input
+                  type="text"
+                  value={currentDraft.briefing}
+                  onChange={(event) => updateDraft({ briefing: event.target.value })}
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+
+              {currentDraft.generateVideo ? (
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Duracao do video
+                  </label>
+                  <select
+                    value={String(currentDraft.durationSeconds)}
+                    onChange={(event) =>
+                      updateDraft({
+                        durationSeconds: Number(
+                          event.target.value,
+                        ) as AiVideoDurationSeconds,
+                      })
+                    }
+                    disabled={!canEditAiPosts}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    {VIDEO_DURATION_OPTIONS.map((duration) => (
+                      <option key={duration} value={duration}>
+                        {duration} segundos
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
+              {currentDraft.generateVideo ? (
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Idioma do video
+                  </label>
+                  <select
+                    value={currentDraft.videoLanguage}
+                    onChange={(event) =>
+                      updateDraft({
+                        videoLanguage: event.target.value as VideoLanguageOption,
+                      })
+                    }
+                    disabled={!canEditAiPosts}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    {VIDEO_LANGUAGE_OPTIONS.map((languageOption) => (
+                      <option
+                        key={languageOption.value}
+                        value={languageOption.value}
+                      >
+                        {languageOption.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
+              {currentDraft.generateImage ? (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Prompt da imagem
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={currentDraft.imagePrompt}
+                    onChange={(event) =>
+                      updateDraft({ imagePrompt: event.target.value })
+                    }
+                    disabled={!canEditAiPosts}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                </div>
+              ) : null}
+
+              {currentDraft.generateVideo ? (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Prompt do video
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={currentDraft.videoPrompt}
+                    onChange={(event) =>
+                      updateDraft({ videoPrompt: event.target.value })
+                    }
+                    disabled={!canEditAiPosts}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="font-bold text-slate-900">Legenda</div>
+              {isLoadingSelectedPost ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+              ) : null}
+            </div>
+            <textarea
+              rows={8}
+              value={currentDraft.caption}
+              onChange={(event) => updateDraft({ caption: event.target.value })}
+              disabled={!canEditAiPosts}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 font-bold text-slate-900">Hashtags</div>
+            <input
+              type="text"
+              value={currentDraft.hashtags}
+              onChange={(event) => updateDraft({ hashtags: event.target.value })}
+              disabled={!canEditAiPosts}
+              placeholder="#seunegocio, #promocao, #campanha"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Separe por virgula, espaco ou quebra de linha.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
+              <Calendar className="h-4 w-4 text-slate-500" />
+              Agendamento
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Data e hora
+                </label>
+                <input
+                  type="datetime-local"
+                  value={currentDraft.schedule}
+                  onChange={(event) => updateDraft({ schedule: event.target.value })}
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Timezone
+                </label>
+                <input
+                  type="text"
+                  value={currentDraft.timezone}
+                  onChange={(event) => updateDraft({ timezone: event.target.value })}
+                  disabled={!canEditAiPosts}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              O backend recebe a data no timezone informado e publica na
+              conta conectada.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 font-bold text-slate-900">Preview</div>
+            <div className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
+              {currentDraft.caption || selectedPost.publishPreview || "Sem texto de preview."}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
+              <ImageIcon className="h-4 w-4 text-slate-500" />
+              Midia gerada
+            </div>
+            {selectedPost.media.length === 0 ? (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                Nenhum asset retornado para este rascunho.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {selectedPost.media.map((item, index) => (
+                  <div
+                    key={item.id || `${item.url}-${index}`}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                  >
+                    {isVideoMedia(item) ? (
+                      <video
+                        src={item.url}
+                        controls
+                        className="aspect-[4/5] w-full bg-black object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={item.url}
+                        alt="Asset gerado pela IA"
+                        className="aspect-[4/5] w-full object-cover"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 font-bold text-slate-900">Metadados</div>
+            <div className="space-y-3 text-sm text-slate-700">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Status</span>
+                <span className="font-semibold">
+                  {getStatusMeta(selectedPost.status).label}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Modo</span>
+                <span className="font-semibold">
+                  {getModeLabel(currentDraft.mode)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Formato</span>
+                <span className="font-semibold">
+                  {getPostTypeLabel(currentDraft.postType)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Timezone</span>
+                <span className="font-semibold">{selectedPost.timezone}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Criado em</span>
+                <span className="font-semibold">
+                  {selectedPost.createdAt
+                    ? new Date(selectedPost.createdAt).toLocaleString("pt-BR")
+                    : "Nao informado"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Agendado para</span>
+                <span className="font-semibold">
+                  {selectedPost.scheduledAt
+                    ? new Date(selectedPost.scheduledAt).toLocaleString("pt-BR")
+                    : "Nao agendado"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="text-xs text-slate-500">
+          Reels podem exigir video e stories priorizam asset vertical.
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={updateMutation.isPending || !canEditAiPosts}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {updateMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Salvar revisao
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSchedule}
+            disabled={
+              scheduleMutation.isPending ||
+              !canEditAiPosts ||
+              !isMetaConnected
+            }
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {scheduleMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Clock3 className="h-4 w-4" />
+            )}
+            Agendar
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePublishNow}
+            disabled={
+              publishMutation.isPending ||
+              !canEditAiPosts ||
+              !isMetaConnected
+            }
+            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {publishMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Publicar agora
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectedPost.id && cancelMutation.mutate(selectedPost.id)}
+            disabled={
+              cancelMutation.isPending ||
+              !canEditAiPosts ||
+              !selectedPost.scheduledAt
+            }
+            className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {cancelMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      {isMetaConnected ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              A conta do estabelecimento esta conectada e pronta para publicar
+              no Instagram, sujeito as permissoes concedidas na Meta.
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  ) : (
+    <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-center text-slate-500">
+      <Sparkles className="mb-4 h-10 w-10 text-slate-300" />
+      <div className="font-semibold text-slate-700">
+        Selecione um rascunho para revisar
+      </div>
+      <div className="mt-1 max-w-md text-sm">
+        Gere um novo conteudo com IA ou escolha um item da lista para editar
+        legenda, hashtags e publicacao.
+      </div>
+    </div>
+  );
+
   if (isLoadingMe) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -1283,7 +1915,12 @@ export default function PublicacoesIaPage() {
                 <button
                   key={section.id}
                   type="button"
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => {
+                    setActiveSection(section.id);
+                    if (section.id !== "library") {
+                      setIsPostDetailModalOpen(false);
+                    }
+                  }}
                   className={`w-full rounded-xl px-4 py-3 text-left transition-colors ${
                     isActive
                       ? "bg-slate-900 text-white shadow-sm"
@@ -1850,7 +2487,7 @@ export default function PublicacoesIaPage() {
                     <button
                       key={post.id}
                       type="button"
-                      onClick={() => setSelectedPostId(post.id)}
+                      onClick={() => handleSelectPost(post.id)}
                       className={`w-full border-b border-slate-100 p-4 text-left transition-colors ${
                         isSelected
                           ? "bg-primary-50"
@@ -1909,7 +2546,7 @@ export default function PublicacoesIaPage() {
             </div>
           </div>
 
-          <div className="min-w-0 flex-1 bg-slate-50/50 p-6">
+          <div className="hidden min-w-0 flex-1 bg-slate-50/50 p-6 lg:block">
             {selectedPost ? (
               <div className="space-y-6">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -2531,6 +3168,18 @@ export default function PublicacoesIaPage() {
             )}
           </div>
         </div>
+
+        <DashboardDialog
+          open={isMobileViewport && isPostDetailModalOpen && Boolean(selectedPost)}
+          onClose={() => setIsPostDetailModalOpen(false)}
+          title="Revisar publicacao"
+          description="Ajuste legenda, hashtags, midia e agendamento antes de publicar."
+          maxWidthClassName="max-w-6xl"
+        >
+          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+            {selectedPostReviewContent}
+          </div>
+        </DashboardDialog>
 
         <PaginationControls
           page={libraryPage}

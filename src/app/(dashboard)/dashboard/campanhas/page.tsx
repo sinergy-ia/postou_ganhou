@@ -16,6 +16,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PaginationControls from "@/components/dashboard/PaginationControls";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
+import DashboardDialog from "@/components/ui/DashboardDialog";
 import { normalizeSponsoredHref } from "@/lib/sponsored-highlights-public";
 import { establishmentApi } from "@/services/establishment-api";
 import {
@@ -149,6 +150,7 @@ export default function CampanhasPage() {
   const [activeTab, setActiveTab] = useState("Todas");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [notice, setNotice] = useState("");
   const [boostFeedback, setBoostFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -222,8 +224,8 @@ export default function CampanhasPage() {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },
     onError: (error) => {
-      alert(
-        `Falha ao atualizar campanha no Backend: ${getCampaignErrorMessage(
+      setNotice(
+        `Falha ao atualizar campanha no backend: ${getCampaignErrorMessage(
           error,
           "erro inesperado",
         )}`,
@@ -630,6 +632,22 @@ export default function CampanhasPage() {
           <p className="text-slate-500 max-w-sm mb-6">Você ainda não criou campanhas ou não há resultados para o filtro atual.</p>
         </div> */}
       </div>
+
+      <DashboardDialog
+        open={Boolean(notice)}
+        onClose={() => setNotice("")}
+        title="Nao foi possivel atualizar a campanha"
+        description={notice}
+        footer={
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Entendi
+          </button>
+        }
+      />
 
     </div>
   );

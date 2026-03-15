@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
+import DashboardDialog from "@/components/ui/DashboardDialog";
 import { establishmentApi } from "@/services/establishment-api";
 
 type TeamFormState = {
@@ -79,6 +80,7 @@ export default function TeamManagementSection() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState<TeamFormState>(defaultTeamForm);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ["establishment-me"],
@@ -127,9 +129,7 @@ export default function TeamManagementSection() {
       await queryClient.invalidateQueries({ queryKey: ["team-users"] });
     },
     onError: (mutationError) => {
-      window.alert(
-        getErrorMessage(mutationError, "Nao foi possivel atualizar o usuario."),
-      );
+      setNotice(getErrorMessage(mutationError, "Nao foi possivel atualizar o usuario."));
     },
   });
 
@@ -467,6 +467,22 @@ export default function TeamManagementSection() {
           </div>
         </div>
       ) : null}
+
+      <DashboardDialog
+        open={Boolean(notice)}
+        onClose={() => setNotice("")}
+        title="Nao foi possivel concluir a acao"
+        description={notice}
+        footer={
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Entendi
+          </button>
+        }
+      />
     </div>
   );
 }

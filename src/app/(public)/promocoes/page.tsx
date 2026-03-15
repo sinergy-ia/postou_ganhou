@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import DashboardDialog from '@/components/ui/DashboardDialog';
 import { publicApi } from '@/services/public-api';
 import { Search, MapPin, Filter, Tag, ChevronDown, Loader2 } from 'lucide-react';
 import PublicSponsoredCard from '@/components/sponsored-highlights/PublicSponsoredCard';
@@ -33,9 +34,87 @@ interface PromotionCard {
   establishment?: PromotionEstablishment;
 }
 
+function PromotionFiltersPanel({
+  activeCategory,
+  categories,
+  onCategoryChange,
+  onClear,
+}: {
+  activeCategory: string;
+  categories: string[];
+  onCategoryChange: (category: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 font-bold text-slate-900">
+        <span className="flex items-center gap-2"><Filter className="w-4 h-4" /> Filtros</span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-primary-600 transition-colors hover:text-primary-700 hover:underline"
+        >
+          Limpar
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-slate-800">Categorias</h3>
+          <div className="space-y-2">
+            {categories.map((cat) => (
+              <label key={cat} className="group flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="radio"
+                  name="category"
+                  checked={activeCategory === cat}
+                  onChange={() => onCategoryChange(cat)}
+                  className="h-4 w-4 border-slate-300 text-primary-600 focus:ring-primary-600"
+                />
+                <span className="transition-colors group-hover:text-primary-600">{cat}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-800">Tipo de post</h3>
+          <div className="space-y-2">
+            <label className="group flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked readOnly className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600" />
+              <span className="transition-colors group-hover:text-primary-600">Story</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked readOnly className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600" />
+              <span>Feed</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked readOnly className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600" />
+              <span>Reels</span>
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            As campanhas podem trabalhar com story, feed, reels ou combinar modalidades no mesmo cupom.
+          </p>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-800">Distancia</h3>
+          <input type="range" className="w-full accent-primary-600" min="1" max="20" defaultValue="5" />
+          <div className="mt-1 flex justify-between text-xs text-slate-500">
+            <span>1 km</span>
+            <span>20 km</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PromocoesPage() {
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [locationFilter, setLocationFilter] = useState<{
     lat: number;
     lng: number;
@@ -66,6 +145,7 @@ export default function PromocoesPage() {
   });
 
   const campaigns: PromotionCard[] = (campaignsData?.items || []) as PromotionCard[];
+  const hasActiveFilters = activeCategory !== 'Todos' || Boolean(locationFilter);
   const sponsoredCards = useMemo(
     () => buildPublicSponsoredCards(sponsoredCampaigns),
     [sponsoredCampaigns],
@@ -133,6 +213,12 @@ export default function PromocoesPage() {
     );
   };
 
+  const clearFilters = () => {
+    setActiveCategory('Todos');
+    setLocationFilter(null);
+    setLocationError('');
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen pb-24">
       {/* Header / Search Area */}
@@ -193,14 +279,47 @@ export default function PromocoesPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 mt-8 max-w-7xl flex flex-col lg:flex-row gap-8">
-        
+      <div className="container mx-auto mt-8 flex max-w-7xl flex-col gap-8 px-4 lg:flex-row">
+        <div className="lg:hidden">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setIsMobileFiltersOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+            >
+              <Filter className="h-4 w-4" />
+              Filtros
+            </button>
+
+            <div className="text-sm text-slate-600">
+              <span className="font-semibold text-slate-900">{activeCategory}</span>
+              {locationFilter ? ' • perto de voce' : ''}
+            </div>
+
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="ml-auto rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                Limpar filtros
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         {/* Sidebar Filters */}
-        <aside className="w-full lg:w-64 shrink-0 space-y-6">
+        <aside className="hidden w-full shrink-0 space-y-6 lg:block lg:w-64">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between font-bold text-slate-900 mb-4 pb-4 border-b border-slate-100">
               <span className="flex items-center gap-2"><Filter className="w-4 h-4" /> Filtros</span>
-              <span className="text-xs text-primary-600 cursor-pointer hover:underline">Limpar</span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-primary-600 transition-colors hover:text-primary-700 hover:underline"
+              >
+                Limpar
+              </button>
             </div>
             
             <div className="space-y-4">
@@ -209,7 +328,7 @@ export default function PromocoesPage() {
                 <div className="space-y-2">
                   {categories.map(cat => (
                     <label key={cat} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer group">
-                      <input type="radio" name="category" className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-600" defaultChecked={cat === 'Todos'} onClick={() => setActiveCategory(cat)} />
+                      <input type="radio" name="category" className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-600" checked={activeCategory === cat} onChange={() => setActiveCategory(cat)} />
                       <span className="group-hover:text-primary-600 transition-colors">{cat}</span>
                     </label>
                   ))}
@@ -275,7 +394,7 @@ export default function PromocoesPage() {
             </section>
           ) : null}
 
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-slate-600">Mostrando <strong>{campaigns.length} promoções</strong></p>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-slate-500">Ordenar por:</span>
@@ -365,6 +484,40 @@ export default function PromocoesPage() {
           </div>
         </div>
       </div>
+
+      <DashboardDialog
+        open={isMobileFiltersOpen}
+        onClose={() => setIsMobileFiltersOpen(false)}
+        title="Filtrar promocoes"
+        description="Escolha a categoria e ajuste os filtros antes de continuar."
+        maxWidthClassName="max-w-md"
+      >
+        <div className="space-y-4">
+          <PromotionFiltersPanel
+            activeCategory={activeCategory}
+            categories={categories}
+            onCategoryChange={setActiveCategory}
+            onClear={clearFilters}
+          />
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Limpar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsMobileFiltersOpen(false)}
+              className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+            >
+              Ver promocoes
+            </button>
+          </div>
+        </div>
+      </DashboardDialog>
     </div>
   );
 }

@@ -201,8 +201,74 @@ export default function MapaPage() {
         })}
       </div>
 
+      {selectedEst && selectedPromo ? (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button
+            type="button"
+            aria-label="Fechar detalhes do local"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]"
+            onClick={() => setSelectedPin(null)}
+          />
+
+          <div className="absolute inset-x-0 bottom-0 rounded-t-[2rem] border border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary-600">
+                  Lugar selecionado
+                </div>
+                <h3 className="mt-1 text-lg font-bold text-slate-900">{selectedEst.name}</h3>
+                <p className="text-xs text-slate-500">
+                  {selectedEst.category} • {selectedEst.distance}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPin(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4 aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">
+              <img
+                src={selectedEst.cover}
+                className="h-full w-full object-cover"
+                alt={selectedEst.name}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-primary-100 bg-primary-50 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">
+                Promocao ativa
+              </div>
+              <div className="mt-1 text-sm font-bold text-primary-900">{selectedPromo.title}</div>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-slate-100 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200">
+                <Navigation className="h-4 w-4" /> Rota
+              </button>
+              {selectedPromoId ? (
+                <Link
+                  href={`/promocoes/${selectedPromoId}`}
+                  className="flex flex-1 items-center justify-center rounded-xl bg-primary-600 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-700"
+                >
+                  Ver Cupom
+                </Link>
+              ) : (
+                <span className="flex flex-1 cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 py-3 text-sm font-bold text-slate-500">
+                  Indisponivel
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Selected Location Card Outline (Overlay on bottom) */}
-      <div className={`absolute bottom-6 inset-x-0 px-4 md:px-0 flex justify-center w-full transition-transform duration-500 ${selectedEst ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'}`}>
+      <div className={`absolute bottom-6 inset-x-0 hidden w-full justify-center px-4 transition-transform duration-500 md:px-0 md:flex ${selectedEst ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'}`}>
         {selectedEst && selectedPromo && (
           <div className="bg-white p-4 rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col sm:flex-row gap-4">
             <div className="w-full sm:w-1/3 aspect-[4/3] sm:aspect-square rounded-2xl overflow-hidden relative shrink-0">
