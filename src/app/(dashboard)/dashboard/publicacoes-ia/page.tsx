@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PaginationControls from "@/components/dashboard/PaginationControls";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
@@ -12,20 +13,34 @@ import {
   getAiPostsVideoGenerationLimit,
 } from "@/lib/ai-posts-plan-limits";
 import {
+  isAiPostsSectionId,
+  type AiPostsSectionId,
+} from "@/lib/ai-posts-sections";
+import { addDashboardRuntimeNotification } from "@/lib/dashboard-runtime-notifications";
+import {
   establishmentApi,
+  type AiPostAsyncGenerationResponse,
   type AiPostMode,
+  type AiPostQualityProfile,
   type AiPostRecord,
   type AiPostType,
+  type AiVideoContinuityMode,
+  type AiVideoResolution,
   type AiVideoDurationSeconds,
 } from "@/services/establishment-api";
 import {
   AlertTriangle,
+  Bookmark,
   Calendar,
   CheckCircle2,
   Clock3,
+  Heart,
   Image as ImageIcon,
   Loader2,
   Megaphone,
+  MessageCircle,
+  MoreHorizontal,
+  Play,
   RefreshCw,
   Save,
   Send,
@@ -45,15 +60,60 @@ type GenerateFormState = {
   generateImage: boolean;
   generateVideo: boolean;
   durationSeconds: AiVideoDurationSeconds;
+  qualityProfile: AiPostQualityProfile;
+  videoResolution: AiVideoResolution;
+  continuityMode: AiVideoContinuityMode;
+  totalDurationSeconds: number;
   videoLanguage: VideoLanguageOption;
   imagePrompt: string;
   videoPrompt: string;
+  visualStyle: string;
+  negativePrompt: string;
+  referenceImageUrls: string[];
+  storyOutline: string;
+  storyBeats: string;
+  sequenceCount: number;
+  sequenceSteps: string;
 };
 
 type FeedbackState = {
   type: "success" | "error" | "info";
   message: string;
 } | null;
+
+type BatchGenerationProgress = {
+  current: number;
+  total: number;
+} | null;
+
+type ToastItem = {
+  id: string;
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+};
+
+type TrackedAsyncGenerationJob = {
+  aiPostId: string;
+  status: string;
+  notificationChannelId?: string;
+};
+
+type AiPostSocketEvent = {
+  namespace?: string;
+  type?: string;
+  aiPostId?: string;
+  status?: string;
+  messageId?: string;
+  notificationChannelId?: string;
+  createdAt?: string;
+  timestamp?: number;
+  message?: string;
+  aiPost?: {
+    _id?: string;
+    id?: string;
+  } | null;
+};
 
 type DraftState = {
   postId: string;
@@ -68,9 +128,18 @@ type DraftState = {
   generateImage: boolean;
   generateVideo: boolean;
   durationSeconds: AiVideoDurationSeconds;
+  qualityProfile: AiPostQualityProfile;
+  videoResolution: AiVideoResolution;
+  continuityMode: AiVideoContinuityMode;
+  totalDurationSeconds: number;
   videoLanguage: VideoLanguageOption;
   imagePrompt: string;
   videoPrompt: string;
+  visualStyle: string;
+  negativePrompt: string;
+  referenceImageUrls: string[];
+  storyOutline: string;
+  storyBeats: string;
   caption: string;
   hashtags: string;
   timezone: string;
@@ -85,15 +154,55 @@ type CampaignSelectorItem = {
 };
 
 type VideoLanguageOption = "pt-BR" | "en";
-type AiPostsSection = "generate" | "library";
 type FieldSuggestion = {
   label: string;
   value: string;
 };
 
+type VisualPreset = {
+  label: string;
+  visualStyle: string;
+  negativePrompt: string;
+};
+
+type ReferenceQuickOption = {
+  label: string;
+  helper: string;
+  url: string;
+};
+
+type ReferenceAccessState = "public" | "protected";
+
+const DEFAULT_AI_REFERENCE_BUCKET = "midiahub-v1";
+const AI_POST_ASYNC_POLL_INTERVAL_MS = 5000;
+const AI_POST_TERMINAL_STATUSES = ["READY", "FAILED", "CANCELLED", "PUBLISHED", "SCHEDULED"];
+const AI_POST_PROCESSING_STATUSES = ["QUEUED", "GENERATING", "PUBLISHING"];
+const TOAST_DURATION_MS = 6000;
+const AI_POSTS_LIBRARY_HREF = "/dashboard/publicacoes-ia?section=library";
+
 const DEFAULT_TIMEZONE = "America/Sao_Paulo";
 const VIDEO_DURATION_OPTIONS: AiVideoDurationSeconds[] = [4, 6, 8];
+const VIDEO_RESOLUTION_OPTIONS: AiVideoResolution[] = ["720p", "1080p"];
+const VIDEO_CONTINUITY_OPTIONS: AiVideoContinuityMode[] = ["SINGLE", "SEQUENTIAL"];
+const VIDEO_TOTAL_DURATION_OPTIONS = [30, 60];
+const SEQUENCE_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
 const LIBRARY_PAGE_SIZE = 20;
+const QUALITY_PROFILE_OPTIONS: Array<{
+  value: AiPostQualityProfile;
+  label: string;
+  helper: string;
+}> = [
+  {
+    value: "BALANCED",
+    label: "Balanced",
+    helper: "Mais rapido e indicado para testes, iteracoes e pecas do dia a dia.",
+  },
+  {
+    value: "PROFESSIONAL",
+    label: "Professional",
+    helper: "Melhor escolha para criativos principais, campanhas pagas e pecas de maior impacto.",
+  },
+];
 const VIDEO_LANGUAGE_OPTIONS: Array<{
   value: VideoLanguageOption;
   label: string;
@@ -151,9 +260,18 @@ function createEmptyDraftState(): DraftState {
     generateImage: true,
     generateVideo: false,
     durationSeconds: 6,
+    qualityProfile: "BALANCED",
+    videoResolution: "720p",
+    continuityMode: "SINGLE",
+    totalDurationSeconds: 30,
     videoLanguage: "pt-BR",
     imagePrompt: "",
     videoPrompt: "",
+    visualStyle: "",
+    negativePrompt: "",
+    referenceImageUrls: [],
+    storyOutline: "",
+    storyBeats: "",
     caption: "",
     hashtags: "",
     timezone: DEFAULT_TIMEZONE,
@@ -172,8 +290,13 @@ function createDraftStateFromPost(post?: AiPostRecord | null): DraftState {
     Boolean(post.generateImage),
     Boolean(post.generateVideo),
   );
+  const normalizedVideoSettings = normalizeVideoSettings(
+    post.durationSeconds || 6,
+    post.videoResolution || "720p",
+    post.continuityMode || "SINGLE",
+  );
 
-  return {
+  return applyVideoReferenceModelConstraints({
     postId: post.id,
     mode: (String(post.mode || "EDITORIAL").toUpperCase() === "CAMPAIGN"
       ? "CAMPAIGN"
@@ -187,15 +310,24 @@ function createDraftStateFromPost(post?: AiPostRecord | null): DraftState {
     callToAction: post.callToAction || "",
     generateImage: mediaConfig.generateImage,
     generateVideo: mediaConfig.generateVideo,
-    durationSeconds: post.durationSeconds || 6,
+    durationSeconds: normalizedVideoSettings.durationSeconds,
+    qualityProfile: post.qualityProfile || "BALANCED",
+    videoResolution: normalizedVideoSettings.videoResolution,
+    continuityMode: post.continuityMode || "SINGLE",
+    totalDurationSeconds: post.totalDurationSeconds || 30,
     videoLanguage: parsedVideoPrompt.videoLanguage,
     imagePrompt: post.imagePrompt || "",
     videoPrompt: parsedVideoPrompt.videoPrompt,
+    visualStyle: post.visualStyle || "",
+    negativePrompt: post.negativePrompt || "",
+    referenceImageUrls: normalizeReferenceImageUrls(post.referenceImageUrls || []),
+    storyOutline: post.storyOutline || "",
+    storyBeats: Array.isArray(post.storyBeats) ? post.storyBeats.join("\n") : "",
     caption: post.caption || post.publishPreview || "",
     hashtags: (post.hashtags || []).join(", "),
     timezone: post.timezone || DEFAULT_TIMEZONE,
     schedule: toDatetimeLocalValue(post.scheduledAt),
-  };
+  });
 }
 
 function getDefaultMediaConfig(postType: AiPostType) {
@@ -231,13 +363,6 @@ function normalizeMediaSelection(
     };
   }
 
-  if (postType === "STORY") {
-    return {
-      generateImage: true,
-      generateVideo: false,
-    };
-  }
-
   if (generateImage && generateVideo) {
     return {
       generateImage: true,
@@ -268,54 +393,88 @@ const defaultGenerateForm: GenerateFormState = {
   generateImage: true,
   generateVideo: false,
   durationSeconds: 6,
+  qualityProfile: "BALANCED",
+  videoResolution: "720p",
+  continuityMode: "SINGLE",
+  totalDurationSeconds: 30,
   videoLanguage: "pt-BR",
   imagePrompt: "",
   videoPrompt: "",
+  visualStyle: "",
+  negativePrompt: "",
+  referenceImageUrls: [],
+  storyOutline: "",
+  storyBeats: "",
+  sequenceCount: 1,
+  sequenceSteps: "",
 };
 
 const PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
-    label: "Captar clientes",
+    label: "Oferta premium",
     value:
-      "Crie uma campanha para atrair novos clientes da regiao, destacar o principal beneficio do servico e fechar com CTA forte para WhatsApp ou agendamento.",
+      "Crie uma publicacao para Instagram com proposta premium, beneficio principal cristalino, copy curta e sofisticada, valor percebido alto e CTA direto para WhatsApp, direct ou agendamento. Evite linguagem vaga e visual de panfleto.",
   },
   {
-    label: "Oferta limitada",
+    label: "Movimento hoje",
     value:
-      "Crie uma campanha promocional com senso de urgencia, valor claro, quebra de objecao e chamada direta para aproveitar a oferta hoje.",
+      "Crie uma publicacao para gerar visitas ainda hoje, destacando o motivo para agir agora, mensagem objetiva para mobile, senso de oportunidade e CTA simples para reservar, chamar ou comparecer.",
+  },
+  {
+    label: "Autoridade visual",
+    value:
+      "Crie uma publicacao editorial que fortalece o posicionamento da marca, transmite confianca e acabamento premium, com texto enxuto, linguagem segura e foco em diferenciar o negocio da concorrencia.",
   },
   {
     label: "Prova social",
     value:
-      "Crie uma campanha baseada em resultado real de cliente, reforcando confianca, transformacao percebida e convite para entrar em contato.",
-  },
-  {
-    label: "Gerar autoridade",
-    value:
-      "Crie uma campanha educativa que mostre autoridade no segmento, entregue valor rapido e leve o publico a pedir mais informacoes.",
+      "Crie uma publicacao baseada em experiencia real de cliente, destaque a transformacao percebida, reduza objecoes com naturalidade e finalize com convite para falar com a equipe.",
   },
 ];
 
-const IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+const FEED_IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
-    label: "Arte de conversao",
+    label: "Hero premium",
     value:
-      "Crie uma arte vertical para Instagram com titulo curto de alto impacto, hierarquia visual forte, contraste alto, cores da marca e CTA bem visivel.",
+      "Crie uma arte vertical 4:5 para Instagram com visual premium, elemento principal em destaque, iluminacao refinada, profundidade sutil, tipografia curta de alto impacto, area de respiro e acabamento publicitario. Evite poluicao visual, excesso de texto e aspecto de panfleto.",
   },
   {
-    label: "Oferta premium",
+    label: "Oferta elegante",
     value:
-      "Crie uma arte promocional premium com foco total na oferta, selo de urgencia, composicao limpa e acabamento profissional para gerar clique e contato.",
+      "Crie uma arte promocional vertical com headline forte, selo de oferta sofisticado, hierarquia visual clara, cores de marca bem aplicadas e CTA evidente. O resultado deve parecer campanha profissional de Instagram Ads, nao arte amadora.",
   },
   {
-    label: "Prova social",
+    label: "Lifestyle",
     value:
-      "Crie uma arte com prova social, visual confiavel, destaque para resultado do cliente e frase curta que transmita credibilidade imediata.",
+      "Crie uma imagem estilo editorial lifestyle, com cena realista, contexto de uso do produto ou servico, luz bonita, enquadramento premium e atmosfera aspiracional. O resultado deve parecer ensaio de marca bem produzido.",
   },
   {
-    label: "Carrossel forte",
+    label: "Close de produto",
     value:
-      "Crie um layout de carrossel moderno com capa chamativa, blocos de leitura facil no mobile e fechamento visual com chamada para acao.",
+      "Crie uma imagem com close hero do produto ou servico, textura valorizada, fundo refinado, contraste controlado e direcao de arte comercial. Inserir apenas um titulo curto e elegante.",
+  },
+];
+
+const STORY_IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Story de oferta",
+    value:
+      "Crie um story vertical 9:16 com headline curta, oferta muito clara, contraste alto para leitura no celular, CTA forte e composicao limpa. Reservar area segura para arroba e hashtag visiveis.",
+  },
+  {
+    label: "Story premium",
+    value:
+      "Crie um story vertical sofisticado, com fundo elegante, tipografia editorial curta, foco em valor percebido e atmosfera premium. Manter leitura imediata e espaco livre para marcacao visivel.",
+  },
+  {
+    label: "Story prova social",
+    value:
+      "Crie um story com prova social, frase curta de impacto, visual confiavel e resultado percebido em destaque. Deixar area limpa para inserir arroba e hashtag sem perder legibilidade.",
+  },
+  {
+    label: "Story bastidor",
+    value:
+      "Crie um story com visual autentico de bastidor, enquadramento vertical, luz natural bonita, informacao rapida e CTA discreto. Priorizar aparencia real, atual e profissional.",
   },
 ];
 
@@ -375,35 +534,577 @@ const BRIEFING_SUGGESTIONS: FieldSuggestion[] = [
   },
 ];
 
-const VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+const FEED_VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
-    label: "Alta conversao",
+    label: "Motion premium",
     value:
-      "Crie um video vertical de alta conversao com gancho forte nos primeiros segundos, cenas dinamicas, texto na tela, beneficio principal bem claro e CTA final para contato.",
+      "Crie um video curto para feed com visual premium, movimentos suaves de camera, close-ups elegantes, texto minimo na tela, color grading comercial e fechamento com CTA discreto.",
   },
   {
-    label: "Antes e depois",
+    label: "Oferta em motion",
     value:
-      "Crie um video estilo antes e depois com abertura emocional, evidencia visual do resultado e encerramento convidando a chamar no WhatsApp.",
+      "Crie um video promocional curto para feed destacando a oferta principal com ritmo agil, tipografia impactante, detalhes do produto ou servico e CTA final muito claro.",
   },
   {
-    label: "Oferta urgente",
+    label: "Institucional",
     value:
-      "Crie um video promocional com ritmo acelerado, destaque da oferta, reforco de valor percebido, urgencia elegante e fechamento com CTA direto.",
+      "Crie um video institucional curto para feed reforcando autoridade, ambiente, atendimento e qualidade percebida, com edicao limpa e sofisticada.",
   },
   {
-    label: "Video educativo",
+    label: "Prova social",
     value:
-      "Crie um video educativo com 3 pontos curtos, legendas claras, cortes limpos, visual profissional e CTA final para pedir mais informacoes.",
+      "Crie um video curto com resultado de cliente, cenas que mostrem antes e depois ou beneficio percebido, narrativa clara e encerramento convidando para contato.",
   },
 ];
+
+const REELS_VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Reels cinematico",
+    value:
+      "Crie um reels vertical 9:16 com gancho forte no primeiro segundo, cenas premium, camera motion suave, cortes ritmados, texto curto na tela, color grading comercial e CTA final. Deve parecer anuncio profissional.",
+  },
+  {
+    label: "Reels de conversao",
+    value:
+      "Crie um reels promocional de alta conversao, com abertura que prende, destaque da oferta, valor percebido claro, urgencia elegante e encerramento chamando para direct ou WhatsApp.",
+  },
+  {
+    label: "Reels bastidores",
+    value:
+      "Crie um reels mostrando bastidores ou processo com planos curtos, close-ups fortes, autenticidade, energia e acabamento de marca premium. Usar legendas curtas e limpas.",
+  },
+  {
+    label: "Transformacao",
+    value:
+      "Crie um reels de transformacao ou antes e depois com contraste visual forte, narrativa imediata, foco no resultado final e CTA para falar com a equipe.",
+  },
+];
+
+const VISUAL_STYLE_PRESETS: VisualPreset[] = [
+  {
+    label: "Premium",
+    visualStyle:
+      "fotografia publicitaria premium, luz refinada, composicao limpa, acabamento sofisticado e atmosfera aspiracional",
+    negativePrompt:
+      "visual amador, composicao poluida, excesso de texto, elementos aleatorios, baixa qualidade",
+  },
+  {
+    label: "Clean",
+    visualStyle:
+      "visual clean e contemporaneo, fundo organizado, foco central claro, paleta equilibrada e leitura imediata",
+    negativePrompt:
+      "bagunca visual, excesso de props, tipografia exagerada, ruido, distracoes no fundo",
+  },
+  {
+    label: "Gastronomia",
+    visualStyle:
+      "fotografia gastronomica premium, close apetitoso, luz quente, textura valorizada e apresentacao elegante",
+    negativePrompt:
+      "comida deformada, prato confuso, ingredientes duplicados, aspecto artificial, blur",
+  },
+  {
+    label: "Moda",
+    visualStyle:
+      "editorial de moda moderno, pose confiante, enquadramento elegante, luz controlada e styling sofisticado",
+    negativePrompt:
+      "anatomia estranha, dedos extras, roupa deformada, fundo poluido, pose travada",
+  },
+  {
+    label: "Fitness",
+    visualStyle:
+      "energia alta, luz dramatica, contraste forte, movimento controlado e acabamento cinematografico",
+    negativePrompt:
+      "corpo deformado, membros estranhos, borrado de movimento ruim, academia baguncada, anatomia errada",
+  },
+  {
+    label: "Luxo",
+    visualStyle:
+      "estetica de luxo, materiais nobres, brilho controlado, profundidade suave e direcao de arte exclusiva",
+    negativePrompt:
+      "visual popular demais, excesso de cores, poluicao, reflexos ruins, acabamento barato",
+  },
+  {
+    label: "Urbano",
+    visualStyle:
+      "linguagem urbana premium, contraste moderno, composicao dinamica, atitude contemporanea e look de campanha",
+    negativePrompt:
+      "caos visual, baixa definicao, cenarios aleatorios, texto excessivo, ruido exagerado",
+  },
+];
+
+const NEGATIVE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Sem texto",
+    value: "texto na arte, letras deformadas, tipografia quebrada",
+  },
+  {
+    label: "Sem distorcoes",
+    value: "anatomia estranha, dedos extras, rosto distorcido, objetos duplicados",
+  },
+  {
+    label: "Sem poluicao",
+    value: "composicao poluida, excesso de elementos, fundo confuso, bagunca visual",
+  },
+  {
+    label: "Sem blur ruim",
+    value: "blur, baixa nitidez, flicker, morphing, serrilhado, artefatos visuais",
+  },
+];
+
+const PROMPT_PLACEHOLDER =
+  "Ex: crie uma publicacao premium para divulgar um combo especial, com beneficio claro, valor percebido alto e CTA para WhatsApp";
+
+const IMAGE_PROMPT_PLACEHOLDERS: Record<AiPostType, string> = {
+  STORY:
+    "Ex: Story 9:16 premium, headline curta, oferta clara, contraste alto e area segura para arroba e hashtag visiveis",
+  FEED:
+    "Ex: Arte 4:5 premium com close do produto, iluminacao refinada, tipografia curta e acabamento publicitario",
+  REELS:
+    "Ex: Arte premium para Instagram com composicao clean, foco total no produto e texto minimo",
+};
+
+const VIDEO_PROMPT_PLACEHOLDERS: Record<AiPostType, string> = {
+  STORY: "",
+  FEED:
+    "Ex: Video curto para feed com close-ups elegantes, camera suave, texto minimo e CTA discreto no final",
+  REELS:
+    "Ex: Reels 9:16 com gancho forte, cortes ritmados, cenas premium, texto curto na tela e CTA final",
+};
+
+const VISUAL_STYLE_PLACEHOLDERS: Record<AiPostType, string> = {
+  STORY:
+    "Ex: visual premium para story, leitura instantanea, foco central, contraste alto e espaco livre para marcacao",
+  FEED:
+    "Ex: fotografia publicitaria premium, luz lateral quente, close elegante e composicao hero equilibrada",
+  REELS:
+    "Ex: comercial premium com energia alta, camera suave, clima aspiracional e acabamento cinematografico",
+};
+
+const NEGATIVE_PROMPT_PLACEHOLDER =
+  "Ex: texto na arte, blur, composicao poluida, anatomia estranha, logo deformado, objetos duplicados";
+
+function getImagePromptSuggestions(postType: AiPostType) {
+  return postType === "STORY"
+    ? STORY_IMAGE_PROMPT_SUGGESTIONS
+    : FEED_IMAGE_PROMPT_SUGGESTIONS;
+}
+
+function getVideoPromptSuggestions(postType: AiPostType) {
+  return postType === "REELS"
+    ? REELS_VIDEO_PROMPT_SUGGESTIONS
+    : FEED_VIDEO_PROMPT_SUGGESTIONS;
+}
+
+function getImagePromptHelper(postType: AiPostType) {
+  if (postType === "STORY") {
+    return "Descreva hierarquia visual, contraste, area segura para marcacao e o clima da arte.";
+  }
+
+  return "Descreva composicao, luz, enquadramento, nivel de texto e acabamento que a imagem deve ter.";
+}
+
+function getVideoPromptHelper(postType: AiPostType) {
+  if (postType === "REELS") {
+    return "Descreva o gancho inicial, os tipos de cena, o ritmo dos cortes, o texto na tela e o fechamento.";
+  }
+
+  return "Descreva cenas, movimentos de camera, ritmo, presenca de texto e a sensacao final do video.";
+}
+
+function getVisualStyleHelper(postType: AiPostType) {
+  if (postType === "STORY") {
+    return "Descreva o clima visual, o contraste, o nivel de sofisticao e como a arte deve se comportar no formato vertical.";
+  }
+
+  if (postType === "REELS") {
+    return "Descreva o look visual do video: luz, energia, camera, acabamento e tipo de campanha que ele deve lembrar.";
+  }
+
+  return "Descreva a linguagem visual da peca: fotografia, direcao de arte, luz, textura, paleta e sensacao de marca.";
+}
+
+function getFormatDirectionTip(postType: AiPostType) {
+  switch (postType) {
+    case "STORY":
+      return "Story funciona melhor com foco central, leitura rapida, contraste alto e poucos elementos.";
+    case "REELS":
+      return "Reels ganha muito com referencia principal forte, gancho visual e energia alta desde o primeiro segundo.";
+    case "FEED":
+    default:
+      return "Feed costuma performar melhor com composicao hero limpa, acabamento premium e hierarquia visual clara.";
+  }
+}
+
+function normalizeReferenceImageUrls(urls: string[]) {
+  return urls
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index)
+    .slice(0, 3);
+}
+
+function parseStoryBeatsInput(value: string) {
+  return value
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseSequenceStepsInput(value: string) {
+  return value
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeSequenceCount(value: number) {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.min(
+    SEQUENCE_COUNT_OPTIONS[SEQUENCE_COUNT_OPTIONS.length - 1],
+    Math.max(SEQUENCE_COUNT_OPTIONS[0], Math.trunc(value)),
+  );
+}
+
+function getSequenceCollectionLabel(postType: AiPostType, count: number) {
+  if (count <= 1) {
+    return "Peca unica";
+  }
+
+  switch (postType) {
+    case "STORY":
+      return `${count} stories em sequencia`;
+    case "REELS":
+      return `${count} reels em serie`;
+    case "FEED":
+    default:
+      return `${count} cards de carrossel`;
+  }
+}
+
+function getSequenceItemTitle(
+  postType: AiPostType,
+  index: number,
+  count: number,
+  explicitStep?: string,
+) {
+  if (explicitStep) {
+    return explicitStep;
+  }
+
+  if (count <= 1) {
+    return postType === "REELS" ? "Reel principal" : "Peca principal";
+  }
+
+  switch (postType) {
+    case "STORY":
+      return `Story ${index + 1}`;
+    case "REELS":
+      return `Reel ${index + 1}`;
+    case "FEED":
+    default:
+      return `Card ${index + 1}`;
+  }
+}
+
+function buildSequencePrompt(
+  basePrompt: string,
+  postType: AiPostType,
+  index: number,
+  count: number,
+  explicitStep?: string,
+) {
+  const normalizedPrompt = basePrompt.trim();
+
+  if (count <= 1) {
+    return normalizedPrompt;
+  }
+
+  const instructions = [
+    `Esta peca faz parte de uma sequencia de ${count} itens para Instagram.`,
+    `Crie o item ${index + 1} de ${count}.`,
+    explicitStep ? `Foco deste item: ${explicitStep}.` : "Crie uma variacao complementar as demais pecas, sem repetir tudo igual.",
+    postType === "FEED"
+      ? "Pense como um card de carrossel que precisa funcionar sozinho e em conjunto."
+      : postType === "STORY"
+        ? "Pense como um story em sequencia, com leitura rapida e continuidade clara."
+        : "Pense como um reel de uma serie curta, com continuidade de linguagem visual.",
+  ];
+
+  return [normalizedPrompt, instructions.join(" ")].filter(Boolean).join("\n\n");
+}
+
+function buildPreviewCaptionText(input: {
+  caption?: string;
+  prompt?: string;
+  topic?: string;
+  callToAction?: string;
+  hashtags?: string[] | string;
+}) {
+  const caption = String(input.caption || "").trim();
+
+  if (caption) {
+    return caption;
+  }
+
+  const content = [
+    String(input.topic || "").trim(),
+    String(input.prompt || "").trim(),
+    String(input.callToAction || "").trim(),
+  ].filter(Boolean);
+
+  const hashtags = Array.isArray(input.hashtags)
+    ? input.hashtags.map((item) => String(item || "").trim()).filter(Boolean)
+    : String(input.hashtags || "")
+        .split(/[\s,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  if (hashtags.length > 0) {
+    content.push(hashtags.slice(0, 4).join(" "));
+  }
+
+  return content.join("\n\n").trim() || "Sua legenda e o CTA aparecerao aqui.";
+}
+
+function sanitizeAiPostDisplayText(value?: string | null) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+
+  if (!normalized || normalized === "[object Object]") {
+    return "";
+  }
+
+  return normalized;
+}
+
+function getAiPostCardPreviewText(post: AiPostRecord) {
+  return (
+    sanitizeAiPostDisplayText(post.caption) ||
+    sanitizeAiPostDisplayText(post.publishPreview) ||
+    sanitizeAiPostDisplayText(post.prompt) ||
+    sanitizeAiPostDisplayText(post.topic) ||
+    "Sem texto"
+  );
+}
+
+function getGeneratedMediaClass(postType: AiPostType, mediaIsVideo: boolean) {
+  if (postType === "FEED" && mediaIsVideo) {
+    return "aspect-video w-full bg-black object-contain";
+  }
+
+  return `${postType === "FEED" ? "aspect-[4/5]" : "aspect-[9/16]"} w-full ${
+    mediaIsVideo ? "bg-black object-cover" : "object-cover"
+  }`;
+}
+
+function normalizeTotalDurationSeconds(value: number) {
+  return VIDEO_TOTAL_DURATION_OPTIONS.includes(value)
+    ? value
+    : VIDEO_TOTAL_DURATION_OPTIONS[0];
+}
+
+function isSequentialVideoMode(mode: AiVideoContinuityMode, generateVideo: boolean) {
+  return generateVideo && mode === "SEQUENTIAL";
+}
+
+function isValidReferenceImageUrl(value: string) {
+  const normalized = value.trim();
+
+  if (!normalized || /\s/.test(normalized)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isValidReferenceImageFile(file: File) {
+  return String(file.type || "")
+    .toLowerCase()
+    .startsWith("image/");
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () =>
+      reject(new Error(`Nao foi possivel ler o arquivo "${file.name}".`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function canRenderImageFromUrl(url: string) {
+  return new Promise<boolean>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(true);
+      return;
+    }
+
+    const image = new Image();
+
+    image.onload = () => resolve(true);
+    image.onerror = () => resolve(false);
+    image.src = url;
+  });
+}
+
+function getProtectedReferenceUrls(
+  referenceImageUrls: string[],
+  accessStateByReference: Record<string, ReferenceAccessState>,
+) {
+  return normalizeReferenceImageUrls(referenceImageUrls).filter(
+    (url) => accessStateByReference[url] === "protected",
+  );
+}
+
+function getProtectedReferenceGenerationMessage(protectedReferenceUrls: string[]) {
+  if (protectedReferenceUrls.length === 0) {
+    return null;
+  }
+
+  return protectedReferenceUrls.length > 1
+    ? "Algumas imagens importadas do PC ficaram com preview local apenas. A geracao foi bloqueada porque a IA nao consegue baixar essas URLs protegidas."
+    : "A imagem importada do PC ficou com preview local apenas. A geracao foi bloqueada porque a IA nao consegue baixar essa URL protegida.";
+}
+
+function isReferenceDownloadForbiddenMessage(message: string) {
+  return /baixar uma imagem de referencia/i.test(message) && /403/.test(message);
+}
+
+function hasVideoReferenceImages(generateVideo: boolean, referenceImageUrls: string[]) {
+  return generateVideo && normalizeReferenceImageUrls(referenceImageUrls).length > 0;
+}
+
+function applyVideoReferenceModelConstraints<
+  T extends {
+    postType: AiPostType;
+    generateVideo: boolean;
+    durationSeconds: AiVideoDurationSeconds;
+    referenceImageUrls: string[];
+  },
+>(state: T): T {
+  const normalizedReferenceImageUrls = normalizeReferenceImageUrls(
+    state.referenceImageUrls,
+  );
+
+  if (!state.generateVideo || normalizedReferenceImageUrls.length === 0) {
+    return {
+      ...state,
+      referenceImageUrls: normalizedReferenceImageUrls,
+    };
+  }
+
+  return {
+    ...state,
+    durationSeconds: 8,
+    referenceImageUrls: normalizedReferenceImageUrls,
+  };
+}
+
+function getVideoReferenceValidationMessage({
+  generateVideo,
+  durationSeconds,
+  referenceImageUrls,
+}: {
+  generateVideo: boolean;
+  durationSeconds: AiVideoDurationSeconds;
+  referenceImageUrls: string[];
+}) {
+  if (!hasVideoReferenceImages(generateVideo, referenceImageUrls)) {
+    return null;
+  }
+
+  if (durationSeconds !== 8) {
+    return "Video com imagem de referencia exige 8 segundos no modelo atual.";
+  }
+
+  return null;
+}
+
+function normalizeVideoSettings(
+  durationSeconds: AiVideoDurationSeconds,
+  videoResolution: AiVideoResolution,
+  continuityMode: AiVideoContinuityMode = "SINGLE",
+) {
+  if (continuityMode === "SEQUENTIAL") {
+    return {
+      durationSeconds,
+      videoResolution: "720p" as AiVideoResolution,
+    };
+  }
+
+  if (videoResolution === "1080p") {
+    return {
+      durationSeconds: 8 as AiVideoDurationSeconds,
+      videoResolution: "1080p" as AiVideoResolution,
+    };
+  }
+
+  return {
+    durationSeconds,
+    videoResolution: "720p" as AiVideoResolution,
+  };
+}
+
+function buildVideoSettingsFromDuration(
+  durationSeconds: AiVideoDurationSeconds,
+  currentResolution: AiVideoResolution,
+  continuityMode: AiVideoContinuityMode = "SINGLE",
+) {
+  if (continuityMode === "SEQUENTIAL") {
+    return {
+      durationSeconds,
+      videoResolution: "720p" as AiVideoResolution,
+    };
+  }
+
+  return {
+    durationSeconds,
+    videoResolution:
+      durationSeconds === 8 ? currentResolution : ("720p" as AiVideoResolution),
+  };
+}
+
+function buildVideoSettingsFromResolution(
+  videoResolution: AiVideoResolution,
+  currentDuration: AiVideoDurationSeconds,
+  continuityMode: AiVideoContinuityMode = "SINGLE",
+) {
+  if (continuityMode === "SEQUENTIAL") {
+    return {
+      durationSeconds: currentDuration,
+      videoResolution: "720p" as AiVideoResolution,
+    };
+  }
+
+  if (videoResolution === "1080p") {
+    return {
+      durationSeconds: 8 as AiVideoDurationSeconds,
+      videoResolution: "1080p" as AiVideoResolution,
+    };
+  }
+
+  return {
+    durationSeconds: currentDuration,
+    videoResolution: "720p" as AiVideoResolution,
+  };
+}
 
 function SuggestionButtons({
   suggestions,
   onSelect,
+  disabled = false,
 }: {
   suggestions: FieldSuggestion[];
   onSelect: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="mb-2 flex flex-wrap gap-2">
@@ -412,7 +1113,8 @@ function SuggestionButtons({
           key={`${suggestion.label}-${suggestion.value}`}
           type="button"
           onClick={() => onSelect(suggestion.value)}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+          disabled={disabled}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
         >
           {suggestion.label}
         </button>
@@ -421,8 +1123,837 @@ function SuggestionButtons({
   );
 }
 
+function VisualPresetButtons({
+  presets,
+  onSelect,
+  disabled = false,
+}: {
+  presets: VisualPreset[];
+  onSelect: (preset: VisualPreset) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-2">
+      {presets.map((preset) => (
+        <button
+          key={preset.label}
+          type="button"
+          onClick={() => onSelect(preset)}
+          disabled={disabled}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        >
+          {preset.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReferenceImageManager({
+  value,
+  previewUrlByReference = {},
+  accessStateByReference = {},
+  urlInput,
+  onUrlInputChange,
+  onAddUrl,
+  onImportFiles,
+  onQuickAdd,
+  onMove,
+  onRemove,
+  quickOptions,
+  disabled = false,
+  generateVideo,
+  isImporting = false,
+}: {
+  value: string[];
+  previewUrlByReference?: Record<string, string>;
+  accessStateByReference?: Record<string, ReferenceAccessState>;
+  urlInput: string;
+  onUrlInputChange: (value: string) => void;
+  onAddUrl: () => void;
+  onImportFiles: (files: FileList | null) => void;
+  onQuickAdd: (url: string) => void;
+  onMove: (fromIndex: number, toIndex: number) => void;
+  onRemove: (index: number) => void;
+  quickOptions: ReferenceQuickOption[];
+  disabled?: boolean;
+  generateVideo: boolean;
+  isImporting?: boolean;
+}) {
+  const isDisabledForInput = disabled || isImporting || value.length >= 3;
+  const protectedReferenceCount = value.filter(
+    (url) => accessStateByReference[url] === "protected",
+  ).length;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="mb-1.5 block text-sm font-bold text-slate-700">
+          Imagens de referencia
+        </div>
+        <p className="text-xs text-slate-500">
+          Adicione ate 3 referencias por URL publica ou importando do computador. A primeira vira a principal e, em video, serve como ancora visual inicial.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="url"
+          value={urlInput}
+          onChange={(event) => onUrlInputChange(event.target.value)}
+          disabled={isDisabledForInput}
+          placeholder="https://cdn.exemplo.com/produto-hero.jpg"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+        />
+        <button
+          type="button"
+          onClick={onAddUrl}
+          disabled={isDisabledForInput}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        >
+          Adicionar URL
+        </button>
+        <label
+          className={`inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+            isDisabledForInput
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+              : "cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={isDisabledForInput}
+            onChange={(event) => {
+              onImportFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          {isImporting ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Enviando...
+            </span>
+          ) : (
+            "Importar do PC"
+          )}
+        </label>
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Arquivos do PC sao enviados para o bucket publico de referencias da IA antes de entrar aqui como URL publica.
+      </p>
+
+      {quickOptions.length > 0 ? (
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Referencias rapidas da marca
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {quickOptions.map((option) => (
+              <button
+                key={`${option.label}-${option.url}`}
+                type="button"
+                onClick={() => onQuickAdd(option.url)}
+                disabled={disabled || value.length >= 3}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                title={option.helper}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {generateVideo && value.length === 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Video sem referencia ainda pode gerar, mas costuma perder consistencia de produto, ambiente e identidade visual.
+        </div>
+      ) : null}
+
+      {generateVideo && value.length > 0 ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Video com imagem de referencia exige 8 segundos no modelo atual. A imagem principal vira a base do video e melhora a consistencia do resultado.
+        </div>
+      ) : null}
+
+      {protectedReferenceCount > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {protectedReferenceCount > 1
+            ? "Algumas referencias importadas do PC ficaram apenas com preview local. A IA nao consegue baixar essas URLs protegidas ate elas ficarem publicas."
+            : "Esta referencia importada do PC ficou apenas com preview local. A IA nao consegue baixar essa URL protegida ate ela ficar publica."}{" "}
+          Remova a referencia ou use uma URL publica.
+        </div>
+      ) : null}
+
+      {value.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {value.map((url, index) => (
+            <div
+              key={`${url}-${index}`}
+              className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <div
+                className="aspect-[4/3] w-full rounded-xl bg-slate-100 bg-cover bg-center"
+                style={{
+                  backgroundImage: `url("${previewUrlByReference[url] || url}")`,
+                }}
+              />
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    index === 0
+                      ? "bg-primary-100 text-primary-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {index === 0 ? "Principal" : `Referencia ${index + 1}`}
+                </span>
+                <span className="truncate text-xs text-slate-500">{url}</span>
+              </div>
+              {accessStateByReference[url] === "protected" ? (
+                <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                  Preview local apenas
+                </div>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onMove(index, index - 1)}
+                  disabled={disabled || index === 0}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Subir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMove(index, index + 1)}
+                  disabled={disabled || index === value.length - 1}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Descer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  disabled={disabled}
+                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+          Nenhuma referencia adicionada ainda. Voce pode colar uma URL publica, importar do PC ou reutilizar imagens da propria marca.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DirectionVisualSection({
+  postType,
+  generateVideo,
+  qualityProfile,
+  videoResolution,
+  continuityMode,
+  totalDurationSeconds,
+  visualStyle,
+  negativePrompt,
+  referenceImageUrls,
+  referencePreviewUrlByReference = {},
+  referenceAccessStateByReference = {},
+  referenceUrlInput,
+  onReferenceUrlInputChange,
+  onAddReferenceUrl,
+  onImportReferenceFiles,
+  onQuickAddReference,
+  onMoveReference,
+  onRemoveReference,
+  onApplyPreset,
+  onVisualStyleChange,
+  onNegativePromptChange,
+  onQualityProfileChange,
+  onVideoResolutionChange,
+  onContinuityModeChange,
+  onTotalDurationChange,
+  onStoryOutlineChange,
+  onStoryBeatsChange,
+  storyOutline,
+  storyBeats,
+  quickReferenceOptions,
+  isImportingReferenceFiles = false,
+  disabled = false,
+}: {
+  postType: AiPostType;
+  generateVideo: boolean;
+  qualityProfile: AiPostQualityProfile;
+  videoResolution: AiVideoResolution;
+  continuityMode: AiVideoContinuityMode;
+  totalDurationSeconds: number;
+  visualStyle: string;
+  negativePrompt: string;
+  referenceImageUrls: string[];
+  referencePreviewUrlByReference?: Record<string, string>;
+  referenceAccessStateByReference?: Record<string, ReferenceAccessState>;
+  referenceUrlInput: string;
+  onReferenceUrlInputChange: (value: string) => void;
+  onAddReferenceUrl: () => void;
+  onImportReferenceFiles: (files: FileList | null) => void;
+  onQuickAddReference: (url: string) => void;
+  onMoveReference: (fromIndex: number, toIndex: number) => void;
+  onRemoveReference: (index: number) => void;
+  onApplyPreset: (preset: VisualPreset) => void;
+  onVisualStyleChange: (value: string) => void;
+  onNegativePromptChange: (value: string) => void;
+  onQualityProfileChange: (value: AiPostQualityProfile) => void;
+  onVideoResolutionChange: (value: AiVideoResolution) => void;
+  onContinuityModeChange: (value: AiVideoContinuityMode) => void;
+  onTotalDurationChange: (value: number) => void;
+  onStoryOutlineChange: (value: string) => void;
+  onStoryBeatsChange: (value: string) => void;
+  storyOutline: string;
+  storyBeats: string;
+  quickReferenceOptions: ReferenceQuickOption[];
+  isImportingReferenceFiles?: boolean;
+  disabled?: boolean;
+}) {
+  const isSequentialMode = isSequentialVideoMode(continuityMode, generateVideo);
+
+  return (
+    <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-4">
+        <div className="text-sm font-bold text-slate-900">Direcao visual</div>
+        <div className="mt-1 text-xs text-slate-500">{getFormatDirectionTip(postType)}</div>
+      </div>
+
+      <ReferenceImageManager
+        value={referenceImageUrls}
+        previewUrlByReference={referencePreviewUrlByReference}
+        accessStateByReference={referenceAccessStateByReference}
+        urlInput={referenceUrlInput}
+        onUrlInputChange={onReferenceUrlInputChange}
+        onAddUrl={onAddReferenceUrl}
+        onImportFiles={onImportReferenceFiles}
+        onQuickAdd={onQuickAddReference}
+        onMove={onMoveReference}
+        onRemove={onRemoveReference}
+        quickOptions={quickReferenceOptions}
+        disabled={disabled}
+        generateVideo={generateVideo}
+        isImporting={isImportingReferenceFiles}
+      />
+
+      <div className="mt-5">
+        <label className="mb-1.5 block text-sm font-bold text-slate-700">
+          Presets rapidos por nicho
+        </label>
+        <VisualPresetButtons
+          presets={VISUAL_STYLE_PRESETS}
+          onSelect={onApplyPreset}
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label className="mb-1.5 block text-sm font-bold text-slate-700">
+            Estilo visual desejado
+          </label>
+          <textarea
+            rows={2}
+            value={visualStyle}
+            onChange={(event) => onVisualStyleChange(event.target.value)}
+            disabled={disabled}
+            placeholder={VISUAL_STYLE_PLACEHOLDERS[postType]}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          />
+          <p className="mt-2 text-xs text-slate-500">{getVisualStyleHelper(postType)}</p>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="mb-1.5 block text-sm font-bold text-slate-700">
+            O que evitar na geracao
+          </label>
+          <SuggestionButtons
+            suggestions={NEGATIVE_PROMPT_SUGGESTIONS}
+            onSelect={onNegativePromptChange}
+            disabled={disabled}
+          />
+          <textarea
+            rows={2}
+            value={negativePrompt}
+            onChange={(event) => onNegativePromptChange(event.target.value)}
+            disabled={disabled}
+            placeholder={NEGATIVE_PROMPT_PLACEHOLDER}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            Use este campo para cortar artefatos comuns como texto ruim, deformacoes, poluicao visual e baixa nitidez.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-700">
+            Qualidade
+          </label>
+          <select
+            value={qualityProfile}
+            onChange={(event) =>
+              onQualityProfileChange(event.target.value as AiPostQualityProfile)
+            }
+            disabled={disabled}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            {QUALITY_PROFILE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-slate-500">
+            {
+              QUALITY_PROFILE_OPTIONS.find((option) => option.value === qualityProfile)
+                ?.helper
+            }
+          </p>
+        </div>
+
+        {generateVideo ? (
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-slate-700">
+              Resolucao do video
+            </label>
+            <select
+              value={videoResolution}
+              onChange={(event) =>
+                onVideoResolutionChange(event.target.value as AiVideoResolution)
+              }
+              disabled={disabled || isSequentialMode}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              {VIDEO_RESOLUTION_OPTIONS.map((resolution) => (
+                <option key={resolution} value={resolution}>
+                  {resolution}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-500">
+              {isSequentialMode
+                ? "O modo sequencial trabalha apenas em 720p para manter a continuidade entre segmentos."
+                : "1080p trava a duracao em 8 segundos. Se a Gemini rejeitar essa resolucao, o backend faz fallback e o resultado final pode voltar em 720p."}
+            </p>
+          </div>
+        ) : null}
+
+        {generateVideo ? (
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-slate-700">
+              Modo de continuidade
+            </label>
+            <select
+              value={continuityMode}
+              onChange={(event) =>
+                onContinuityModeChange(event.target.value as AiVideoContinuityMode)
+              }
+              disabled={disabled}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              {VIDEO_CONTINUITY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "SEQUENTIAL" ? "Video longo com continuidade" : "Video unico"}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-500">
+              Ative o modo sequencial para 30s ou 60s. O backend devolve segmentos e a publicacao automatica fica bloqueada ate a consolidacao final.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      {generateVideo && isSequentialMode ? (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="text-sm font-bold text-amber-950">
+            Video longo com continuidade
+          </div>
+          <p className="mt-1 text-xs text-amber-900">
+            Neste modo, o backend divide a narrativa em segmentos compativeis, mantem continuidade visual e retorna varios videos em `media[]`. O fluxo de publicar/agendar fica bloqueado ate consolidar tudo em um MP4 final.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                Duracao total
+              </label>
+              <select
+                value={String(totalDurationSeconds)}
+                onChange={(event) => onTotalDurationChange(Number(event.target.value))}
+                disabled={disabled}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                {VIDEO_TOTAL_DURATION_OPTIONS.map((durationOption) => (
+                  <option key={durationOption} value={durationOption}>
+                    {durationOption} segundos
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-slate-500">
+                O modo sequencial opera em 720p e e indicado para historias mais completas, nao para um criativo unico curtinho. Com referencia visual, a continuidade atual trabalha em segmentos de 8 segundos.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+              <div className="font-semibold text-slate-900">Comportamento esperado</div>
+              <div className="mt-2">
+                O video volta quebrado em segmentos. A consolidacao posterior continua necessaria antes de publicar automaticamente.
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                Historia resumida
+              </label>
+              <textarea
+                rows={2}
+                value={storyOutline}
+                onChange={(event) => onStoryOutlineChange(event.target.value)}
+                disabled={disabled}
+                placeholder="Ex: abrir com ambiente, mostrar preparo do prato, revelar hero shot e fechar com clima premium"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Resuma a progressao da historia em uma frase clara. Isso ajuda a manter inicio, meio e fim entre os segmentos.
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                Beats e cenas obrigatorias
+              </label>
+              <textarea
+                rows={4}
+                value={storyBeats}
+                onChange={(event) => onStoryBeatsChange(event.target.value)}
+                disabled={disabled}
+                placeholder={"ambiente e chegada\npreparo final do prato\nclose hero do prato\nencerramento aspiracional"}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Use uma linha por beat. A ordem informada orienta a sequencia narrativa dos segmentos.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PreviewMediaSurface({
+  postType,
+  mediaUrl,
+  mediaIsVideo = false,
+  showVideoIntent = false,
+  accentLabel,
+}: {
+  postType: AiPostType;
+  mediaUrl?: string;
+  mediaIsVideo?: boolean;
+  showVideoIntent?: boolean;
+  accentLabel: string;
+}) {
+  const aspectClass = postType === "FEED" ? "aspect-[4/5]" : "aspect-[9/16]";
+  const hasImagePoster = Boolean(mediaUrl && !mediaIsVideo);
+  const isFeedVideo = postType === "FEED" && mediaIsVideo;
+
+  if (mediaUrl && mediaIsVideo) {
+    return (
+      <div className={`${aspectClass} relative w-full overflow-hidden bg-black`}>
+        {isFeedVideo ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(51,65,85,0.7),_rgba(2,6,23,1)_70%)] p-4">
+            <div className="w-full overflow-hidden rounded-[24px] border border-white/10 bg-black shadow-[0_24px_60px_-30px_rgba(0,0,0,0.85)]">
+              <video
+                src={mediaUrl}
+                muted
+                loop
+                playsInline
+                autoPlay
+                className="aspect-video w-full object-contain"
+              />
+            </div>
+          </div>
+        ) : (
+          <video
+            src={mediaUrl}
+            muted
+            loop
+            playsInline
+            autoPlay
+            className="h-full w-full object-cover"
+          />
+        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/35" />
+        <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
+          {accentLabel}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${aspectClass} relative w-full overflow-hidden bg-slate-100`}
+    >
+      {hasImagePoster ? (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url("${mediaUrl}")` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-transparent to-black/30" />
+          <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
+            {accentLabel}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_#fef3c7,_#0f172a_58%,_#020617_100%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/5 to-black/55" />
+        </>
+      )}
+      {!hasImagePoster ? (
+        <div className="absolute inset-x-6 bottom-6 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-white/90 backdrop-blur">
+          <div className="text-xs uppercase tracking-[0.22em] text-white/65">{accentLabel}</div>
+          <div className="mt-2 text-sm font-medium">
+            A IA vai posicionar a midia principal aqui com enquadramento otimizado para {postType.toLowerCase()}.
+          </div>
+        </div>
+      ) : null}
+      {showVideoIntent ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white backdrop-blur">
+            <Play className="ml-1 h-7 w-7 fill-current" />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function InstagramPreviewMock({
+  postType,
+  caption,
+  accountLabel,
+  mediaUrl,
+  mediaIsVideo = false,
+  showVideoIntent = false,
+  sequenceCount = 1,
+  sequenceSteps = [],
+}: {
+  postType: AiPostType;
+  caption: string;
+  accountLabel: string;
+  mediaUrl?: string;
+  mediaIsVideo?: boolean;
+  showVideoIntent?: boolean;
+  sequenceCount?: number;
+  sequenceSteps?: string[];
+}) {
+  const normalizedCount = normalizeSequenceCount(sequenceCount);
+  const previewCaption = caption.trim() || "Sua legenda aparecera aqui.";
+  const captionSnippet = previewCaption.replace(/\s+/g, " ").trim();
+  const shortCaption =
+    captionSnippet.length > 160 ? `${captionSnippet.slice(0, 157).trim()}...` : captionSnippet;
+  const items = Array.from({ length: normalizedCount }, (_, index) =>
+    getSequenceItemTitle(postType, index, normalizedCount, sequenceSteps[index]),
+  );
+  const accentLabel = mediaUrl
+    ? mediaIsVideo
+      ? "Video gerado"
+      : showVideoIntent
+        ? "Referencia visual"
+        : "Imagem gerada"
+    : showVideoIntent
+      ? "Preview de video"
+      : "Preview de imagem";
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="font-bold text-slate-900">Preview do Instagram</div>
+          <div className="text-xs text-slate-500">
+            {getPostTypeLabel(postType)} • {getSequenceCollectionLabel(postType, normalizedCount)}
+          </div>
+        </div>
+        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {postType === "FEED"
+            ? normalizedCount > 1
+              ? "Feed em carrossel"
+              : "Feed unico"
+            : postType === "STORY"
+              ? "Story vertical"
+              : "Reels vertical"}
+        </span>
+      </div>
+
+      <div className="mt-5 flex justify-center">
+        {postType === "FEED" ? (
+          <div className="w-full max-w-[380px] overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-28px_rgba(15,23,42,0.45)]">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-[linear-gradient(135deg,#f97316,#facc15,#22c55e)] p-[2px]">
+                  <div className="h-full w-full rounded-full bg-slate-200" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{accountLabel}</div>
+                  <div className="text-[11px] text-slate-500">Patrocinado</div>
+                </div>
+              </div>
+              <MoreHorizontal className="h-4 w-4 text-slate-500" />
+            </div>
+
+            <PreviewMediaSurface
+              postType={postType}
+              mediaUrl={mediaUrl}
+              mediaIsVideo={mediaIsVideo}
+              showVideoIntent={showVideoIntent}
+              accentLabel={accentLabel}
+            />
+
+            {normalizedCount > 1 ? (
+              <div className="flex items-center justify-center gap-1.5 border-b border-slate-100 py-3">
+                {items.map((item, index) => (
+                  <span
+                    key={`${item}-${index}`}
+                    className={`h-2 rounded-full ${index === 0 ? "w-6 bg-primary-500" : "w-2 bg-slate-300"}`}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between px-4 py-3 text-slate-700">
+              <div className="flex items-center gap-4">
+                <Heart className="h-5 w-5" />
+                <MessageCircle className="h-5 w-5" />
+                <Send className="h-5 w-5" />
+              </div>
+              <Bookmark className="h-5 w-5" />
+            </div>
+
+            <div className="space-y-2 px-4 pb-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Legenda
+              </div>
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                <span className="mr-1 font-semibold text-slate-900">{accountLabel}</span>
+                {shortCaption}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full max-w-[320px] rounded-[36px] bg-slate-950 p-3 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.65)]">
+            <div className="overflow-hidden rounded-[30px] bg-black">
+              <div className="flex gap-1 px-3 pt-3">
+                {items.map((item, index) => (
+                  <span
+                    key={`${item}-${index}`}
+                    className={`h-1.5 flex-1 rounded-full ${index === 0 ? "bg-white" : "bg-white/30"}`}
+                  />
+                ))}
+              </div>
+
+              <div className="relative">
+                <PreviewMediaSurface
+                  postType={postType}
+                  mediaUrl={mediaUrl}
+                  mediaIsVideo={mediaIsVideo}
+                  showVideoIntent={showVideoIntent || postType === "REELS"}
+                  accentLabel={
+                    mediaUrl
+                      ? postType === "STORY"
+                        ? "Story gerado"
+                        : mediaIsVideo
+                          ? "Reels gerado"
+                          : "Referencia visual"
+                      : postType === "STORY"
+                        ? "Preview de story"
+                        : "Preview de reels"
+                  }
+                />
+
+                <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 py-4 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full border border-white/30 bg-white/10 backdrop-blur" />
+                    <div>
+                      <div className="text-sm font-semibold">{accountLabel}</div>
+                      <div className="text-[11px] text-white/70">
+                        {postType === "STORY" ? "Agora" : "Audio original"}
+                      </div>
+                    </div>
+                  </div>
+                  <MoreHorizontal className="h-4 w-4" />
+                </div>
+
+                {postType === "REELS" ? (
+                  <div className="absolute bottom-6 left-4 right-16 text-white">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">
+                      Reels
+                    </div>
+                    <div className="mt-2 text-sm leading-relaxed text-white/90">{shortCaption}</div>
+                  </div>
+                ) : (
+                  <div className="absolute inset-x-4 bottom-5 rounded-3xl border border-white/15 bg-black/30 px-4 py-3 text-white backdrop-blur">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/65">
+                      Story
+                    </div>
+                    <div className="mt-2 text-sm leading-relaxed text-white/90">{shortCaption}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {normalizedCount > 1 ? (
+        <div className="mt-5">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            Sequencia planejada
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((item, index) => (
+              <div
+                key={`${item}-${index}-chip`}
+                className={`rounded-2xl border px-3 py-3 text-sm ${
+                  index === 0
+                    ? "border-primary-200 bg-primary-50 text-primary-900"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                }`}
+              >
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  {getSequenceItemTitle(postType, index, normalizedCount)}
+                </div>
+                <div className="mt-1 font-medium">{item}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const statusFilters = [
   { label: "Todos", value: "" },
+  { label: "Na fila", value: "QUEUED" },
+  { label: "Processando", value: "GENERATING" },
   { label: "Prontos", value: "READY" },
   { label: "Agendados", value: "SCHEDULED" },
   { label: "Publicados", value: "PUBLISHED" },
@@ -443,24 +1974,15 @@ const postTypeFilters = [
   { label: "Reels", value: "REELS" },
 ] as const;
 
-const aiPostsSections: Array<{
-  id: AiPostsSection;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: "generate",
-    label: "Gerar novo rascunho",
-    description: "Configure briefing, formato, mídia e prompts para criar um novo rascunho com IA.",
-  },
-  {
-    id: "library",
-    label: "Rascunhos e publicações",
-    description: "Revise rascunhos gerados, publique agora ou agende no Instagram conectado.",
-  },
-];
-
 function getErrorMessage(error: unknown, fallback: string) {
+  const appendReferenceAccessHint = (message: string) => {
+    if (isReferenceDownloadForbiddenMessage(message)) {
+      return `${message} A imagem importada do PC ficou com preview local, mas a URL retornada pelo upload de referencia parece protegida. Para a IA baixar a referencia sem falhar, essa URL precisa ser publica.`;
+    }
+
+    return message;
+  };
+
   if (
     typeof error === "object" &&
     error !== null &&
@@ -471,23 +1993,114 @@ function getErrorMessage(error: unknown, fallback: string) {
     const message = response?.data?.message;
 
     if (typeof message === "string" && message.trim()) {
-      return message;
+      return appendReferenceAccessHint(message);
     }
 
     if (Array.isArray(message) && message.length > 0) {
-      return String(message[0]);
+      return appendReferenceAccessHint(String(message[0]));
     }
   }
 
   if (error instanceof Error && error.message.trim()) {
-    return error.message;
+    return appendReferenceAccessHint(error.message);
   }
 
   return fallback;
 }
 
+function normalizeAiPostStatus(status?: string | null) {
+  return String(status || "").trim().toUpperCase();
+}
+
+function isAiPostProcessingStatus(status?: string | null) {
+  return AI_POST_PROCESSING_STATUSES.includes(normalizeAiPostStatus(status));
+}
+
+function isAiPostTerminalStatus(status?: string | null) {
+  return AI_POST_TERMINAL_STATUSES.includes(normalizeAiPostStatus(status));
+}
+
+function buildAsyncGenerationFeedbackMessage({
+  readyCount,
+  failedCount,
+}: {
+  readyCount: number;
+  failedCount: number;
+}) {
+  if (readyCount > 0 && failedCount === 0) {
+    return readyCount > 1
+      ? `${readyCount} rascunhos sairam da fila e ja estao prontos para revisao.`
+      : "Seu rascunho saiu da fila e ja esta pronto para revisao.";
+  }
+
+  if (readyCount > 0 && failedCount > 0) {
+    return `${readyCount} rascunhos ficaram prontos e ${failedCount} falharam no processamento. Revise os itens na biblioteca.`;
+  }
+
+  return failedCount > 1
+    ? `${failedCount} geracoes falharam no processamento. Revise o briefing e tente novamente.`
+    : "A geracao falhou no processamento. Revise o briefing e tente novamente.";
+}
+
+function parseAiPostSocketEvent(rawValue: string) {
+  try {
+    const parsed = JSON.parse(rawValue) as AiPostSocketEvent;
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function buildAiPostSocketUrl(notificationChannelId: string) {
+  const normalizedChannelId = String(notificationChannelId || "").trim();
+
+  if (!normalizedChannelId) {
+    return null;
+  }
+
+  const configuredBaseUrl = String(process.env.NEXT_PUBLIC_WS_URL || "").trim();
+  const apiBaseUrl = String(process.env.NEXT_PUBLIC_API_URL || "").trim();
+  let baseUrl = configuredBaseUrl;
+
+  if (!baseUrl && apiBaseUrl) {
+    try {
+      const parsedApiBaseUrl = new URL(apiBaseUrl);
+      parsedApiBaseUrl.protocol =
+        parsedApiBaseUrl.protocol === "https:" ? "wss:" : "ws:";
+      parsedApiBaseUrl.pathname = "/dev";
+      parsedApiBaseUrl.search = "";
+      parsedApiBaseUrl.hash = "";
+      baseUrl = parsedApiBaseUrl.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    const socketUrl = new URL(baseUrl);
+    socketUrl.searchParams.set("channelId", normalizedChannelId);
+    return socketUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
 function getStatusMeta(status?: string | null) {
   switch (String(status || "").toUpperCase()) {
+    case "QUEUED":
+      return {
+        label: "Na fila",
+        className: "border-blue-200 bg-blue-50 text-blue-700",
+      };
     case "PUBLISHED":
       return {
         label: "Publicado",
@@ -542,9 +2155,9 @@ function getPostTypeLabel(postType?: string | null) {
 function getMediaRecommendation(postType: AiPostType) {
   switch (postType) {
     case "STORY":
-      return "Story, neste fluxo, deve ser gerado apenas com imagem vertical.";
+      return "Story pode sair como imagem ou video vertical. Priorize foco central, leitura rapida e area segura para hashtag e arroba.";
     case "REELS":
-      return "Reels exige vídeo, então mantenha a geração de vídeo ativa.";
+      return "Reels segue com foco em video curto, gancho forte e ritmo mais dinamico.";
     case "FEED":
     default:
       return "Feed pode sair como imagem ou video, de acordo com a estrategia.";
@@ -555,8 +2168,8 @@ function StoryPremisesBalloons() {
   return (
     <div className="mt-4 space-y-3">
       <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        No fluxo de Story, a postagem deve ser gerada apenas com imagem.
-        Videos para story ainda nao entram neste fluxo.
+        Story pode ser gerado como imagem ou video, mas a composicao precisa manter
+        leitura vertical rapida e foco central para nao perder a mensagem.
       </div>
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Como premissa, o cliente precisa fazer a marcacao da hashtag e do
@@ -636,6 +2249,18 @@ function isVideoGenerationPost(post?: AiPostRecord | null) {
   );
 }
 
+function getPreferredPreviewMedia(post?: AiPostRecord | null) {
+  if (!post || post.media.length === 0) {
+    return undefined;
+  }
+
+  if (isVideoGenerationPost(post)) {
+    return post.media.find((item) => isVideoMedia(item)) || post.media[0];
+  }
+
+  return post.media.find((item) => !isVideoMedia(item)) || post.media[0];
+}
+
 function isScheduledWithinOneHour(value?: string | null) {
   if (!value) {
     return false;
@@ -654,9 +2279,11 @@ function isScheduledWithinOneHour(value?: string | null) {
 }
 
 export default function PublicacoesIaPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [activeSection, setActiveSection] = useState<AiPostsSection>("generate");
   const [statusFilter, setStatusFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
   const [postTypeFilter, setPostTypeFilter] = useState("");
@@ -664,8 +2291,32 @@ export default function PublicacoesIaPage() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isPostDetailModalOpen, setIsPostDetailModalOpen] = useState(false);
+  const [batchGenerationProgress, setBatchGenerationProgress] =
+    useState<BatchGenerationProgress>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [trackedAsyncGenerationJobs, setTrackedAsyncGenerationJobs] = useState<
+    TrackedAsyncGenerationJob[]
+  >([]);
+  const aiPostSocketByJobIdRef = useRef<Record<string, WebSocket>>({});
+  const toastTimeoutByIdRef = useRef<Record<string, number>>({});
+  const handledAsyncTerminalStatusRef = useRef<Record<string, true>>({});
   const [generateForm, setGenerateForm] = useState<GenerateFormState>(defaultGenerateForm);
   const [draftState, setDraftState] = useState<DraftState>(createEmptyDraftState());
+  const [generateReferencePreviewUrlByReference, setGenerateReferencePreviewUrlByReference] =
+    useState<Record<string, string>>({});
+  const [generateReferenceAccessStateByReference, setGenerateReferenceAccessStateByReference] =
+    useState<Record<string, ReferenceAccessState>>({});
+  const [draftReferencePreviewUrlByReference, setDraftReferencePreviewUrlByReference] =
+    useState<Record<string, string>>({});
+  const [draftReferenceAccessStateByReference, setDraftReferenceAccessStateByReference] =
+    useState<Record<string, ReferenceAccessState>>({});
+  const [referenceUrlInput, setReferenceUrlInput] = useState("");
+  const [draftReferenceUrlInput, setDraftReferenceUrlInput] = useState("");
+  const searchParamsString = searchParams.toString();
+  const activeSection = useMemo<AiPostsSectionId>(() => {
+    const sectionFromQuery = searchParams.get("section");
+    return isAiPostsSectionId(sectionFromQuery) ? sectionFromQuery : "generate";
+  }, [searchParams]);
 
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ["establishment-me"],
@@ -737,6 +2388,71 @@ export default function PublicacoesIaPage() {
 
     return createDraftStateFromPost(selectedPost);
   }, [draftState, selectedPost]);
+  const isSelectedPostProcessing = isAiPostProcessingStatus(selectedPost?.status);
+
+  const navigateToSection = useCallback((section: AiPostsSectionId) => {
+    const nextParams = new URLSearchParams(searchParamsString);
+    nextParams.set("section", section);
+    router.replace(`${pathname}?${nextParams.toString()}`);
+  }, [pathname, router, searchParamsString]);
+
+  const dismissToast = useCallback((toastId: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== toastId));
+
+    const timeoutId = toastTimeoutByIdRef.current[toastId];
+
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      delete toastTimeoutByIdRef.current[toastId];
+    }
+  }, []);
+
+  const showToast = useCallback(
+    (toast: Omit<ToastItem, "id">) => {
+      const toastId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const nextToast: ToastItem = {
+        id: toastId,
+        ...toast,
+      };
+
+      setToasts((current) => [...current.slice(-2), nextToast]);
+
+      toastTimeoutByIdRef.current[toastId] = window.setTimeout(() => {
+        dismissToast(toastId);
+      }, TOAST_DURATION_MS);
+    },
+    [dismissToast],
+  );
+
+  const shouldNotifyAsyncTerminalStatus = useCallback(
+    (aiPostId: string, status: string) => {
+      const normalizedAiPostId = String(aiPostId || "").trim();
+      const normalizedStatus = normalizeAiPostStatus(status);
+      const statusKey = `${normalizedAiPostId}:${normalizedStatus}`;
+
+      if (!normalizedAiPostId || !normalizedStatus) {
+        return false;
+      }
+
+      if (handledAsyncTerminalStatusRef.current[statusKey]) {
+        return false;
+      }
+
+      handledAsyncTerminalStatusRef.current[statusKey] = true;
+      return true;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (searchParams.get("section") === activeSection) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParamsString);
+    nextParams.set("section", activeSection);
+    router.replace(`${pathname}?${nextParams.toString()}`);
+  }, [activeSection, pathname, router, searchParams, searchParamsString]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -763,6 +2479,7 @@ export default function PublicacoesIaPage() {
 
   const handleSelectPost = (postId: string) => {
     setSelectedPostId(postId);
+    setDraftReferenceUrlInput("");
 
     if (isMobileViewport) {
       setIsPostDetailModalOpen(true);
@@ -770,6 +2487,29 @@ export default function PublicacoesIaPage() {
   };
 
   const isMetaConnected = Boolean(me?.metaConnected);
+  const quickReferenceOptions = useMemo<ReferenceQuickOption[]>(() => {
+    const options: ReferenceQuickOption[] = [];
+    const avatarUrl = String(me?.avatarUrl || me?.avatar || "").trim();
+    const coverUrl = String(me?.coverUrl || me?.cover || "").trim();
+
+    if (avatarUrl) {
+      options.push({
+        label: "Usar logo/avatar",
+        helper: "Boa opcao para reforcar identidade visual da marca.",
+        url: avatarUrl,
+      });
+    }
+
+    if (coverUrl) {
+      options.push({
+        label: "Usar capa da marca",
+        helper: "Ajuda a manter ambiente, fachada ou atmosfera principal do negocio.",
+        url: coverUrl,
+      });
+    }
+
+    return options;
+  }, [me]);
   const campaigns = Array.isArray(campaignsData?.items)
     ? (campaignsData.items as CampaignSelectorItem[])
     : [];
@@ -780,6 +2520,11 @@ export default function PublicacoesIaPage() {
       ).length
     : 0;
   const aiPostsVideoGenerationLimit = getAiPostsVideoGenerationLimit(planType);
+  const remainingAiGenerations = Math.max(aiPostsGenerationLimit - totalAiGenerations, 0);
+  const remainingAiVideoGenerations = Math.max(
+    aiPostsVideoGenerationLimit - totalAiVideoGenerations,
+    0,
+  );
   const hasReachedAiPostsGenerationLimit = Boolean(
     isAiPostsPlanEligible &&
       aiPostsGenerationLimit > 0 &&
@@ -799,17 +2544,682 @@ export default function PublicacoesIaPage() {
       : null;
   const requiredCampaignHashtag = String(draftCampaign?.hashtagRequired || "").trim();
   const parsedHashtags = parseHashtagsInput(currentDraft.hashtags);
+  const parsedStoryBeats = parseStoryBeatsInput(currentDraft.storyBeats);
+  const parsedGenerateSequenceSteps = parseSequenceStepsInput(generateForm.sequenceSteps);
+  const isCurrentDraftSequential = isSequentialVideoMode(
+    currentDraft.continuityMode,
+    currentDraft.generateVideo,
+  );
+  const isGenerateVideoReferenceMode = hasVideoReferenceImages(
+    generateForm.generateVideo,
+    generateForm.referenceImageUrls,
+  );
+  const isCurrentDraftVideoReferenceMode = hasVideoReferenceImages(
+    currentDraft.generateVideo,
+    currentDraft.referenceImageUrls,
+  );
+  const generateProtectedReferenceUrls = getProtectedReferenceUrls(
+    generateForm.referenceImageUrls,
+    generateReferenceAccessStateByReference,
+  );
+  const draftProtectedReferenceUrls = getProtectedReferenceUrls(
+    currentDraft.referenceImageUrls,
+    draftReferenceAccessStateByReference,
+  );
+  const isGenerateBlockedByProtectedReferences =
+    generateProtectedReferenceUrls.length > 0;
+  const asyncQueuedCount = trackedAsyncGenerationJobs.filter(
+    (job) => normalizeAiPostStatus(job.status) === "QUEUED",
+  ).length;
+  const asyncProcessingCount = trackedAsyncGenerationJobs.filter(
+    (job) => normalizeAiPostStatus(job.status) === "GENERATING",
+  ).length;
+  const asyncPublishingCount = trackedAsyncGenerationJobs.filter(
+    (job) => normalizeAiPostStatus(job.status) === "PUBLISHING",
+  ).length;
+  const previewAccountLabel =
+    String(me?.instagramHandle || me?.slug || me?.name || "seu_negocio")
+      .replace(/^@/, "")
+      .trim() || "seu_negocio";
+  const selectedPreviewMedia = getPreferredPreviewMedia(selectedPost);
+  const selectedPreviewMediaUrl =
+    String(
+      selectedPreviewMedia?.url ||
+        draftReferencePreviewUrlByReference[currentDraft.referenceImageUrls[0] || ""] ||
+        currentDraft.referenceImageUrls[0] ||
+        "",
+    ).trim() ||
+    undefined;
+  const selectedPreviewMediaIsVideo = selectedPreviewMedia
+    ? isVideoMedia(selectedPreviewMedia)
+    : false;
+  const selectedPreviewShowsVideoIntent =
+    currentDraft.generateVideo || selectedPreviewMediaIsVideo;
+  const draftPreviewCaption = buildPreviewCaptionText({
+    caption: currentDraft.caption || selectedPost?.publishPreview,
+    prompt: currentDraft.prompt,
+    topic: currentDraft.topic,
+    callToAction: currentDraft.callToAction,
+    hashtags: currentDraft.hashtags,
+  });
+  const generatePreviewCaption = buildPreviewCaptionText({
+    prompt: generateForm.prompt,
+    topic: generateForm.topic,
+    callToAction: generateForm.callToAction,
+  });
+  const generatePreviewMediaUrl =
+    generateReferencePreviewUrlByReference[generateForm.referenceImageUrls[0] || ""] ||
+    generateForm.referenceImageUrls[0];
 
   const updateDraft = (partial: Partial<DraftState>) => {
-    setDraftState({
-      ...currentDraft,
-      ...partial,
-      postId: selectedPost?.id || "",
+    setDraftState((state) => {
+      const selectedPostIdValue = selectedPost?.id || "";
+      const baseState =
+        state.postId === selectedPostIdValue ? state : createDraftStateFromPost(selectedPost);
+
+      return applyVideoReferenceModelConstraints({
+        ...baseState,
+        ...partial,
+        postId: selectedPostIdValue,
+      });
     });
   };
 
+  const appendReferenceUrl = (
+    currentUrls: string[],
+    nextUrl: string,
+  ): { urls?: string[]; error?: string } => {
+    const normalizedValue = nextUrl.trim();
+
+    if (!normalizedValue) {
+      return { error: "Cole uma URL publica de imagem antes de adicionar." };
+    }
+
+    if (!isValidReferenceImageUrl(normalizedValue)) {
+      return {
+        error:
+          "Use uma URL publica valida, com http ou https, sem espacos em branco.",
+      };
+    }
+
+    if (currentUrls.includes(normalizedValue)) {
+      return { error: "Essa referencia ja foi adicionada." };
+    }
+
+    if (currentUrls.length >= 3) {
+      return { error: "Voce pode usar no maximo 3 imagens de referencia." };
+    }
+
+    return {
+      urls: normalizeReferenceImageUrls([...currentUrls, normalizedValue]),
+    };
+  };
+
+  const appendReferenceUrls = (
+    currentUrls: string[],
+    nextUrls: string[],
+  ): { urls?: string[]; error?: string } => {
+    let mergedUrls = [...currentUrls];
+
+    for (const nextUrl of nextUrls) {
+      const result = appendReferenceUrl(mergedUrls, nextUrl);
+
+      if (result.error) {
+        return result;
+      }
+
+      mergedUrls = result.urls || mergedUrls;
+    }
+
+    return {
+      urls: mergedUrls,
+    };
+  };
+
+  const moveReferenceUrl = (urls: string[], fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= urls.length ||
+      toIndex >= urls.length ||
+      fromIndex === toIndex
+    ) {
+      return urls;
+    }
+
+    const nextUrls = [...urls];
+    const [item] = nextUrls.splice(fromIndex, 1);
+    nextUrls.splice(toIndex, 0, item);
+    return nextUrls;
+  };
+
+  const handleMoveGenerateReference = (fromIndex: number, toIndex: number) => {
+    setGenerateForm((current) => ({
+      ...current,
+      referenceImageUrls: moveReferenceUrl(
+        current.referenceImageUrls,
+        fromIndex,
+        toIndex,
+      ),
+    }));
+
+    setFeedback({
+      type: "info",
+      message:
+        toIndex === 0
+          ? "Referencia principal atualizada."
+          : "Ordem das referencias atualizada.",
+    });
+  };
+
+  const handleMoveDraftReference = (fromIndex: number, toIndex: number) => {
+    setDraftState((state) => {
+      const selectedPostIdValue = selectedPost?.id || "";
+      const baseState =
+        state.postId === selectedPostIdValue ? state : createDraftStateFromPost(selectedPost);
+
+      return applyVideoReferenceModelConstraints({
+        ...baseState,
+        postId: selectedPostIdValue,
+        referenceImageUrls: moveReferenceUrl(
+          baseState.referenceImageUrls,
+          fromIndex,
+          toIndex,
+        ),
+      });
+    });
+
+    setFeedback({
+      type: "info",
+      message:
+        toIndex === 0
+          ? "Referencia principal atualizada."
+          : "Ordem das referencias atualizada.",
+    });
+  };
+
+  const handleAddGenerateReferenceUrl = (nextUrl?: string) => {
+    const normalizedValue = String(nextUrl ?? referenceUrlInput).trim();
+    const result = appendReferenceUrl(
+      generateForm.referenceImageUrls,
+      normalizedValue,
+    );
+
+    if (result.error) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    const shouldAdjustVideoReferenceConfig =
+      generateForm.generateVideo && generateForm.durationSeconds !== 8;
+
+    setGenerateForm((current) =>
+      applyVideoReferenceModelConstraints({
+        ...current,
+        referenceImageUrls: result.urls || current.referenceImageUrls,
+      }),
+    );
+    setGenerateReferenceAccessStateByReference((current) => ({
+      ...current,
+      [normalizedValue]: "public",
+    }));
+    setReferenceUrlInput("");
+    setFeedback(
+      shouldAdjustVideoReferenceConfig
+        ? {
+            type: "info",
+            message:
+              "Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.",
+          }
+        : null,
+    );
+  };
+
+  const handleAddDraftReferenceUrl = (nextUrl?: string) => {
+    const normalizedValue = String(nextUrl ?? draftReferenceUrlInput).trim();
+    const result = appendReferenceUrl(
+      currentDraft.referenceImageUrls,
+      normalizedValue,
+    );
+
+    if (result.error) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    const shouldAdjustVideoReferenceConfig =
+      currentDraft.generateVideo && currentDraft.durationSeconds !== 8;
+
+    updateDraft({
+      referenceImageUrls: result.urls || currentDraft.referenceImageUrls,
+    });
+    setDraftReferenceAccessStateByReference((current) => ({
+      ...current,
+      [normalizedValue]: "public",
+    }));
+    setDraftReferenceUrlInput("");
+    setFeedback(
+      shouldAdjustVideoReferenceConfig
+        ? {
+            type: "info",
+            message:
+              "Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.",
+          }
+        : null,
+    );
+  };
+
+  const referenceImageImportMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      if (!Array.isArray(files) || files.length === 0) {
+        return [] as Array<{
+          fileName: string;
+          url: string;
+          previewDataUrl: string;
+          browserPreviewReady: boolean;
+        }>;
+      }
+
+      const uploadedItems: Array<{
+        fileName: string;
+        url: string;
+        previewDataUrl: string;
+        browserPreviewReady: boolean;
+      }> = [];
+
+      for (const file of files) {
+        if (!isValidReferenceImageFile(file)) {
+          throw new Error(`O arquivo "${file.name}" nao e uma imagem valida.`);
+        }
+
+        const dataUrl = await readFileAsDataUrl(file);
+        const uploadedAsset = await establishmentApi.uploadAiPostReferenceImage({
+          dataUrl,
+          fileName: file.name,
+          bucket: DEFAULT_AI_REFERENCE_BUCKET,
+        });
+        const uploadedUrl = String(uploadedAsset?.url || "").trim();
+
+        if (!isValidReferenceImageUrl(uploadedUrl)) {
+          throw new Error(
+            `Nao foi possivel obter a URL publica da imagem "${file.name}" depois do upload.`,
+          );
+        }
+
+        const browserPreviewReady = await canRenderImageFromUrl(uploadedUrl);
+
+        uploadedItems.push({
+          fileName: file.name,
+          url: uploadedUrl,
+          previewDataUrl: dataUrl,
+          browserPreviewReady,
+        });
+      }
+
+      return uploadedItems;
+    },
+  });
+
+  const buildReferenceImportSuccessMessage = (
+    importedCount: number,
+    adjustedVideoReferenceConfig: boolean,
+    inaccessibleCount = 0,
+  ) => {
+    const baseMessage =
+      importedCount > 1
+        ? `${importedCount} imagens foram importadas do PC e adicionadas como referencias.`
+        : "Imagem importada do PC e adicionada como referencia.";
+
+    const accessibilityWarning =
+      inaccessibleCount > 0
+        ? ` O preview local foi mantido, mas ${inaccessibleCount > 1 ? "algumas URLs retornadas pelo upload parecem protegidas" : "a URL retornada pelo upload parece protegida"} e a geracao fica bloqueada ate voce trocar por uma URL publica.`
+        : "";
+
+    if (!adjustedVideoReferenceConfig) {
+      return `${baseMessage} A referencia ja entrou como URL publica no S3.${accessibilityWarning}`;
+    }
+
+    return `${baseMessage} Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.${accessibilityWarning}`;
+  };
+
+  const handleImportGenerateReferenceFiles = async (filesList: FileList | null) => {
+    const files = Array.from(filesList ?? []);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    if (generateForm.referenceImageUrls.length + files.length > 3) {
+      setFeedback({
+        type: "error",
+        message: "Voce pode usar no maximo 3 imagens de referencia.",
+      });
+      return;
+    }
+
+    try {
+      const importedItems = await referenceImageImportMutation.mutateAsync(files);
+      const importedUrls = importedItems.map((item) => item.url);
+      const result = appendReferenceUrls(generateForm.referenceImageUrls, importedUrls);
+
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+
+      const shouldAdjustVideoReferenceConfig =
+        generateForm.generateVideo && generateForm.durationSeconds !== 8;
+      const nextPreviewEntries = Object.fromEntries(
+        importedItems.map((item) => [item.url, item.previewDataUrl]),
+      );
+      const nextAccessStateEntries = Object.fromEntries(
+        importedItems.map((item) => [
+          item.url,
+          item.browserPreviewReady ? "public" : "protected",
+        ]),
+      ) as Record<string, ReferenceAccessState>;
+      const inaccessibleCount = importedItems.filter(
+        (item) => !item.browserPreviewReady,
+      ).length;
+
+      setGenerateForm((current) =>
+        applyVideoReferenceModelConstraints({
+          ...current,
+          referenceImageUrls: result.urls || current.referenceImageUrls,
+        }),
+      );
+      setGenerateReferencePreviewUrlByReference((current) => ({
+        ...current,
+        ...nextPreviewEntries,
+      }));
+      setGenerateReferenceAccessStateByReference((current) => ({
+        ...current,
+        ...nextAccessStateEntries,
+      }));
+      setFeedback({
+        type: inaccessibleCount > 0 ? "info" : "success",
+        message: buildReferenceImportSuccessMessage(
+          importedItems.length,
+          shouldAdjustVideoReferenceConfig,
+          inaccessibleCount,
+        ),
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: getErrorMessage(
+          error,
+          "Nao foi possivel importar a imagem de referencia pelo PC.",
+        ),
+      });
+    }
+  };
+
+  const handleImportDraftReferenceFiles = async (filesList: FileList | null) => {
+    const files = Array.from(filesList ?? []);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    if (currentDraft.referenceImageUrls.length + files.length > 3) {
+      setFeedback({
+        type: "error",
+        message: "Voce pode usar no maximo 3 imagens de referencia.",
+      });
+      return;
+    }
+
+    try {
+      const importedItems = await referenceImageImportMutation.mutateAsync(files);
+      const importedUrls = importedItems.map((item) => item.url);
+      const result = appendReferenceUrls(currentDraft.referenceImageUrls, importedUrls);
+
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+
+      const shouldAdjustVideoReferenceConfig =
+        currentDraft.generateVideo && currentDraft.durationSeconds !== 8;
+      const nextPreviewEntries = Object.fromEntries(
+        importedItems.map((item) => [item.url, item.previewDataUrl]),
+      );
+      const nextAccessStateEntries = Object.fromEntries(
+        importedItems.map((item) => [
+          item.url,
+          item.browserPreviewReady ? "public" : "protected",
+        ]),
+      ) as Record<string, ReferenceAccessState>;
+      const inaccessibleCount = importedItems.filter(
+        (item) => !item.browserPreviewReady,
+      ).length;
+
+      updateDraft({
+        referenceImageUrls: result.urls || currentDraft.referenceImageUrls,
+      });
+      setDraftReferencePreviewUrlByReference((current) => ({
+        ...current,
+        ...nextPreviewEntries,
+      }));
+      setDraftReferenceAccessStateByReference((current) => ({
+        ...current,
+        ...nextAccessStateEntries,
+      }));
+      setFeedback({
+        type: inaccessibleCount > 0 ? "info" : "success",
+        message: buildReferenceImportSuccessMessage(
+          importedItems.length,
+          shouldAdjustVideoReferenceConfig,
+          inaccessibleCount,
+        ),
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: getErrorMessage(
+          error,
+          "Nao foi possivel importar a imagem de referencia pelo PC.",
+        ),
+      });
+    }
+  };
+
+  const trackAsyncGenerationJobs = (jobs: AiPostAsyncGenerationResponse[]) => {
+    if (!Array.isArray(jobs) || jobs.length === 0) {
+      return;
+    }
+
+    setTrackedAsyncGenerationJobs((current) => {
+      const nextJobs = [...current];
+
+      jobs.forEach((job) => {
+        const aiPostId = String(job.aiPostId || "").trim();
+
+        if (!aiPostId) {
+          return;
+        }
+
+        const existingIndex = nextJobs.findIndex((item) => item.aiPostId === aiPostId);
+        const nextJob: TrackedAsyncGenerationJob = {
+          aiPostId,
+          status: normalizeAiPostStatus(job.status) || "QUEUED",
+          notificationChannelId: String(job.notificationChannelId || "").trim() || undefined,
+        };
+
+        if (existingIndex >= 0) {
+          nextJobs[existingIndex] = {
+            ...nextJobs[existingIndex],
+            ...nextJob,
+          };
+          return;
+        }
+
+        nextJobs.push(nextJob);
+      });
+
+      return nextJobs;
+    });
+  };
+
+  const updateTrackedAsyncGenerationJobStatus = useCallback(
+    (aiPostId: string, status: string) => {
+      const normalizedAiPostId = String(aiPostId || "").trim();
+      const normalizedStatus = normalizeAiPostStatus(status);
+
+      if (!normalizedAiPostId || !normalizedStatus) {
+        return;
+      }
+
+      setTrackedAsyncGenerationJobs((current) =>
+        current.map((job) =>
+          job.aiPostId === normalizedAiPostId
+            ? {
+                ...job,
+                status: normalizedStatus,
+              }
+            : job,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeTrackedAsyncGenerationJob = useCallback((aiPostId: string) => {
+    const normalizedAiPostId = String(aiPostId || "").trim();
+
+    if (!normalizedAiPostId) {
+      return;
+    }
+
+    setTrackedAsyncGenerationJobs((current) =>
+      current.filter((job) => job.aiPostId !== normalizedAiPostId),
+    );
+  }, []);
+
+  const handleAiPostSocketEvent = useCallback(
+    async (socketEvent: AiPostSocketEvent) => {
+      const aiPostId = String(
+        socketEvent.aiPostId ||
+          socketEvent.aiPost?._id ||
+          socketEvent.aiPost?.id ||
+          "",
+      ).trim();
+      const normalizedStatus = normalizeAiPostStatus(socketEvent.status);
+
+      if (!aiPostId) {
+        return;
+      }
+
+      if (normalizedStatus && !isAiPostTerminalStatus(normalizedStatus)) {
+        updateTrackedAsyncGenerationJobStatus(aiPostId, normalizedStatus);
+      }
+
+      if (normalizedStatus === "READY") {
+        const shouldNotify = shouldNotifyAsyncTerminalStatus(aiPostId, normalizedStatus);
+
+        try {
+          const aiPost = await establishmentApi.getAiPost(aiPostId);
+
+          if (aiPost?.id) {
+            queryClient.setQueryData(["ai-post", aiPost.id], aiPost);
+            queryClient.invalidateQueries({ queryKey: ["ai-post", aiPost.id] });
+            setSelectedPostId(aiPost.id);
+          }
+        } catch {
+          queryClient.invalidateQueries({ queryKey: ["ai-post", aiPostId] });
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+        removeTrackedAsyncGenerationJob(aiPostId);
+
+        if (shouldNotify) {
+          const readyMessage = buildAsyncGenerationFeedbackMessage({
+            readyCount: 1,
+            failedCount: 0,
+          });
+
+          setFeedback({
+            type: "success",
+            message: readyMessage,
+          });
+          addDashboardRuntimeNotification({
+            type: "success",
+            title: "Publicacao pronta",
+            message: "Seu rascunho ja esta pronto para revisao.",
+            href: AI_POSTS_LIBRARY_HREF,
+          });
+          showToast({
+            type: "success",
+            title: "Publicacao pronta",
+            message: "Seu rascunho ja esta pronto para revisao.",
+          });
+        }
+        return;
+      }
+
+      if (normalizedStatus === "FAILED") {
+        const shouldNotify = shouldNotifyAsyncTerminalStatus(aiPostId, normalizedStatus);
+        queryClient.invalidateQueries({ queryKey: ["ai-post", aiPostId] });
+        queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+        removeTrackedAsyncGenerationJob(aiPostId);
+
+        if (shouldNotify) {
+          const failedMessage =
+            String(socketEvent.message || "").trim() ||
+            buildAsyncGenerationFeedbackMessage({
+              readyCount: 0,
+              failedCount: 1,
+            });
+
+          setFeedback({
+            type: "error",
+            message: failedMessage,
+          });
+          addDashboardRuntimeNotification({
+            type: "error",
+            title: "Falha na geracao",
+            message: failedMessage,
+            href: AI_POSTS_LIBRARY_HREF,
+          });
+          showToast({
+            type: "error",
+            title: "Falha na geracao",
+            message: failedMessage,
+          });
+        }
+        return;
+      }
+
+      if (normalizedStatus && isAiPostTerminalStatus(normalizedStatus)) {
+        queryClient.invalidateQueries({ queryKey: ["ai-post", aiPostId] });
+        queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+        removeTrackedAsyncGenerationJob(aiPostId);
+      }
+    },
+    [
+      queryClient,
+      removeTrackedAsyncGenerationJob,
+      shouldNotifyAsyncTerminalStatus,
+      showToast,
+      updateTrackedAsyncGenerationJobStatus,
+    ],
+  );
+
   const generateMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      const normalizedReferenceImageUrls = normalizeReferenceImageUrls(
+        generateForm.referenceImageUrls,
+      );
+      const normalizedVideoSettings = normalizeVideoSettings(
+        generateForm.durationSeconds,
+        generateForm.videoResolution,
+        generateForm.continuityMode,
+      );
+      const normalizedStoryBeats = parseStoryBeatsInput(generateForm.storyBeats);
+      const normalizedSequenceCount = normalizeSequenceCount(generateForm.sequenceCount);
+      const normalizedSequenceSteps = parseSequenceStepsInput(generateForm.sequenceSteps);
+
       if (!isAiPostsPlanEligible) {
         throw new Error("Publicações IA estão disponíveis apenas nos planos Pro e Scale.");
       }
@@ -823,6 +3233,21 @@ export default function PublicacoesIaPage() {
       if (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit) {
         throw new Error(
           `Seu plano atingiu o limite de ${aiPostsVideoGenerationLimit} gerações de vídeo.`,
+        );
+      }
+
+      if (normalizedSequenceCount > remainingAiGenerations) {
+        throw new Error(
+          `Sua sequencia pede ${normalizedSequenceCount} geracoes, mas restam apenas ${remainingAiGenerations} no plano atual.`,
+        );
+      }
+
+      if (
+        generateForm.generateVideo &&
+        normalizedSequenceCount > remainingAiVideoGenerations
+      ) {
+        throw new Error(
+          `Sua sequencia pede ${normalizedSequenceCount} videos, mas restam apenas ${remainingAiVideoGenerations} geracoes de video no plano atual.`,
         );
       }
 
@@ -844,18 +3269,47 @@ export default function PublicacoesIaPage() {
         throw new Error("Publicações do tipo reels precisam de geração de vídeo.");
       }
 
-      if (generateForm.postType === "STORY" && !generateForm.generateImage) {
+      if (generateForm.referenceImageUrls.some((url) => !isValidReferenceImageUrl(url))) {
         throw new Error(
-          "Publicações do tipo story, neste fluxo, precisam ser geradas apenas com imagem.",
+          "Revise as imagens de referencia. Use apenas URLs publicas validas com http ou https.",
         );
       }
 
-      return establishmentApi.generateAiPost({
+      const protectedReferenceGenerationMessage =
+        getProtectedReferenceGenerationMessage(generateProtectedReferenceUrls);
+
+      if (protectedReferenceGenerationMessage) {
+        throw new Error(protectedReferenceGenerationMessage);
+      }
+
+      const videoReferenceValidationMessage = getVideoReferenceValidationMessage({
+        generateVideo: generateForm.generateVideo,
+        durationSeconds: normalizedVideoSettings.durationSeconds,
+        referenceImageUrls: normalizedReferenceImageUrls,
+      });
+
+      if (videoReferenceValidationMessage) {
+        throw new Error(videoReferenceValidationMessage);
+      }
+
+      if (isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)) {
+        if (!generateForm.storyOutline.trim()) {
+          throw new Error(
+            "Descreva a historia resumida do video longo antes de gerar o modo sequencial.",
+          );
+        }
+
+        if (!Number.isFinite(generateForm.totalDurationSeconds)) {
+          throw new Error("Defina a duracao total do video longo.");
+        }
+      }
+
+      const queuedJobs: AiPostAsyncGenerationResponse[] = [];
+      const basePayload = {
         mode: generateForm.mode,
         campaignId:
           generateForm.mode === "CAMPAIGN" ? generateForm.campaignId : undefined,
         postType: generateForm.postType,
-        prompt: generateForm.prompt.trim(),
         topic: generateForm.topic.trim() || undefined,
         briefing: generateForm.briefing.trim() || undefined,
         targetAudience: generateForm.targetAudience.trim() || undefined,
@@ -863,7 +3317,16 @@ export default function PublicacoesIaPage() {
         timezone: generateForm.timezone.trim() || DEFAULT_TIMEZONE,
         generateImage: generateForm.generateImage,
         generateVideo: generateForm.generateVideo,
-        durationSeconds: generateForm.generateVideo ? generateForm.durationSeconds : undefined,
+        durationSeconds:
+          generateForm.generateVideo ? normalizedVideoSettings.durationSeconds : undefined,
+        qualityProfile: generateForm.qualityProfile,
+        videoResolution:
+          generateForm.generateVideo ? normalizedVideoSettings.videoResolution : undefined,
+        continuityMode: generateForm.generateVideo ? generateForm.continuityMode : undefined,
+        totalDurationSeconds:
+          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)
+            ? normalizeTotalDurationSeconds(generateForm.totalDurationSeconds)
+            : undefined,
         imagePrompt: generateForm.imagePrompt.trim() || undefined,
         videoPrompt: generateForm.generateVideo
           ? buildVideoPromptWithLanguage(
@@ -871,23 +3334,111 @@ export default function PublicacoesIaPage() {
               generateForm.videoLanguage,
             )
           : undefined,
-      });
+        visualStyle: generateForm.visualStyle.trim() || undefined,
+        negativePrompt: generateForm.negativePrompt.trim() || undefined,
+        referenceImageUrls:
+          normalizedReferenceImageUrls.length > 0
+            ? normalizedReferenceImageUrls
+            : undefined,
+        storyOutline:
+          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)
+            ? generateForm.storyOutline.trim()
+            : undefined,
+        storyBeats:
+          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo) &&
+          normalizedStoryBeats.length > 0
+            ? normalizedStoryBeats
+            : undefined,
+      };
+
+      try {
+        for (let index = 0; index < normalizedSequenceCount; index += 1) {
+          setBatchGenerationProgress({
+            current: index + 1,
+            total: normalizedSequenceCount,
+          });
+
+          const queuedJob = await establishmentApi.generateAiPostAsync({
+            ...basePayload,
+            prompt: buildSequencePrompt(
+              generateForm.prompt,
+              generateForm.postType,
+              index,
+              normalizedSequenceCount,
+              normalizedSequenceSteps[index],
+            ),
+          });
+
+          if (!queuedJob?.aiPostId) {
+            throw new Error("A fila retornou uma resposta vazia.");
+          }
+
+          queuedJobs.push(queuedJob);
+        }
+      } catch (error) {
+        if (queuedJobs.length > 0) {
+          const partialError = new Error(
+            `Enviamos ${queuedJobs.length} de ${normalizedSequenceCount} pecas para a fila antes da interrupcao. ${getErrorMessage(error, "Nao foi possivel concluir o envio da sequencia.")}`,
+          ) as Error & { partialQueuedJobs?: AiPostAsyncGenerationResponse[] };
+          partialError.partialQueuedJobs = queuedJobs;
+          throw partialError;
+        }
+
+        throw error;
+      }
+
+      return {
+        queuedJobs,
+        requestedCount: normalizedSequenceCount,
+      };
     },
-    onSuccess: (post) => {
+    onSuccess: (result) => {
+      const queuedJobs = Array.isArray(result?.queuedJobs) ? result.queuedJobs : [];
+      const latestQueuedJob = queuedJobs[queuedJobs.length - 1] || null;
+
+      trackAsyncGenerationJobs(queuedJobs);
+
       setFeedback({
         type: "success",
         message:
-          "Rascunho gerado com sucesso. Revise legenda, hashtags e mídia antes de publicar.",
+          queuedJobs.length > 1
+            ? `${queuedJobs.length} publicacoes foram enviadas para fila. Voce pode continuar mexendo em outras areas enquanto a biblioteca atualiza automaticamente.`
+            : "Publicacao enviada para fila com sucesso. Voce pode continuar mexendo em outras areas enquanto a biblioteca atualiza automaticamente.",
       });
+      addDashboardRuntimeNotification({
+        type: "info",
+        title: queuedJobs.length > 1 ? "Publicacoes na fila" : "Publicacao na fila",
+        message:
+          queuedJobs.length > 1
+            ? `${queuedJobs.length} publicacoes entraram na fila. Voce pode continuar usando o painel enquanto elas sao geradas.`
+            : "Sua publicacao entrou na fila. Voce pode continuar usando o painel enquanto ela e gerada.",
+        href: AI_POSTS_LIBRARY_HREF,
+      });
+      showToast({
+        type: "info",
+        title: queuedJobs.length > 1 ? "Publicacoes na fila" : "Publicacao na fila",
+        message:
+          queuedJobs.length > 1
+            ? `${queuedJobs.length} publicacoes foram para a fila. Voce pode continuar usando o sistema normalmente.`
+            : "Sua publicacao foi para a fila. Voce pode continuar usando o sistema normalmente.",
+      });
+      setStatusFilter("");
+      setLibraryPage(1);
       queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
 
-      if (post?.id) {
-        setSelectedPostId(post.id);
-        setActiveSection("library");
+      queuedJobs.forEach((job) => {
+        if (job?.aiPostId) {
+          queryClient.invalidateQueries({ queryKey: ["ai-post", job.aiPostId] });
+        }
+      });
+
+      if (latestQueuedJob?.aiPostId) {
+        setSelectedPostId(latestQueuedJob.aiPostId);
+        navigateToSection("library");
         if (isMobileViewport) {
           setIsPostDetailModalOpen(true);
         }
-        queryClient.invalidateQueries({ queryKey: ["ai-post", post.id] });
+        queryClient.invalidateQueries({ queryKey: ["ai-post", latestQueuedJob.aiPostId] });
       }
 
       setGenerateForm((current) => ({
@@ -899,13 +3450,91 @@ export default function PublicacoesIaPage() {
         callToAction: "",
         imagePrompt: "",
         videoPrompt: "",
+        sequenceCount: 1,
+        sequenceSteps: "",
       }));
+      setReferenceUrlInput("");
     },
     onError: (error) => {
+      const errorMessage = getErrorMessage(
+        error,
+        "Nao foi possivel enviar a publicacao para fila.",
+      );
+      const partialQueuedJobs =
+        typeof error === "object" &&
+        error !== null &&
+        "partialQueuedJobs" in error &&
+        Array.isArray(
+          (error as { partialQueuedJobs?: AiPostAsyncGenerationResponse[] })
+            .partialQueuedJobs,
+        )
+          ? (error as { partialQueuedJobs?: AiPostAsyncGenerationResponse[] })
+              .partialQueuedJobs || []
+          : [];
+
+      if (partialQueuedJobs.length > 0) {
+        trackAsyncGenerationJobs(partialQueuedJobs);
+        setStatusFilter("");
+        setLibraryPage(1);
+        addDashboardRuntimeNotification({
+          type: "info",
+          title:
+            partialQueuedJobs.length > 1 ? "Fila iniciada parcialmente" : "Fila iniciada",
+          message:
+            partialQueuedJobs.length > 1
+              ? `${partialQueuedJobs.length} publicacoes entraram na fila. O restante teve erro, mas voce pode continuar usando o painel.`
+              : "Sua publicacao entrou na fila, mas houve uma falha no restante do processo. Voce pode continuar usando o painel.",
+          href: AI_POSTS_LIBRARY_HREF,
+        });
+        showToast({
+          type: "info",
+          title:
+            partialQueuedJobs.length > 1 ? "Fila iniciada parcialmente" : "Fila iniciada",
+          message:
+            partialQueuedJobs.length > 1
+              ? `${partialQueuedJobs.length} publicacoes entraram na fila. Voce pode continuar usando o sistema enquanto concluimos o restante.`
+              : "Sua publicacao entrou na fila. Voce pode continuar usando o sistema enquanto concluimos o restante.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+        partialQueuedJobs.forEach((job) => {
+          if (job?.aiPostId) {
+            queryClient.invalidateQueries({ queryKey: ["ai-post", job.aiPostId] });
+          }
+        });
+
+        const latestPartialJob = partialQueuedJobs[partialQueuedJobs.length - 1];
+
+        if (latestPartialJob?.aiPostId) {
+          setSelectedPostId(latestPartialJob.aiPostId);
+          navigateToSection("library");
+          if (isMobileViewport) {
+            setIsPostDetailModalOpen(true);
+          }
+        }
+      }
+
+      if (isReferenceDownloadForbiddenMessage(errorMessage)) {
+        const nextProtectedEntries = Object.fromEntries(
+          normalizeReferenceImageUrls(generateForm.referenceImageUrls)
+            .filter((url) => Boolean(generateReferencePreviewUrlByReference[url]))
+            .map((url) => [url, "protected"]),
+        ) as Record<string, ReferenceAccessState>;
+
+        if (Object.keys(nextProtectedEntries).length > 0) {
+          setGenerateReferenceAccessStateByReference((current) => ({
+            ...current,
+            ...nextProtectedEntries,
+          }));
+        }
+      }
+
       setFeedback({
         type: "error",
-        message: getErrorMessage(error, "Não foi possível gerar o rascunho com IA."),
+        message: errorMessage,
       });
+    },
+    onSettled: () => {
+      setBatchGenerationProgress(null);
     },
   });
 
@@ -926,9 +3555,315 @@ export default function PublicacoesIaPage() {
     };
   }, [generateMutation.isPending]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const trackedJobIds = new Set(
+      trackedAsyncGenerationJobs.map((job) => job.aiPostId).filter(Boolean),
+    );
+
+    trackedAsyncGenerationJobs.forEach((job) => {
+      const normalizedStatus = normalizeAiPostStatus(job.status);
+
+      if (
+        !job.notificationChannelId ||
+        isAiPostTerminalStatus(normalizedStatus) ||
+        aiPostSocketByJobIdRef.current[job.aiPostId]
+      ) {
+        return;
+      }
+
+      const socketUrl = buildAiPostSocketUrl(job.notificationChannelId);
+
+      if (!socketUrl) {
+        return;
+      }
+
+      try {
+        const socket = new WebSocket(socketUrl);
+        aiPostSocketByJobIdRef.current[job.aiPostId] = socket;
+
+        socket.onmessage = (event) => {
+          const socketEvent = parseAiPostSocketEvent(String(event.data || ""));
+
+          if (!socketEvent) {
+            return;
+          }
+
+          void handleAiPostSocketEvent(socketEvent);
+        };
+
+        socket.onerror = () => {
+          if (aiPostSocketByJobIdRef.current[job.aiPostId] === socket) {
+            delete aiPostSocketByJobIdRef.current[job.aiPostId];
+          }
+
+          try {
+            socket.close();
+          } catch {}
+        };
+
+        socket.onclose = () => {
+          if (aiPostSocketByJobIdRef.current[job.aiPostId] === socket) {
+            delete aiPostSocketByJobIdRef.current[job.aiPostId];
+          }
+        };
+      } catch {
+        delete aiPostSocketByJobIdRef.current[job.aiPostId];
+      }
+    });
+
+    Object.entries(aiPostSocketByJobIdRef.current).forEach(([aiPostId, socket]) => {
+      if (trackedJobIds.has(aiPostId)) {
+        return;
+      }
+
+      try {
+        socket.close();
+      } catch {}
+
+      delete aiPostSocketByJobIdRef.current[aiPostId];
+    });
+  }, [handleAiPostSocketEvent, trackedAsyncGenerationJobs]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(aiPostSocketByJobIdRef.current).forEach((socket) => {
+        try {
+          socket.close();
+        } catch {}
+      });
+
+      aiPostSocketByJobIdRef.current = {};
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(toastTimeoutByIdRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+
+      toastTimeoutByIdRef.current = {};
+    };
+  }, []);
+
+  useEffect(() => {
+    if (trackedAsyncGenerationJobs.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const pollTrackedAsyncGenerationJobs = async () => {
+      const jobsSnapshot = [...trackedAsyncGenerationJobs];
+      const results = await Promise.allSettled(
+        jobsSnapshot.map((job) => establishmentApi.getAiPost(job.aiPostId)),
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      const nextTrackedJobs: TrackedAsyncGenerationJob[] = [];
+      const readyPosts: AiPostRecord[] = [];
+      const failedCountByStatus: Record<string, number> = {};
+      let shouldRefreshLibrary = false;
+
+      results.forEach((result, index) => {
+        const job = jobsSnapshot[index];
+
+        if (!job) {
+          return;
+        }
+
+        if (result.status === "rejected") {
+          nextTrackedJobs.push(job);
+          return;
+        }
+
+        const post = result.value;
+
+        if (!post?.id) {
+          nextTrackedJobs.push(job);
+          return;
+        }
+
+        const normalizedStatus = normalizeAiPostStatus(post.status || job.status);
+
+        queryClient.setQueryData(["ai-post", post.id], post);
+        shouldRefreshLibrary = true;
+
+        if (isAiPostTerminalStatus(normalizedStatus)) {
+          const shouldNotify = shouldNotifyAsyncTerminalStatus(post.id, normalizedStatus);
+
+          if (normalizedStatus === "READY") {
+            if (shouldNotify) {
+              readyPosts.push(post);
+            }
+            return;
+          }
+
+          if (shouldNotify) {
+            failedCountByStatus[normalizedStatus] =
+              (failedCountByStatus[normalizedStatus] || 0) + 1;
+          }
+          return;
+        }
+
+        nextTrackedJobs.push({
+          ...job,
+          status: normalizedStatus,
+        });
+      });
+
+      setTrackedAsyncGenerationJobs(nextTrackedJobs);
+
+      if (shouldRefreshLibrary) {
+        queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
+      }
+
+      const failedCount = Object.values(failedCountByStatus).reduce(
+        (total, count) => total + count,
+        0,
+      );
+
+      if (readyPosts.length === 0 && failedCount === 0) {
+        return;
+      }
+
+      const latestReadyPost = readyPosts[readyPosts.length - 1] || null;
+
+      if (latestReadyPost?.id) {
+        setSelectedPostId(latestReadyPost.id);
+        queryClient.invalidateQueries({ queryKey: ["ai-post", latestReadyPost.id] });
+
+        if (activeSection !== "library") {
+          navigateToSection("library");
+        }
+
+        if (isMobileViewport) {
+          setIsPostDetailModalOpen(true);
+        }
+      }
+
+      setFeedback({
+        type:
+          readyPosts.length > 0 && failedCount > 0
+            ? "info"
+            : readyPosts.length > 0
+              ? "success"
+              : "error",
+        message: buildAsyncGenerationFeedbackMessage({
+          readyCount: readyPosts.length,
+          failedCount,
+        }),
+      });
+
+      showToast({
+        type:
+          readyPosts.length > 0 && failedCount > 0
+            ? "info"
+            : readyPosts.length > 0
+              ? "success"
+              : "error",
+        title:
+          readyPosts.length > 0
+            ? readyPosts.length > 1
+              ? "Publicacoes prontas"
+              : "Publicacao pronta"
+            : failedCount > 1
+              ? "Falhas na geracao"
+              : "Falha na geracao",
+        message:
+          readyPosts.length > 0
+            ? readyPosts.length > 1
+              ? `${readyPosts.length} rascunhos ja estao prontos para revisao.`
+              : "Seu rascunho ja esta pronto para revisao."
+            : buildAsyncGenerationFeedbackMessage({
+                readyCount: readyPosts.length,
+                failedCount,
+              }),
+      });
+      addDashboardRuntimeNotification({
+        type:
+          readyPosts.length > 0 && failedCount > 0
+            ? "info"
+            : readyPosts.length > 0
+              ? "success"
+              : "error",
+        title:
+          readyPosts.length > 0
+            ? readyPosts.length > 1
+              ? "Publicacoes prontas"
+              : "Publicacao pronta"
+            : failedCount > 1
+              ? "Falhas na geracao"
+              : "Falha na geracao",
+        message:
+          readyPosts.length > 0
+            ? readyPosts.length > 1
+              ? `${readyPosts.length} rascunhos ja estao prontos para revisao.`
+              : "Seu rascunho ja esta pronto para revisao."
+            : buildAsyncGenerationFeedbackMessage({
+                readyCount: readyPosts.length,
+                failedCount,
+              }),
+        href: AI_POSTS_LIBRARY_HREF,
+      });
+    };
+
+    pollTrackedAsyncGenerationJobs();
+    const intervalId = window.setInterval(
+      pollTrackedAsyncGenerationJobs,
+      AI_POST_ASYNC_POLL_INTERVAL_MS,
+    );
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    activeSection,
+    isMobileViewport,
+    navigateToSection,
+    queryClient,
+    shouldNotifyAsyncTerminalStatus,
+    showToast,
+    trackedAsyncGenerationJobs,
+  ]);
+
   const updateMutation = useMutation({
-    mutationFn: (postId: string) =>
-      establishmentApi.updateAiPost(postId, {
+    mutationFn: (postId: string) => {
+      const normalizedReferenceImageUrls = normalizeReferenceImageUrls(
+        currentDraft.referenceImageUrls,
+      );
+      const normalizedVideoSettings = normalizeVideoSettings(
+        currentDraft.durationSeconds,
+        currentDraft.videoResolution,
+        currentDraft.continuityMode,
+      );
+      const normalizedStoryBeats = parseStoryBeatsInput(currentDraft.storyBeats);
+
+      if (currentDraft.referenceImageUrls.some((url) => !isValidReferenceImageUrl(url))) {
+        throw new Error(
+          "Revise as imagens de referencia. Use apenas URLs publicas validas com http ou https.",
+        );
+      }
+
+      const videoReferenceValidationMessage = getVideoReferenceValidationMessage({
+        generateVideo: currentDraft.generateVideo,
+        durationSeconds: normalizedVideoSettings.durationSeconds,
+        referenceImageUrls: normalizedReferenceImageUrls,
+      });
+
+      if (videoReferenceValidationMessage) {
+        throw new Error(videoReferenceValidationMessage);
+      }
+
+      return establishmentApi.updateAiPost(postId, {
         mode: currentDraft.mode,
         campaignId:
           currentDraft.mode === "CAMPAIGN" ? currentDraft.campaignId || undefined : undefined,
@@ -941,7 +3876,15 @@ export default function PublicacoesIaPage() {
         generateImage: currentDraft.generateImage,
         generateVideo: currentDraft.generateVideo,
         durationSeconds:
-          currentDraft.generateVideo ? currentDraft.durationSeconds : undefined,
+          currentDraft.generateVideo ? normalizedVideoSettings.durationSeconds : undefined,
+        qualityProfile: currentDraft.qualityProfile,
+        videoResolution:
+          currentDraft.generateVideo ? normalizedVideoSettings.videoResolution : undefined,
+        continuityMode: currentDraft.generateVideo ? currentDraft.continuityMode : undefined,
+        totalDurationSeconds:
+          isSequentialVideoMode(currentDraft.continuityMode, currentDraft.generateVideo)
+            ? normalizeTotalDurationSeconds(currentDraft.totalDurationSeconds)
+            : undefined,
         imagePrompt: currentDraft.imagePrompt.trim() || undefined,
         videoPrompt: currentDraft.generateVideo
           ? buildVideoPromptWithLanguage(
@@ -949,16 +3892,33 @@ export default function PublicacoesIaPage() {
               currentDraft.videoLanguage,
             )
           : undefined,
+        visualStyle: currentDraft.visualStyle.trim() || undefined,
+        negativePrompt: currentDraft.negativePrompt.trim() || undefined,
+        referenceImageUrls:
+          normalizedReferenceImageUrls.length > 0
+            ? normalizedReferenceImageUrls
+            : undefined,
+        storyOutline:
+          isSequentialVideoMode(currentDraft.continuityMode, currentDraft.generateVideo)
+            ? currentDraft.storyOutline.trim() || undefined
+            : undefined,
+        storyBeats:
+          isSequentialVideoMode(currentDraft.continuityMode, currentDraft.generateVideo) &&
+          normalizedStoryBeats.length > 0
+            ? normalizedStoryBeats
+            : undefined,
         caption: currentDraft.caption.trim(),
         hashtags: parsedHashtags,
         timezone: currentDraft.timezone.trim() || DEFAULT_TIMEZONE,
-      }),
+      });
+    },
     onSuccess: (post) => {
       setFeedback({
         type: "success",
         message: "Rascunho atualizado com sucesso.",
       });
       setDraftState(createEmptyDraftState());
+      setDraftReferenceUrlInput("");
       queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
 
       if (post?.id) {
@@ -1067,15 +4027,6 @@ export default function PublicacoesIaPage() {
       return false;
     }
 
-    if (currentDraft.postType === "STORY" && !currentDraft.generateImage) {
-      setFeedback({
-        type: "error",
-        message:
-          "Rascunhos do tipo story, neste fluxo, precisam ser mantidos apenas com imagem.",
-      });
-      return false;
-    }
-
     if (
       !hasRequiredCampaignHashtag(
         currentDraft.caption,
@@ -1098,6 +4049,15 @@ export default function PublicacoesIaPage() {
       return;
     }
 
+    if (isSelectedPostProcessing) {
+      setFeedback({
+        type: "info",
+        message:
+          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao terminar antes de salvar a revisao.",
+      });
+      return;
+    }
+
     if (!validateCampaignHashtag()) {
       return;
     }
@@ -1111,6 +4071,24 @@ export default function PublicacoesIaPage() {
       return;
     }
 
+    if (isSelectedPostProcessing) {
+      setFeedback({
+        type: "info",
+        message:
+          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao concluir antes de publicar.",
+      });
+      return;
+    }
+
+    if (isCurrentDraftSequential) {
+      setFeedback({
+        type: "info",
+        message:
+          "Videos longos em modo sequencial retornam em segmentos e precisam de consolidacao antes da publicacao automatica.",
+      });
+      return;
+    }
+
     if (!validateCampaignHashtag()) {
       return;
     }
@@ -1121,6 +4099,24 @@ export default function PublicacoesIaPage() {
 
   const handleSchedule = () => {
     if (!selectedPost?.id) {
+      return;
+    }
+
+    if (isSelectedPostProcessing) {
+      setFeedback({
+        type: "info",
+        message:
+          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao concluir antes de agendar.",
+      });
+      return;
+    }
+
+    if (isCurrentDraftSequential) {
+      setFeedback({
+        type: "info",
+        message:
+          "Videos longos em modo sequencial precisam ser consolidados antes de entrar no fluxo de agendamento.",
+      });
       return;
     }
 
@@ -1192,6 +4188,27 @@ export default function PublicacoesIaPage() {
               permanecer na legenda final ou na lista de hashtags.
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {isCurrentDraftSequential ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="font-semibold">
+            Video longo com continuidade ativo
+          </div>
+          <div className="mt-1">
+            Este rascunho retorna segmentos em sequencia e ainda precisa de consolidacao antes do fluxo de publicar ou agendar.
+          </div>
+        </div>
+      ) : null}
+
+      {isSelectedPostProcessing ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="font-semibold">Geracao em andamento</div>
+          <div className="mt-1">
+            Este rascunho ainda esta {getStatusMeta(selectedPost.status).label.toLowerCase()}.
+            Aguarde a conclusao para revisar a midia final, publicar ou agendar.
+          </div>
         </div>
       ) : null}
 
@@ -1275,32 +4292,9 @@ export default function PublicacoesIaPage() {
 
               <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <input
-                      type="radio"
-                      name={`draft-media-type-${selectedPost?.id || "default"}`}
-                      checked={currentDraft.generateImage}
-                      onChange={() =>
-                        updateDraft({
-                          generateImage: true,
-                          generateVideo: false,
-                        })
-                      }
-                      disabled={!canEditAiPosts}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-slate-700">
-                      <span className="block font-bold text-slate-900">
-                        Gerar imagem
-                      </span>
-                      Use quando quiser uma arte fixa para feed ou story. Em
-                      story, este e o formato disponivel neste fluxo.
-                    </span>
-                  </label>
-
                   <label
                     className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
-                      currentDraft.postType === "STORY"
+                      currentDraft.postType === "REELS"
                         ? "cursor-not-allowed border-slate-200 bg-slate-100"
                         : "border-slate-200 bg-white"
                     }`}
@@ -1308,10 +4302,39 @@ export default function PublicacoesIaPage() {
                     <input
                       type="radio"
                       name={`draft-media-type-${selectedPost?.id || "default"}`}
-                      checked={currentDraft.generateVideo}
+                      checked={currentDraft.generateImage}
                       disabled={
-                        currentDraft.postType === "STORY" || !canEditAiPosts
+                        currentDraft.postType === "REELS" || !canEditAiPosts
                       }
+                      onChange={() =>
+                        updateDraft({
+                          generateImage: true,
+                          generateVideo: false,
+                        })
+                      }
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span
+                      className={`text-sm ${
+                        currentDraft.postType === "REELS"
+                          ? "text-slate-500"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      <span className="block font-bold text-slate-900">
+                        Gerar imagem
+                      </span>
+                      Use quando quiser uma arte fixa para feed ou story, com
+                      leitura rapida e composicao estatica.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <input
+                      type="radio"
+                      name={`draft-media-type-${selectedPost?.id || "default"}`}
+                      checked={currentDraft.generateVideo}
+                      disabled={!canEditAiPosts}
                       onChange={() =>
                         updateDraft({
                           generateImage: false,
@@ -1320,18 +4343,12 @@ export default function PublicacoesIaPage() {
                       }
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                     />
-                    <span
-                      className={`text-sm ${
-                        currentDraft.postType === "STORY"
-                          ? "text-slate-500"
-                          : "text-slate-700"
-                      }`}
-                    >
+                    <span className="text-sm text-slate-700">
                       <span className="block font-bold text-slate-900">
                         Gerar video
                       </span>
-                      Ative para reels ou quando quiser motion no feed. Story
-                      ainda nao aceita video neste fluxo.
+                      Ative para feed, story ou reels quando quiser motion,
+                      narrativa em movimento e mais impacto visual.
                     </span>
                   </label>
                 </div>
@@ -1418,13 +4435,15 @@ export default function PublicacoesIaPage() {
                   <select
                     value={String(currentDraft.durationSeconds)}
                     onChange={(event) =>
-                      updateDraft({
-                        durationSeconds: Number(
-                          event.target.value,
-                        ) as AiVideoDurationSeconds,
-                      })
+                      updateDraft(
+                        buildVideoSettingsFromDuration(
+                          Number(event.target.value) as AiVideoDurationSeconds,
+                          currentDraft.videoResolution,
+                          currentDraft.continuityMode,
+                        ),
+                      )
                     }
-                    disabled={!canEditAiPosts}
+                    disabled={!canEditAiPosts || isCurrentDraftVideoReferenceMode}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   >
                     {VIDEO_DURATION_OPTIONS.map((duration) => (
@@ -1433,6 +4452,11 @@ export default function PublicacoesIaPage() {
                       </option>
                     ))}
                   </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {isCurrentDraftVideoReferenceMode
+                      ? "Video com imagem de referencia fica travado em 8 segundos no modelo atual."
+                      : "O backend aceita apenas 4, 6 ou 8 segundos."}
+                  </p>
                 </div>
               ) : null}
 
@@ -1475,8 +4499,12 @@ export default function PublicacoesIaPage() {
                       updateDraft({ imagePrompt: event.target.value })
                     }
                     disabled={!canEditAiPosts}
+                    placeholder={IMAGE_PROMPT_PLACEHOLDERS[currentDraft.postType]}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
+                  <p className="mt-2 text-xs text-slate-500">
+                    {getImagePromptHelper(currentDraft.postType)}
+                  </p>
                 </div>
               ) : null}
 
@@ -1492,10 +4520,87 @@ export default function PublicacoesIaPage() {
                       updateDraft({ videoPrompt: event.target.value })
                     }
                     disabled={!canEditAiPosts}
+                    placeholder={VIDEO_PROMPT_PLACEHOLDERS[currentDraft.postType]}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
+                  <p className="mt-2 text-xs text-slate-500">
+                    {getVideoPromptHelper(currentDraft.postType)}
+                  </p>
                 </div>
               ) : null}
+
+              <DirectionVisualSection
+                postType={currentDraft.postType}
+                generateVideo={currentDraft.generateVideo}
+                qualityProfile={currentDraft.qualityProfile}
+                videoResolution={currentDraft.videoResolution}
+                continuityMode={currentDraft.continuityMode}
+                totalDurationSeconds={currentDraft.totalDurationSeconds}
+                visualStyle={currentDraft.visualStyle}
+                negativePrompt={currentDraft.negativePrompt}
+                referenceImageUrls={currentDraft.referenceImageUrls}
+                referencePreviewUrlByReference={draftReferencePreviewUrlByReference}
+                referenceAccessStateByReference={draftReferenceAccessStateByReference}
+                referenceUrlInput={draftReferenceUrlInput}
+                onReferenceUrlInputChange={setDraftReferenceUrlInput}
+                onAddReferenceUrl={() => handleAddDraftReferenceUrl()}
+                onImportReferenceFiles={handleImportDraftReferenceFiles}
+                onQuickAddReference={handleAddDraftReferenceUrl}
+                onMoveReference={handleMoveDraftReference}
+                onRemoveReference={(index) =>
+                  updateDraft({
+                    referenceImageUrls: currentDraft.referenceImageUrls.filter(
+                      (_, currentIndex) => currentIndex !== index,
+                    ),
+                  })
+                }
+                onApplyPreset={(preset) =>
+                  updateDraft({
+                    visualStyle: preset.visualStyle,
+                    negativePrompt: preset.negativePrompt,
+                  })
+                }
+                onVisualStyleChange={(value) => updateDraft({ visualStyle: value })}
+                onNegativePromptChange={(value) =>
+                  updateDraft({ negativePrompt: value })
+                }
+                onQualityProfileChange={(value) =>
+                  updateDraft({ qualityProfile: value })
+                }
+                onVideoResolutionChange={(value) =>
+                  updateDraft(
+                    buildVideoSettingsFromResolution(
+                      value,
+                      currentDraft.durationSeconds,
+                      currentDraft.continuityMode,
+                    ),
+                  )
+                }
+                onContinuityModeChange={(value) =>
+                  updateDraft({
+                    continuityMode: value,
+                    durationSeconds:
+                      value === "SEQUENTIAL" ? 8 : currentDraft.durationSeconds,
+                    videoResolution: value === "SEQUENTIAL" ? "720p" : currentDraft.videoResolution,
+                    totalDurationSeconds:
+                      value === "SEQUENTIAL"
+                        ? normalizeTotalDurationSeconds(currentDraft.totalDurationSeconds)
+                        : currentDraft.totalDurationSeconds,
+                  })
+                }
+                onTotalDurationChange={(value) =>
+                  updateDraft({
+                    totalDurationSeconds: normalizeTotalDurationSeconds(value),
+                  })
+                }
+                onStoryOutlineChange={(value) => updateDraft({ storyOutline: value })}
+                onStoryBeatsChange={(value) => updateDraft({ storyBeats: value })}
+                storyOutline={currentDraft.storyOutline}
+                storyBeats={currentDraft.storyBeats}
+                quickReferenceOptions={quickReferenceOptions}
+                isImportingReferenceFiles={referenceImageImportMutation.isPending}
+                disabled={!canEditAiPosts}
+              />
             </div>
           </div>
 
@@ -1569,12 +4674,14 @@ export default function PublicacoesIaPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 font-bold text-slate-900">Preview</div>
-            <div className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
-              {currentDraft.caption || selectedPost.publishPreview || "Sem texto de preview."}
-            </div>
-          </div>
+          <InstagramPreviewMock
+            postType={currentDraft.postType}
+            caption={draftPreviewCaption}
+            accountLabel={previewAccountLabel}
+            mediaUrl={selectedPreviewMediaUrl}
+            mediaIsVideo={selectedPreviewMediaIsVideo}
+            showVideoIntent={selectedPreviewShowsVideoIntent}
+          />
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
@@ -1592,17 +4699,29 @@ export default function PublicacoesIaPage() {
                     key={item.id || `${item.url}-${index}`}
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                   >
+                    {isCurrentDraftSequential ? (
+                      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">
+                        <span>Segmento {index + 1}</span>
+                        <span>{parsedStoryBeats[index] || "Beat livre"}</span>
+                      </div>
+                    ) : null}
                     {isVideoMedia(item) ? (
                       <video
                         src={item.url}
                         controls
-                        className="aspect-[4/5] w-full bg-black object-cover"
+                        className={getGeneratedMediaClass(
+                          selectedPost.postType as AiPostType,
+                          true,
+                        )}
                       />
                     ) : (
                       <img
                         src={item.url}
                         alt="Asset gerado pela IA"
-                        className="aspect-[4/5] w-full object-cover"
+                        className={getGeneratedMediaClass(
+                          selectedPost.postType as AiPostType,
+                          false,
+                        )}
                       />
                     )}
                   </div>
@@ -1633,6 +4752,28 @@ export default function PublicacoesIaPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Continuidade</span>
+                <span className="font-semibold">
+                  {isCurrentDraftSequential ? "Sequencial" : "Video unico"}
+                </span>
+              </div>
+              {isCurrentDraftSequential ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-500">Duracao total</span>
+                  <span className="font-semibold">
+                    {currentDraft.totalDurationSeconds} segundos
+                  </span>
+                </div>
+              ) : null}
+              {isCurrentDraftSequential ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-500">Segmentos</span>
+                  <span className="font-semibold">
+                    {selectedPost.media.length || 0}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-slate-500">Timezone</span>
                 <span className="font-semibold">{selectedPost.timezone}</span>
               </div>
@@ -1657,16 +4798,26 @@ export default function PublicacoesIaPage() {
         </div>
       </div>
 
+      {draftProtectedReferenceUrls.length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          As referencias importadas do PC continuam com preview local apenas. Para usar essas imagens em novas geracoes, troque por URLs publicas.
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="text-xs text-slate-500">
-          Reels podem exigir video e stories priorizam asset vertical.
+          {isCurrentDraftSequential
+            ? "Videos longos sequenciais retornam em segmentos e aguardam consolidacao antes da publicacao."
+            : "Reels podem exigir video e stories priorizam asset vertical."}
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={updateMutation.isPending || !canEditAiPosts}
+            disabled={
+              updateMutation.isPending || !canEditAiPosts || isSelectedPostProcessing
+            }
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {updateMutation.isPending ? (
@@ -1683,7 +4834,9 @@ export default function PublicacoesIaPage() {
             disabled={
               scheduleMutation.isPending ||
               !canEditAiPosts ||
-              !isMetaConnected
+              !isMetaConnected ||
+              isSelectedPostProcessing ||
+              isCurrentDraftSequential
             }
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -1701,7 +4854,9 @@ export default function PublicacoesIaPage() {
             disabled={
               publishMutation.isPending ||
               !canEditAiPosts ||
-              !isMetaConnected
+              !isMetaConnected ||
+              isSelectedPostProcessing ||
+              isCurrentDraftSequential
             }
             className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -1905,43 +5060,72 @@ export default function PublicacoesIaPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <div className="xl:sticky xl:top-24 xl:self-start">
-          <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-            {aiPostsSections.map((section) => {
-              const isActive = activeSection === section.id;
-
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveSection(section.id);
-                    if (section.id !== "library") {
-                      setIsPostDetailModalOpen(false);
-                    }
-                  }}
-                  className={`w-full rounded-xl px-4 py-3 text-left transition-colors ${
-                    isActive
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      {toasts.length > 0 ? (
+        <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-3">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`pointer-events-auto rounded-2xl border bg-white p-4 shadow-lg ${
+                toast.type === "success"
+                  ? "border-emerald-200"
+                  : toast.type === "error"
+                    ? "border-red-200"
+                    : "border-blue-200"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 shrink-0 ${
+                    toast.type === "success"
+                      ? "text-emerald-600"
+                      : toast.type === "error"
+                        ? "text-red-600"
+                        : "text-blue-600"
                   }`}
                 >
-                  <div className="font-medium text-sm">{section.label}</div>
-                  <div
-                    className={`mt-1 text-xs leading-5 ${
-                      isActive ? "text-slate-300" : "text-slate-500"
-                    }`}
-                  >
-                    {section.description}
-                  </div>
+                  {toast.type === "success" ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : toast.type === "error" ? (
+                    <AlertTriangle className="h-5 w-5" />
+                  ) : (
+                    <Sparkles className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-900">{toast.title}</div>
+                  <div className="mt-1 text-sm text-slate-600">{toast.message}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismissToast(toast.id)}
+                  className="text-slate-400 transition-colors hover:text-slate-600"
+                  aria-label="Fechar notificacao"
+                >
+                  ×
                 </button>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          ))}
         </div>
+      ) : null}
 
-        <div className="space-y-6">
+      {trackedAsyncGenerationJobs.length > 0 ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {trackedAsyncGenerationJobs.length > 1
+            ? `${trackedAsyncGenerationJobs.length} geracoes estao em acompanhamento agora.`
+            : "1 geracao esta em acompanhamento agora."}{" "}
+          {asyncQueuedCount > 0 ? `${asyncQueuedCount} na fila.` : ""}
+          {asyncProcessingCount > 0
+            ? ` ${asyncProcessingCount} processando.`
+            : ""}
+          {asyncPublishingCount > 0
+            ? ` ${asyncPublishingCount} publicando.`
+            : ""}{" "}
+          A biblioteca atualiza automaticamente.
+        </div>
+      ) : null}
+
+      <div className="space-y-6">
       {activeSection === "generate" ? (
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
@@ -1950,7 +5134,7 @@ export default function PublicacoesIaPage() {
           </div>
           <div>
             <h2 className="font-heading text-xl font-bold text-slate-900">
-              Gerar novo rascunho
+              Gerar nova publicação
             </h2>
             <p className="text-sm text-slate-500">
               Escolha se a IA deve criar um conteúdo editorial ou vinculado a uma
@@ -1988,11 +5172,13 @@ export default function PublicacoesIaPage() {
             <select
               value={generateForm.postType}
               onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  postType: event.target.value as AiPostType,
-                  ...getDefaultMediaConfig(event.target.value as AiPostType),
-                }))
+                setGenerateForm((current) =>
+                  applyVideoReferenceModelConstraints({
+                    ...current,
+                    postType: event.target.value as AiPostType,
+                    ...getDefaultMediaConfig(event.target.value as AiPostType),
+                  }),
+                )
               }
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             >
@@ -2012,11 +5198,18 @@ export default function PublicacoesIaPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <label
+                className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
+                  generateForm.postType === "REELS"
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
                 <input
                   type="radio"
                   name="generate-media-type"
                   checked={generateForm.generateImage}
+                  disabled={generateForm.postType === "REELS"}
                   onChange={() =>
                     setGenerateForm((current) => ({
                       ...current,
@@ -2026,44 +5219,37 @@ export default function PublicacoesIaPage() {
                   }
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                 />
-                <span className="text-sm text-slate-700">
+                <span
+                  className={`text-sm ${
+                    generateForm.postType === "REELS" ? "text-slate-500" : "text-slate-700"
+                  }`}
+                >
                   <span className="block font-bold text-slate-900">Gerar imagem</span>
-                  Use quando quiser uma arte fixa para feed ou story. Em story,
-                  este e o formato disponivel neste fluxo.
+                  Use quando quiser uma arte fixa para feed ou story, com leitura
+                  rapida e composicao estatica.
                 </span>
               </label>
 
-              <label
-                className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
-                  generateForm.postType === "STORY"
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                 <input
                   type="radio"
                   name="generate-media-type"
                   checked={generateForm.generateVideo}
-                  disabled={generateForm.postType === "STORY"}
                   onChange={() =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      generateImage: false,
-                      generateVideo: true,
-                    }))
+                    setGenerateForm((current) =>
+                      applyVideoReferenceModelConstraints({
+                        ...current,
+                        generateImage: false,
+                        generateVideo: true,
+                      }),
+                    )
                   }
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                 />
-                <span
-                  className={`text-sm ${
-                    generateForm.postType === "STORY"
-                      ? "text-slate-500"
-                      : "text-slate-700"
-                  }`}
-                >
+                <span className="text-sm text-slate-700">
                   <span className="block font-bold text-slate-900">Gerar vídeo</span>
-                  Ative para reels ou quando quiser motion no feed. Story ainda
-                  nao aceita video neste fluxo.
+                  Ative para feed, story ou reels quando quiser motion, narrativa
+                  em movimento e mais impacto visual.
                 </span>
               </label>
             </div>
@@ -2118,9 +5304,12 @@ export default function PublicacoesIaPage() {
                   prompt: event.target.value,
                 }))
               }
-              placeholder="Ex: campanha para atrair novos clientes com CTA no WhatsApp"
+              placeholder={PROMPT_PLACEHOLDER}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
+            <p className="mt-2 text-xs text-slate-500">
+              Quanto mais claro o objetivo comercial e o tom da peca, melhor a IA acerta copy e direcao criativa.
+            </p>
           </div>
 
           {generateForm.generateImage ? (
@@ -2129,7 +5318,7 @@ export default function PublicacoesIaPage() {
                 Prompt da imagem
               </label>
               <SuggestionButtons
-                suggestions={IMAGE_PROMPT_SUGGESTIONS}
+                suggestions={getImagePromptSuggestions(generateForm.postType)}
                 onSelect={(value) =>
                   setGenerateForm((current) => ({
                     ...current,
@@ -2146,9 +5335,12 @@ export default function PublicacoesIaPage() {
                     imagePrompt: event.target.value,
                   }))
                 }
-                placeholder="Ex: Arte clean para academia premium, tons escuros e dourado"
+                placeholder={IMAGE_PROMPT_PLACEHOLDERS[generateForm.postType]}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
               />
+              <p className="mt-2 text-xs text-slate-500">
+                {getImagePromptHelper(generateForm.postType)}
+              </p>
             </div>
           ) : null}
 
@@ -2161,11 +5353,18 @@ export default function PublicacoesIaPage() {
                 <select
                   value={String(generateForm.durationSeconds)}
                   onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      durationSeconds: Number(event.target.value) as AiVideoDurationSeconds,
-                    }))
+                    setGenerateForm((current) =>
+                      applyVideoReferenceModelConstraints({
+                        ...current,
+                        ...buildVideoSettingsFromDuration(
+                          Number(event.target.value) as AiVideoDurationSeconds,
+                          current.videoResolution,
+                          current.continuityMode,
+                        ),
+                      }),
+                    )
                   }
+                  disabled={isGenerateVideoReferenceMode}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
                 >
                   {VIDEO_DURATION_OPTIONS.map((duration) => (
@@ -2175,7 +5374,9 @@ export default function PublicacoesIaPage() {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-500">
-                  O backend aceita apenas 4, 6 ou 8 segundos.
+                  {isGenerateVideoReferenceMode
+                    ? "Video com imagem de referencia fica travado em 8 segundos no modelo atual."
+                    : "O backend aceita apenas 4, 6 ou 8 segundos."}
                 </p>
               </div>
 
@@ -2208,7 +5409,7 @@ export default function PublicacoesIaPage() {
                 Prompt do vídeo
               </label>
               <SuggestionButtons
-                suggestions={VIDEO_PROMPT_SUGGESTIONS}
+                suggestions={getVideoPromptSuggestions(generateForm.postType)}
                 onSelect={(value) =>
                   setGenerateForm((current) => ({
                     ...current,
@@ -2225,11 +5426,185 @@ export default function PublicacoesIaPage() {
                     videoPrompt: event.target.value,
                   }))
                 }
-                placeholder="Ex: Video dinamico de 8 segundos mostrando treino funcional com cortes rapidos"
+                placeholder={VIDEO_PROMPT_PLACEHOLDERS[generateForm.postType]}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
               />
+              <p className="mt-2 text-xs text-slate-500">
+                {getVideoPromptHelper(generateForm.postType)}
+              </p>
             </div>
           ) : null}
+
+          <DirectionVisualSection
+            postType={generateForm.postType}
+            generateVideo={generateForm.generateVideo}
+            qualityProfile={generateForm.qualityProfile}
+            videoResolution={generateForm.videoResolution}
+            continuityMode={generateForm.continuityMode}
+            totalDurationSeconds={generateForm.totalDurationSeconds}
+            visualStyle={generateForm.visualStyle}
+            negativePrompt={generateForm.negativePrompt}
+            referenceImageUrls={generateForm.referenceImageUrls}
+            referencePreviewUrlByReference={generateReferencePreviewUrlByReference}
+            referenceAccessStateByReference={generateReferenceAccessStateByReference}
+            referenceUrlInput={referenceUrlInput}
+            onReferenceUrlInputChange={setReferenceUrlInput}
+            onAddReferenceUrl={() => handleAddGenerateReferenceUrl()}
+            onImportReferenceFiles={handleImportGenerateReferenceFiles}
+            onQuickAddReference={handleAddGenerateReferenceUrl}
+            onMoveReference={handleMoveGenerateReference}
+            onRemoveReference={(index) =>
+              setGenerateForm((current) => ({
+                ...current,
+                referenceImageUrls: current.referenceImageUrls.filter(
+                  (_, currentIndex) => currentIndex !== index,
+                ),
+              }))
+            }
+            onApplyPreset={(preset) =>
+              setGenerateForm((current) => ({
+                ...current,
+                visualStyle: preset.visualStyle,
+                negativePrompt: preset.negativePrompt,
+              }))
+            }
+            onVisualStyleChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                visualStyle: value,
+              }))
+            }
+            onNegativePromptChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                negativePrompt: value,
+              }))
+            }
+            onQualityProfileChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                qualityProfile: value,
+              }))
+            }
+            onVideoResolutionChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                ...buildVideoSettingsFromResolution(
+                  value,
+                  current.durationSeconds,
+                  current.continuityMode,
+                ),
+              }))
+            }
+            onContinuityModeChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                continuityMode: value,
+                durationSeconds: value === "SEQUENTIAL" ? 8 : current.durationSeconds,
+                videoResolution: value === "SEQUENTIAL" ? "720p" : current.videoResolution,
+                totalDurationSeconds:
+                  value === "SEQUENTIAL"
+                    ? normalizeTotalDurationSeconds(current.totalDurationSeconds)
+                    : current.totalDurationSeconds,
+              }))
+            }
+            onTotalDurationChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                totalDurationSeconds: normalizeTotalDurationSeconds(value),
+              }))
+            }
+            onStoryOutlineChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                storyOutline: value,
+              }))
+            }
+            onStoryBeatsChange={(value) =>
+              setGenerateForm((current) => ({
+                ...current,
+                storyBeats: value,
+              }))
+            }
+            storyOutline={generateForm.storyOutline}
+            storyBeats={generateForm.storyBeats}
+            quickReferenceOptions={quickReferenceOptions}
+            isImportingReferenceFiles={referenceImageImportMutation.isPending}
+            disabled={!canEditAiPosts}
+          />
+
+          <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4">
+              <div className="text-sm font-bold text-slate-900">Sequencia de publicacoes</div>
+              <div className="mt-1 text-xs text-slate-500">
+                Gere uma peca unica ou uma sequencia inteira de feed, story ou reels no mesmo fluxo.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Quantidade de pecas
+                </label>
+                <select
+                  value={String(generateForm.sequenceCount)}
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      sequenceCount: normalizeSequenceCount(Number(event.target.value)),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                >
+                  {SEQUENCE_COUNT_OPTIONS.map((count) => (
+                    <option key={count} value={count}>
+                      {count === 1 ? "1 peca" : `${count} pecas`}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  {getSequenceCollectionLabel(
+                    generateForm.postType,
+                    normalizeSequenceCount(generateForm.sequenceCount),
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                <div className="font-semibold text-slate-900">Resultado na biblioteca</div>
+                <div className="mt-2">
+                  Cada item da sequencia vira um rascunho separado. Isso ja resolve stories em passos e series de reels; carrossel unico no feed ainda depende de suporte especifico do backend.
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Passos por item
+                </label>
+                <textarea
+                  rows={Math.min(Math.max(generateForm.sequenceCount, 3), 6)}
+                  value={generateForm.sequenceSteps}
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      sequenceSteps: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    generateForm.postType === "FEED"
+                      ? "card 1: chamar atencao para o problema\ncard 2: mostrar a solucao\ncard 3: fechar com CTA"
+                      : generateForm.postType === "STORY"
+                        ? "story 1: contexto rapido\nstory 2: prova ou beneficio\nstory 3: CTA para responder"
+                        : "reel 1: gancho forte\nreel 2: bastidores\nreel 3: oferta final"
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Use uma linha por item. Se preencher menos linhas que a quantidade, o restante sai como variacao complementar.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
@@ -2253,7 +5628,7 @@ export default function PublicacoesIaPage() {
                   topic: event.target.value,
                 }))
               }
-              placeholder="Ex: academia"
+              placeholder="Ex: lancamento de combo executivo, makeover capilar ou consulta inicial"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -2280,7 +5655,7 @@ export default function PublicacoesIaPage() {
                   callToAction: event.target.value,
                 }))
               }
-              placeholder="Ex: Agende sua aula"
+              placeholder="Ex: Reserve pelo WhatsApp agora"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -2307,7 +5682,7 @@ export default function PublicacoesIaPage() {
                   targetAudience: event.target.value,
                 }))
               }
-              placeholder="Ex: mulheres de 25 a 45 anos"
+              placeholder="Ex: pessoas da regiao buscando qualidade, praticidade e bom atendimento"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -2351,12 +5726,31 @@ export default function PublicacoesIaPage() {
                   briefing: event.target.value,
                 }))
               }
-              placeholder="Ex: foco em conversao para novos alunos e linguagem acolhedora"
+              placeholder="Ex: tom premium, visual limpo, beneficio claro, sem poluicao visual e com CTA direto"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
+          <div className="md:col-span-2">
+            <InstagramPreviewMock
+              postType={generateForm.postType}
+              caption={generatePreviewCaption}
+              accountLabel={previewAccountLabel}
+              mediaUrl={generatePreviewMediaUrl}
+              mediaIsVideo={false}
+              showVideoIntent={generateForm.generateVideo}
+              sequenceCount={generateForm.sequenceCount}
+              sequenceSteps={parsedGenerateSequenceSteps}
+            />
+          </div>
+
         </div>
+
+        {isGenerateBlockedByProtectedReferences ? (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            A geracao foi bloqueada porque pelo menos uma referencia importada do PC ficou com preview local apenas. Remova essa imagem ou troque por uma URL publica antes de continuar.
+          </div>
+        ) : null}
 
         <div className="mt-6 flex justify-end">
           <button
@@ -2369,7 +5763,8 @@ export default function PublicacoesIaPage() {
               generateMutation.isPending ||
               !canEditAiPosts ||
               hasReachedAiPostsGenerationLimit ||
-              (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit)
+              (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit) ||
+              isGenerateBlockedByProtectedReferences
             }
             className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -2378,14 +5773,17 @@ export default function PublicacoesIaPage() {
             ) : (
               <Sparkles className="h-5 w-5" />
             )}
-            Gerar com IA
+            {generateForm.sequenceCount > 1
+              ? `Gerar ${generateForm.sequenceCount} pecas com IA`
+              : "Gerar com IA"}
           </button>
         </div>
 
         {generateMutation.isPending ? (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            A IA está gerando sua publicação agora. Não atualize a página e
-            permaneça nesta tela até a geração terminar.
+            {batchGenerationProgress && batchGenerationProgress.total > 1
+              ? `Estamos enviando a sequencia para fila agora (${batchGenerationProgress.current}/${batchGenerationProgress.total}).`
+              : "Estamos enviando sua publicacao para fila agora."}
           </div>
         ) : null}
       </section>
@@ -2397,10 +5795,10 @@ export default function PublicacoesIaPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="font-heading text-xl font-bold text-slate-900">
-                Rascunhos e publicações
+                Publicações
               </h2>
               <p className="text-sm text-slate-500">
-                {aiPostsData?.total || aiPosts.length} itens encontrados
+                Revise rascunhos gerados, publicações já feitas e itens agendados.
               </p>
             </div>
 
@@ -2482,6 +5880,10 @@ export default function PublicacoesIaPage() {
                   const isScheduledSoon =
                     String(post.status || "").toUpperCase() === "SCHEDULED" &&
                     isScheduledWithinOneHour(post.scheduledAt);
+                  const isSequentialPost = isSequentialVideoMode(
+                    post.continuityMode,
+                    Boolean(post.generateVideo),
+                  );
 
                   return (
                     <button
@@ -2506,7 +5908,7 @@ export default function PublicacoesIaPage() {
                       </div>
 
                       <div className="line-clamp-2 font-semibold text-slate-900">
-                        {post.caption || post.publishPreview || post.prompt || "Sem texto"}
+                        {getAiPostCardPreviewText(post)}
                       </div>
 
                       <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
@@ -2518,6 +5920,11 @@ export default function PublicacoesIaPage() {
                           <ImageIcon className="h-3.5 w-3.5" />
                           {post.media.length}
                         </span>
+                        {isSequentialPost ? (
+                          <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                            Video longo
+                          </span>
+                        ) : null}
                       </div>
 
                       {post.campaign?.title ? (
@@ -2682,7 +6089,13 @@ export default function PublicacoesIaPage() {
 
                         <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <label
+                              className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
+                                currentDraft.postType === "REELS"
+                                  ? "cursor-not-allowed border-slate-200 bg-slate-100"
+                                  : "border-slate-200 bg-white"
+                              }`}
+                            >
                               <input
                                 type="radio"
                                 name={`draft-media-type-${selectedPost?.id || "default"}`}
@@ -2693,33 +6106,32 @@ export default function PublicacoesIaPage() {
                                     generateVideo: false,
                                   })
                                 }
-                                disabled={!canEditAiPosts}
+                                disabled={
+                                  currentDraft.postType === "REELS" || !canEditAiPosts
+                                }
                                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                               />
-                              <span className="text-sm text-slate-700">
+                              <span
+                                className={`text-sm ${
+                                  currentDraft.postType === "REELS"
+                                    ? "text-slate-500"
+                                    : "text-slate-700"
+                                }`}
+                              >
                                 <span className="block font-bold text-slate-900">
                                   Gerar imagem
                                 </span>
                                 Use quando quiser uma arte fixa para feed ou
-                                story. Em story, este e o formato disponivel
-                                neste fluxo.
+                                story, com leitura rapida e composicao estatica.
                               </span>
                             </label>
 
-                            <label
-                              className={`flex items-start gap-3 rounded-2xl border px-4 py-4 ${
-                                currentDraft.postType === "STORY"
-                                  ? "cursor-not-allowed border-slate-200 bg-slate-100"
-                                  : "border-slate-200 bg-white"
-                              }`}
-                            >
+                            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                               <input
                                 type="radio"
                                 name={`draft-media-type-${selectedPost?.id || "default"}`}
                                 checked={currentDraft.generateVideo}
-                                disabled={
-                                  currentDraft.postType === "STORY" || !canEditAiPosts
-                                }
+                                disabled={!canEditAiPosts}
                                 onChange={() =>
                                   updateDraft({
                                     generateImage: false,
@@ -2728,18 +6140,13 @@ export default function PublicacoesIaPage() {
                                 }
                                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                               />
-                              <span
-                                className={`text-sm ${
-                                  currentDraft.postType === "STORY"
-                                    ? "text-slate-500"
-                                    : "text-slate-700"
-                                }`}
-                              >
+                              <span className="text-sm text-slate-700">
                                 <span className="block font-bold text-slate-900">
                                   Gerar vídeo
                                 </span>
-                                Ative para reels ou quando quiser motion no
-                                feed. Story ainda nao aceita video neste fluxo.
+                                Ative para feed, story ou reels quando quiser
+                                motion, narrativa em movimento e mais impacto
+                                visual.
                               </span>
                             </label>
                           </div>
@@ -2826,13 +6233,15 @@ export default function PublicacoesIaPage() {
                             <select
                               value={String(currentDraft.durationSeconds)}
                               onChange={(event) =>
-                                updateDraft({
-                                  durationSeconds: Number(
-                                    event.target.value,
-                                  ) as AiVideoDurationSeconds,
-                                })
+                                updateDraft(
+                                  buildVideoSettingsFromDuration(
+                                    Number(event.target.value) as AiVideoDurationSeconds,
+                                    currentDraft.videoResolution,
+                                    currentDraft.continuityMode,
+                                  ),
+                                )
                               }
-                              disabled={!canEditAiPosts}
+                              disabled={!canEditAiPosts || isCurrentDraftVideoReferenceMode}
                               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                             >
                               {VIDEO_DURATION_OPTIONS.map((duration) => (
@@ -2841,6 +6250,11 @@ export default function PublicacoesIaPage() {
                                 </option>
                               ))}
                             </select>
+                            <p className="mt-2 text-xs text-slate-500">
+                              {isCurrentDraftVideoReferenceMode
+                                ? "Video com imagem de referencia fica travado em 8 segundos no modelo atual."
+                                : "O backend aceita apenas 4, 6 ou 8 segundos."}
+                            </p>
                           </div>
                         ) : null}
 
@@ -2883,8 +6297,12 @@ export default function PublicacoesIaPage() {
                                 updateDraft({ imagePrompt: event.target.value })
                               }
                               disabled={!canEditAiPosts}
+                              placeholder={IMAGE_PROMPT_PLACEHOLDERS[currentDraft.postType]}
                               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                             />
+                            <p className="mt-2 text-xs text-slate-500">
+                              {getImagePromptHelper(currentDraft.postType)}
+                            </p>
                           </div>
                         ) : null}
 
@@ -2900,10 +6318,98 @@ export default function PublicacoesIaPage() {
                                 updateDraft({ videoPrompt: event.target.value })
                               }
                               disabled={!canEditAiPosts}
+                              placeholder={VIDEO_PROMPT_PLACEHOLDERS[currentDraft.postType]}
                               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                             />
+                            <p className="mt-2 text-xs text-slate-500">
+                              {getVideoPromptHelper(currentDraft.postType)}
+                            </p>
                           </div>
                         ) : null}
+
+                        <DirectionVisualSection
+                          postType={currentDraft.postType}
+                          generateVideo={currentDraft.generateVideo}
+                          qualityProfile={currentDraft.qualityProfile}
+                          videoResolution={currentDraft.videoResolution}
+                          continuityMode={currentDraft.continuityMode}
+                          totalDurationSeconds={currentDraft.totalDurationSeconds}
+                          visualStyle={currentDraft.visualStyle}
+                          negativePrompt={currentDraft.negativePrompt}
+                          referenceImageUrls={currentDraft.referenceImageUrls}
+                          referencePreviewUrlByReference={draftReferencePreviewUrlByReference}
+                          referenceAccessStateByReference={draftReferenceAccessStateByReference}
+                          referenceUrlInput={draftReferenceUrlInput}
+                          onReferenceUrlInputChange={setDraftReferenceUrlInput}
+                          onAddReferenceUrl={() => handleAddDraftReferenceUrl()}
+                          onImportReferenceFiles={handleImportDraftReferenceFiles}
+                          onQuickAddReference={handleAddDraftReferenceUrl}
+                          onMoveReference={handleMoveDraftReference}
+                          onRemoveReference={(index) =>
+                            updateDraft({
+                              referenceImageUrls: currentDraft.referenceImageUrls.filter(
+                                (_, currentIndex) => currentIndex !== index,
+                              ),
+                            })
+                          }
+                          onApplyPreset={(preset) =>
+                            updateDraft({
+                              visualStyle: preset.visualStyle,
+                              negativePrompt: preset.negativePrompt,
+                            })
+                          }
+                          onVisualStyleChange={(value) =>
+                            updateDraft({ visualStyle: value })
+                          }
+                          onNegativePromptChange={(value) =>
+                            updateDraft({ negativePrompt: value })
+                          }
+                          onQualityProfileChange={(value) =>
+                            updateDraft({ qualityProfile: value })
+                          }
+                          onVideoResolutionChange={(value) =>
+                            updateDraft(
+                              buildVideoSettingsFromResolution(
+                                value,
+                                currentDraft.durationSeconds,
+                                currentDraft.continuityMode,
+                              ),
+                            )
+                          }
+                          onContinuityModeChange={(value) =>
+                            updateDraft({
+                              continuityMode: value,
+                              durationSeconds:
+                                value === "SEQUENTIAL" ? 8 : currentDraft.durationSeconds,
+                              videoResolution:
+                                value === "SEQUENTIAL"
+                                  ? "720p"
+                                  : currentDraft.videoResolution,
+                              totalDurationSeconds:
+                                value === "SEQUENTIAL"
+                                  ? normalizeTotalDurationSeconds(
+                                      currentDraft.totalDurationSeconds,
+                                    )
+                                  : currentDraft.totalDurationSeconds,
+                            })
+                          }
+                          onTotalDurationChange={(value) =>
+                            updateDraft({
+                              totalDurationSeconds: normalizeTotalDurationSeconds(value),
+                            })
+                          }
+                          onStoryOutlineChange={(value) =>
+                            updateDraft({ storyOutline: value })
+                          }
+                          onStoryBeatsChange={(value) =>
+                            updateDraft({ storyBeats: value })
+                          }
+                          storyOutline={currentDraft.storyOutline}
+                          storyBeats={currentDraft.storyBeats}
+                          quickReferenceOptions={quickReferenceOptions}
+                          isImportingReferenceFiles={referenceImageImportMutation.isPending}
+                          disabled={!canEditAiPosts}
+                        />
                       </div>
                     </div>
 
@@ -2977,12 +6483,14 @@ export default function PublicacoesIaPage() {
                   </div>
 
                   <div className="space-y-6">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="mb-4 font-bold text-slate-900">Preview</div>
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
-                        {currentDraft.caption || selectedPost.publishPreview || "Sem texto de preview."}
-                      </div>
-                    </div>
+                    <InstagramPreviewMock
+                      postType={currentDraft.postType}
+                      caption={draftPreviewCaption}
+                      accountLabel={previewAccountLabel}
+                      mediaUrl={selectedPreviewMediaUrl}
+                      mediaIsVideo={selectedPreviewMediaIsVideo}
+                      showVideoIntent={selectedPreviewShowsVideoIntent}
+                    />
 
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
@@ -3004,13 +6512,19 @@ export default function PublicacoesIaPage() {
                                 <video
                                   src={item.url}
                                   controls
-                                  className="aspect-[4/5] w-full bg-black object-cover"
+                                  className={getGeneratedMediaClass(
+                                    selectedPost.postType as AiPostType,
+                                    true,
+                                  )}
                                 />
                               ) : (
                                 <img
                                   src={item.url}
                                   alt="Asset gerado pela IA"
-                                  className="aspect-[4/5] w-full object-cover"
+                                  className={getGeneratedMediaClass(
+                                    selectedPost.postType as AiPostType,
+                                    false,
+                                  )}
                                 />
                               )}
                             </div>
@@ -3065,7 +6579,13 @@ export default function PublicacoesIaPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
+                  {draftProtectedReferenceUrls.length > 0 ? (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      As referencias importadas do PC continuam com preview local apenas. Para usar essas imagens em novas geracoes, troque por URLs publicas.
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
                   <div className="text-xs text-slate-500">
                     Reels podem exigir vídeo e stories priorizam asset vertical.
                   </div>
@@ -3074,7 +6594,11 @@ export default function PublicacoesIaPage() {
                     <button
                       type="button"
                       onClick={handleSaveDraft}
-                      disabled={updateMutation.isPending || !canEditAiPosts}
+                      disabled={
+                        updateMutation.isPending ||
+                        !canEditAiPosts ||
+                        isSelectedPostProcessing
+                      }
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {updateMutation.isPending ? (
@@ -3085,14 +6609,16 @@ export default function PublicacoesIaPage() {
                       Salvar revisao
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleSchedule}
-                      disabled={
-                        scheduleMutation.isPending ||
-                        !canEditAiPosts ||
-                        !isMetaConnected
-                      }
+                      <button
+                        type="button"
+                        onClick={handleSchedule}
+                        disabled={
+                          scheduleMutation.isPending ||
+                          !canEditAiPosts ||
+                          !isMetaConnected ||
+                          isSelectedPostProcessing ||
+                          isCurrentDraftSequential
+                        }
                       className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {scheduleMutation.isPending ? (
@@ -3103,14 +6629,16 @@ export default function PublicacoesIaPage() {
                       Agendar
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handlePublishNow}
-                      disabled={
-                        publishMutation.isPending ||
-                        !canEditAiPosts ||
-                        !isMetaConnected
-                      }
+                      <button
+                        type="button"
+                        onClick={handlePublishNow}
+                        disabled={
+                          publishMutation.isPending ||
+                          !canEditAiPosts ||
+                          !isMetaConnected ||
+                          isSelectedPostProcessing ||
+                          isCurrentDraftSequential
+                        }
                       className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {publishMutation.isPending ? (
@@ -3170,7 +6698,12 @@ export default function PublicacoesIaPage() {
         </div>
 
         <DashboardDialog
-          open={isMobileViewport && isPostDetailModalOpen && Boolean(selectedPost)}
+          open={
+            activeSection === "library" &&
+            isMobileViewport &&
+            isPostDetailModalOpen &&
+            Boolean(selectedPost)
+          }
           onClose={() => setIsPostDetailModalOpen(false)}
           title="Revisar publicacao"
           description="Ajuste legenda, hashtags, midia e agendamento antes de publicar."
@@ -3191,7 +6724,6 @@ export default function PublicacoesIaPage() {
         />
       </section>
       ) : null}
-        </div>
       </div>
     </div>
   );
