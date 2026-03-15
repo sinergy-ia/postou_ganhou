@@ -31,6 +31,8 @@ import {
   establishmentApi,
   type PricingEstablishmentAssignment,
 } from "@/services/establishment-api";
+import { openHtmlAsPdf } from "@/lib/billing-invoice";
+import DashboardDialog from "@/components/ui/DashboardDialog";
 
 type InsightCard = {
   title?: string;
@@ -93,15 +95,6 @@ function escapeHtml(value?: string | number | null) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function sanitizeFileName(value?: string | null) {
-  return String(value || "estabelecimento")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
 }
 
 function buildInvoiceHtml(payload: {
@@ -409,6 +402,7 @@ const defaultAdminCreateForm: AdminCreateForm = {
 export default function PricingAdminSection() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [notice, setNotice] = useState("");
   const [selectedAnalyticsEstablishmentId, setSelectedAnalyticsEstablishmentId] =
     useState("");
   const [analyticsFilters, setAnalyticsFilters] = useState({
@@ -462,7 +456,7 @@ export default function PricingAdminSection() {
       ]);
     },
     onError: (error) => {
-      window.alert(getErrorMessage(error, "Nao foi possivel alterar o plano."));
+      setNotice(getErrorMessage(error, "Nao foi possivel alterar o plano."));
     },
   });
 
@@ -482,7 +476,7 @@ export default function PricingAdminSection() {
       ]);
     },
     onError: (error) => {
-      window.alert(getErrorMessage(error, "Nao foi possivel atualizar o super admin."));
+      setNotice(getErrorMessage(error, "Nao foi possivel atualizar o super admin."));
     },
   });
 
@@ -604,9 +598,6 @@ export default function PricingAdminSection() {
       .replace(/-/g, "")}-${String(selectedAnalyticsEstablishment.id || "")
       .slice(-6)
       .toUpperCase()}`;
-    const fileName = `fatura-${sanitizeFileName(
-      selectedAnalyticsEstablishment.name,
-    )}-${analyticsFilters.endDate || getToday()}.html`;
     const html = buildInvoiceHtml({
       invoiceNumber,
       generatedAt: formatDateTimePtBr(generatedAt),
@@ -631,16 +622,7 @@ export default function PricingAdminSection() {
       unitFee: formatCurrency(selectedPricingPlan?.redemptionFee || 0),
       totalAmount: formatCurrency(estimatedRedemptionCharge),
     });
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    openHtmlAsPdf(html);
   }
 
   function getDraft(establishment: PricingEstablishmentAssignment) {
@@ -847,7 +829,7 @@ export default function PricingAdminSection() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <Download className="h-4 w-4" />
-            Baixar fatura
+            Baixar fatura em PDF
           </button>
         </div>
 
@@ -1554,6 +1536,22 @@ export default function PricingAdminSection() {
           </div>
         </div>
       ) : null}
+
+      <DashboardDialog
+        open={Boolean(notice)}
+        onClose={() => setNotice("")}
+        title="Nao foi possivel concluir a acao"
+        description={notice}
+        footer={
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Entendi
+          </button>
+        }
+      />
     </div>
   );
 }

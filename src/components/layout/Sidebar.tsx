@@ -15,6 +15,7 @@ import {
   Star,
   Store,
   Ticket,
+  X,
 } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 import {
@@ -43,7 +44,7 @@ const navigation = [
     superAdminOnly: true,
   },
   {
-    name: "Publicações IA",
+    name: "Publicacoes IA",
     href: "/dashboard/publicacoes-ia",
     icon: Sparkles,
     proScaleOnly: true,
@@ -54,10 +55,22 @@ const navigation = [
     icon: BarChart3,
     requiredFeature: "advancedAnalytics",
   },
-  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+  { name: "Configuracoes", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
-export default function Sidebar() {
+const sidebarConfigSections = dashboardConfigSections.filter(
+  (section) => section.id !== "team" && section.id !== "billing",
+);
+
+type SidebarProps = {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+};
+
+export default function Sidebar({
+  isMobileOpen = false,
+  onClose,
+}: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isConfigRoute =
@@ -73,9 +86,7 @@ export default function Sidebar() {
   const establishmentName = user?.name || "Estabelecimento";
   const currentUserName = user?.currentUser?.name || establishmentName;
   const currentUserRole = user?.currentUser?.role || "owner";
-  const isSuperAdmin = Boolean(
-    user?.superAdmin || user?.currentUser?.superAdmin,
-  );
+  const isSuperAdmin = Boolean(user?.superAdmin || user?.currentUser?.superAdmin);
   const planName = user?.plan || "Free";
   const planType = user?.planAccess?.planType || "free";
   const hasAiPostsPlan = canUseAiPosts(planType);
@@ -90,19 +101,30 @@ export default function Sidebar() {
 
     return Boolean(user?.planAccess?.features?.[item.requiredFeature]);
   });
-  const activeConfigSection = isDashboardConfigSectionId(
-    searchParams.get("section"),
-  )
+  const activeConfigSection = isDashboardConfigSectionId(searchParams.get("section"))
     ? searchParams.get("section")
     : "profile";
   const configHref = `/dashboard/configuracoes?section=${activeConfigSection}`;
 
   return (
-    <div className="fixed left-0 top-0 flex h-screen w-64 flex-col overflow-x-hidden border-r border-slate-800 bg-slate-900 text-slate-300">
-      <div className="flex h-16 items-center border-b border-slate-800 px-6">
-        <span className="font-heading text-xl font-bold text-white">
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[86vw] flex-col overflow-hidden border-r border-slate-800 bg-slate-900 text-slate-300 shadow-2xl transition-transform duration-300 lg:z-40 lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
+      <div className="flex h-16 items-center justify-between border-b border-slate-800 px-5 lg:px-6">
+        <span className="truncate font-heading text-xl font-bold text-white">
           Marque &amp; Ganhe
         </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-800 hover:text-white lg:hidden"
+          aria-label="Fechar menu lateral"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       <div className="dashboard-sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden py-4 pr-2">
@@ -111,13 +133,11 @@ export default function Sidebar() {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === item.href
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPlanLocked = Boolean(item.proScaleOnly && !hasAiPostsPlan);
             const shouldShowConfigSubmenu =
               item.href === "/dashboard/configuracoes" &&
-              isConfigRoute &&
-              isConfigMenuOpen;
+              (isConfigRoute || isConfigMenuOpen);
 
             if (item.href === "/dashboard/configuracoes") {
               return (
@@ -127,11 +147,11 @@ export default function Sidebar() {
                     onClick={(event) => {
                       if (isConfigRoute) {
                         event.preventDefault();
-                        setIsConfigMenuOpen((current) => !current);
                         return;
                       }
 
                       setIsConfigMenuOpen(true);
+                      onClose?.();
                     }}
                     className={cn(
                       isActive
@@ -144,9 +164,7 @@ export default function Sidebar() {
                     <span className="flex min-w-0 items-center">
                       <item.icon
                         className={cn(
-                          isActive
-                            ? "text-white"
-                            : "text-slate-400 group-hover:text-white",
+                          isActive ? "text-white" : "text-slate-400 group-hover:text-white",
                           "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
                         )}
                         aria-hidden="true"
@@ -155,9 +173,7 @@ export default function Sidebar() {
                     </span>
                     <ChevronRight
                       className={cn(
-                        isActive
-                          ? "text-white/85"
-                          : "text-slate-400 group-hover:text-white",
+                        isActive ? "text-white/85" : "text-slate-400 group-hover:text-white",
                         "h-4 w-4 shrink-0 transition-transform",
                         shouldShowConfigSubmenu ? "rotate-90" : "",
                       )}
@@ -168,14 +184,14 @@ export default function Sidebar() {
                   {shouldShowConfigSubmenu ? (
                     <div className="ml-5 mt-2 overflow-hidden border-l border-slate-800 pl-3">
                       <div className="space-y-1">
-                        {dashboardConfigSections.map((section) => {
-                          const isSectionActive =
-                            activeConfigSection === section.id;
+                        {sidebarConfigSections.map((section) => {
+                          const isSectionActive = activeConfigSection === section.id;
 
                           return (
                             <Link
                               key={section.id}
                               href={`/dashboard/configuracoes?section=${section.id}`}
+                              onClick={() => onClose?.()}
                               className={cn(
                                 isSectionActive
                                   ? "bg-slate-800 text-white"
@@ -183,9 +199,7 @@ export default function Sidebar() {
                                 "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors",
                               )}
                             >
-                              <span className="min-w-0 flex-1 truncate">
-                                {section.label}
-                              </span>
+                              <span className="min-w-0 flex-1 truncate">{section.label}</span>
                               {!section.available ? (
                                 <span className="shrink-0 rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">
                                   Em breve
@@ -205,10 +219,9 @@ export default function Sidebar() {
               <div key={item.name}>
                 <Link
                   href={item.href}
+                  onClick={() => onClose?.()}
                   className={cn(
-                    isActive
-                      ? "bg-primary-600 text-white"
-                      : "hover:bg-slate-800 hover:text-white",
+                    isActive ? "bg-primary-600 text-white" : "hover:bg-slate-800 hover:text-white",
                     isPlanLocked && !isActive ? "text-slate-400" : "",
                     "group flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                   )}
@@ -216,9 +229,7 @@ export default function Sidebar() {
                   <span className="flex min-w-0 items-center">
                     <item.icon
                       className={cn(
-                        isActive
-                          ? "text-white"
-                          : "text-slate-400 group-hover:text-white",
+                        isActive ? "text-white" : "text-slate-400 group-hover:text-white",
                         "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
                       )}
                       aria-hidden="true"
@@ -229,9 +240,7 @@ export default function Sidebar() {
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                        isActive
-                          ? "bg-white/15 text-white"
-                          : "bg-slate-800 text-slate-400",
+                        isActive ? "bg-white/15 text-white" : "bg-slate-800 text-slate-400",
                       )}
                     >
                       Pro/Scale
@@ -249,19 +258,19 @@ export default function Sidebar() {
           <div className="rounded-full bg-slate-800 p-2">
             <Store className="h-5 w-5 text-primary-400" />
           </div>
-          <div className="flex flex-col">
+          <div className="min-w-0 flex flex-col">
             <span
               className="line-clamp-1 text-sm font-medium text-white"
               title={currentUserName}
             >
               {currentUserName}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="truncate text-xs text-slate-500">
               {currentUserRole} • {planName}
             </span>
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

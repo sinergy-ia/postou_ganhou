@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { getAiPostsMarketingBenefit } from "@/lib/ai-posts-plan-limits";
 import { publicApi, type PublicPricingPlan } from "@/services/public-api";
 
 type BillingCycle = "monthly" | "annual";
@@ -57,6 +58,31 @@ function resolveDisplayedPrice(plan: PublicPricingPlan, billingCycle: BillingCyc
         ? "Comece mensal e evolua no seu ritmo"
         : "Entrada sem risco para validar a estrategia",
   };
+}
+
+function normalizeBenefitLabel(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function resolvePlanBenefits(plan: PublicPricingPlan) {
+  const aiBenefit = getAiPostsMarketingBenefit(plan.type);
+
+  if (!aiBenefit) {
+    return plan.benefits;
+  }
+
+  const filteredBenefits = plan.benefits.filter((benefit) => {
+    const normalizedBenefit = normalizeBenefitLabel(benefit);
+
+    return !(
+      normalizedBenefit.includes("ia") &&
+      (normalizedBenefit.includes("instagram") ||
+        normalizedBenefit.includes("publica") ||
+        normalizedBenefit.includes("video"))
+    );
+  });
+
+  return [...filteredBenefits, aiBenefit];
 }
 
 export default function PricingSection() {
@@ -139,6 +165,7 @@ export default function PricingSection() {
         <div className="mt-12 grid grid-cols-1 gap-6 xl:grid-cols-4">
           {plans.map((plan) => {
             const price = resolveDisplayedPrice(plan, billingCycle);
+            const planBenefits = resolvePlanBenefits(plan);
             const isAnnual = billingCycle === "annual";
             const ctaHref = "/para-estabelecimentos#cadastro";
 
@@ -211,7 +238,7 @@ export default function PricingSection() {
                 </div>
 
                 <ul className="mt-6 space-y-3">
-                  {plan.benefits.map((benefit) => (
+                  {planBenefits.map((benefit) => (
                     <li key={benefit} className="flex items-start gap-3 text-sm text-slate-600">
                       <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary-50 text-primary-600">
                         <Check className="h-3.5 w-3.5" />

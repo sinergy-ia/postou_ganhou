@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import MetricCard from "@/components/sponsored-highlights/MetricCard";
 import StatusBadge from "@/components/sponsored-highlights/StatusBadge";
+import DashboardDialog from "@/components/ui/DashboardDialog";
 import {
   formatCurrency,
   formatDate,
@@ -76,6 +77,7 @@ export default function SponsoredCampaignsPage() {
   const [origin, setOrigin] = useState("");
   const [formatId, setFormatId] = useState("");
   const [selectedCampaign, setSelectedCampaign] = useState<SponsoredCampaign | null>(null);
+  const [notice, setNotice] = useState("");
 
   const { data: lookups } = useQuery({
     queryKey: ["sponsored-highlights", "lookups"],
@@ -202,7 +204,7 @@ export default function SponsoredCampaignsPage() {
         queryClient.setQueryData(queryKey, queryData);
       }
 
-      window.alert(getErrorMessage(mutationError));
+      setNotice(getErrorMessage(mutationError));
     },
   });
 
@@ -658,6 +660,22 @@ export default function SponsoredCampaignsPage() {
           </div>
         </div>
       ) : null}
+
+      <DashboardDialog
+        open={Boolean(notice)}
+        onClose={() => setNotice("")}
+        title="Nao foi possivel concluir a acao"
+        description={notice}
+        footer={
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Entendi
+          </button>
+        }
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   establishmentApi,
   type EstablishmentLoginMembership,
@@ -33,6 +33,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,6 +43,8 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: establishmentApi.login,
     onSuccess: (result) => {
+      queryClient.clear();
+
       if (result.requiresEstablishmentSelection) {
         setSelectionToken(result.selectionToken || '');
         setMemberships(result.memberships || []);
@@ -58,6 +61,7 @@ export default function LoginPage() {
   const selectMembershipMutation = useMutation({
     mutationFn: establishmentApi.selectMembership,
     onSuccess: () => {
+      queryClient.clear();
       router.push('/dashboard');
     },
     onError: (error) => {
