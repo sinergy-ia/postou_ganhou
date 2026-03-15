@@ -127,6 +127,11 @@ export interface AiPostMediaItem {
   url: string;
   type: string;
   mimeType?: string;
+  segmentIndex?: number;
+  segmentStartSeconds?: number;
+  segmentEndSeconds?: number;
+  segmentTitle?: string;
+  continuityStrategy?: string;
 }
 
 export interface AiPostUploadedAsset {
@@ -275,6 +280,33 @@ function normalizeAiPost(record: Record<string, any> | null | undefined): AiPost
             url,
             type: String(item.type ?? item.mediaType ?? "IMAGE").toUpperCase(),
             mimeType: String(item.mimeType ?? item.contentType ?? "").trim() || undefined,
+            segmentIndex:
+              typeof item.segmentIndex === "number" && Number.isFinite(item.segmentIndex)
+                ? Math.trunc(item.segmentIndex)
+                : typeof item.segmentIndex === "string" &&
+                    Number.isFinite(Number(item.segmentIndex))
+                  ? Math.trunc(Number(item.segmentIndex))
+                  : undefined,
+            segmentStartSeconds:
+              typeof item.segmentStartSeconds === "number" &&
+              Number.isFinite(item.segmentStartSeconds)
+                ? item.segmentStartSeconds
+                : typeof item.segmentStartSeconds === "string" &&
+                    Number.isFinite(Number(item.segmentStartSeconds))
+                  ? Number(item.segmentStartSeconds)
+                  : undefined,
+            segmentEndSeconds:
+              typeof item.segmentEndSeconds === "number" &&
+              Number.isFinite(item.segmentEndSeconds)
+                ? item.segmentEndSeconds
+                : typeof item.segmentEndSeconds === "string" &&
+                    Number.isFinite(Number(item.segmentEndSeconds))
+                  ? Number(item.segmentEndSeconds)
+                  : undefined,
+            segmentTitle:
+              String(item.segmentTitle ?? item.title ?? "").trim() || undefined,
+            continuityStrategy:
+              String(item.continuityStrategy ?? "").trim() || undefined,
           };
         })
         .filter(Boolean)

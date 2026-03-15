@@ -45,6 +45,7 @@ import {
   Save,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
 
 type GenerateFormState = {
@@ -1661,12 +1662,14 @@ function PreviewMediaSurface({
   mediaIsVideo = false,
   showVideoIntent = false,
   accentLabel,
+  showAccentBadge = true,
 }: {
   postType: AiPostType;
   mediaUrl?: string;
   mediaIsVideo?: boolean;
   showVideoIntent?: boolean;
   accentLabel: string;
+  showAccentBadge?: boolean;
 }) {
   const aspectClass = postType === "FEED" ? "aspect-[4/5]" : "aspect-[9/16]";
   const hasImagePoster = Boolean(mediaUrl && !mediaIsVideo);
@@ -1699,9 +1702,11 @@ function PreviewMediaSurface({
           />
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/35" />
-        <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
-          {accentLabel}
-        </div>
+        {showAccentBadge ? (
+          <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
+            {accentLabel}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1717,9 +1722,11 @@ function PreviewMediaSurface({
             style={{ backgroundImage: `url("${mediaUrl}")` }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-transparent to-black/30" />
-          <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
-            {accentLabel}
-          </div>
+          {showAccentBadge ? (
+            <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85 backdrop-blur">
+              {accentLabel}
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -1755,6 +1762,8 @@ function InstagramPreviewMock({
   showVideoIntent = false,
   sequenceCount = 1,
   sequenceSteps = [],
+  continuityMode = "SINGLE",
+  totalDurationSeconds,
 }: {
   postType: AiPostType;
   caption: string;
@@ -1764,8 +1773,15 @@ function InstagramPreviewMock({
   showVideoIntent?: boolean;
   sequenceCount?: number;
   sequenceSteps?: string[];
+  continuityMode?: AiVideoContinuityMode;
+  totalDurationSeconds?: number;
 }) {
   const normalizedCount = normalizeSequenceCount(sequenceCount);
+  const normalizedTotalDuration =
+    typeof totalDurationSeconds === "number" && Number.isFinite(totalDurationSeconds)
+      ? normalizeTotalDurationSeconds(totalDurationSeconds)
+      : undefined;
+  const isSequentialPreview = continuityMode === "SEQUENTIAL" && showVideoIntent;
   const previewCaption = caption.trim() || "Sua legenda aparecera aqui.";
   const captionSnippet = previewCaption.replace(/\s+/g, " ").trim();
   const shortCaption =
@@ -1782,6 +1798,8 @@ function InstagramPreviewMock({
     : showVideoIntent
       ? "Preview de video"
       : "Preview de imagem";
+  const displayAccountLabel =
+    accountLabel.replace(/^@/, "").trim().replace(/\s+/g, "_") || "seu_negocio";
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1789,17 +1807,21 @@ function InstagramPreviewMock({
         <div>
           <div className="font-bold text-slate-900">Preview do Instagram</div>
           <div className="text-xs text-slate-500">
-            {getPostTypeLabel(postType)} • {getSequenceCollectionLabel(postType, normalizedCount)}
+            {isSequentialPreview
+              ? `${getPostTypeLabel(postType)} - Video continuo de ${normalizedTotalDuration || 30}s`
+              : `${getPostTypeLabel(postType)} - ${getSequenceCollectionLabel(postType, normalizedCount)}`}
           </div>
         </div>
         <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-          {postType === "FEED"
-            ? normalizedCount > 1
-              ? "Feed em carrossel"
-              : "Feed unico"
-            : postType === "STORY"
-              ? "Story vertical"
-              : "Reels vertical"}
+          {isSequentialPreview
+            ? `${postType === "FEED" ? "Feed" : postType === "STORY" ? "Story" : "Reels"} ${normalizedTotalDuration || 30}s`
+            : postType === "FEED"
+              ? normalizedCount > 1
+                ? "Feed em carrossel"
+                : "Feed unico"
+              : postType === "STORY"
+                ? "Story vertical"
+                : "Reels vertical"}
         </span>
       </div>
 
@@ -1812,7 +1834,7 @@ function InstagramPreviewMock({
                   <div className="h-full w-full rounded-full bg-slate-200" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">{accountLabel}</div>
+                  <div className="text-sm font-semibold text-slate-900">{displayAccountLabel}</div>
                   <div className="text-[11px] text-slate-500">Patrocinado</div>
                 </div>
               </div>
@@ -1825,6 +1847,7 @@ function InstagramPreviewMock({
               mediaIsVideo={mediaIsVideo}
               showVideoIntent={showVideoIntent}
               accentLabel={accentLabel}
+              showAccentBadge={false}
             />
 
             {normalizedCount > 1 ? (
@@ -1847,76 +1870,131 @@ function InstagramPreviewMock({
               <Bookmark className="h-5 w-5" />
             </div>
 
-            <div className="space-y-2 px-4 pb-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Legenda
-              </div>
+            <div className="px-4 text-sm font-semibold text-slate-900">Curtido por 1.248 pessoas</div>
+
+            <div className="space-y-2 px-4 pt-3 pb-5">
               <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                <span className="mr-1 font-semibold text-slate-900">{accountLabel}</span>
+                <span className="mr-1 font-semibold text-slate-900">{displayAccountLabel}</span>
                 {shortCaption}
+              </div>
+              <div className="text-xs text-slate-400">Ver todos os 84 comentarios</div>
+              <div className="border-t border-slate-100 pt-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                Ha 12 minutos
               </div>
             </div>
           </div>
         ) : (
-          <div className="w-full max-w-[320px] rounded-[36px] bg-slate-950 p-3 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.65)]">
+          <div className="w-full max-w-[320px] rounded-[38px] bg-[#090b12] p-3 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.65)]">
             <div className="overflow-hidden rounded-[30px] bg-black">
-              <div className="flex gap-1 px-3 pt-3">
-                {items.map((item, index) => (
-                  <span
-                    key={`${item}-${index}`}
-                    className={`h-1.5 flex-1 rounded-full ${index === 0 ? "bg-white" : "bg-white/30"}`}
-                  />
-                ))}
-              </div>
-
-              <div className="relative">
-                <PreviewMediaSurface
-                  postType={postType}
-                  mediaUrl={mediaUrl}
-                  mediaIsVideo={mediaIsVideo}
-                  showVideoIntent={showVideoIntent || postType === "REELS"}
-                  accentLabel={
-                    mediaUrl
-                      ? postType === "STORY"
-                        ? "Story gerado"
-                        : mediaIsVideo
-                          ? "Reels gerado"
-                          : "Referencia visual"
-                      : postType === "STORY"
-                        ? "Preview de story"
-                        : "Preview de reels"
-                  }
-                />
-
-                <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 py-4 text-white">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full border border-white/30 bg-white/10 backdrop-blur" />
-                    <div>
-                      <div className="text-sm font-semibold">{accountLabel}</div>
-                      <div className="text-[11px] text-white/70">
-                        {postType === "STORY" ? "Agora" : "Audio original"}
+              {postType === "STORY" ? (
+                <div className="relative">
+                  <div className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/55 via-black/20 to-transparent px-3 pt-3 pb-8">
+                    <div className="flex gap-1">
+                      {items.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className={`h-1 flex-1 rounded-full ${index === 0 ? "bg-white" : "bg-white/35"}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 text-white">
+                      <div className="min-w-0 flex flex-1 items-center gap-2.5">
+                        <div className="h-8 w-8 shrink-0 rounded-full border border-white/35 bg-[linear-gradient(135deg,#f97316,#facc15,#22c55e)] p-[1.5px]">
+                          <div className="h-full w-full rounded-full bg-white/15" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">{displayAccountLabel}</div>
+                          <div className="text-[11px] text-white/70">Agora</div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
-                  <MoreHorizontal className="h-4 w-4" />
-                </div>
 
-                {postType === "REELS" ? (
-                  <div className="absolute bottom-6 left-4 right-16 text-white">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">
-                      Reels
-                    </div>
-                    <div className="mt-2 text-sm leading-relaxed text-white/90">{shortCaption}</div>
-                  </div>
-                ) : (
-                  <div className="absolute inset-x-4 bottom-5 rounded-3xl border border-white/15 bg-black/30 px-4 py-3 text-white backdrop-blur">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/65">
+                  <PreviewMediaSurface
+                    postType={postType}
+                    mediaUrl={mediaUrl}
+                    mediaIsVideo={mediaIsVideo}
+                    showVideoIntent={showVideoIntent}
+                    accentLabel={accentLabel}
+                    showAccentBadge={false}
+                  />
+
+                  <div className="absolute inset-x-4 bottom-16 z-20 rounded-[28px] border border-white/15 bg-black/30 px-4 py-3 text-white shadow-[0_20px_40px_-24px_rgba(0,0,0,0.9)] backdrop-blur-md">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
                       Story
                     </div>
-                    <div className="mt-2 text-sm leading-relaxed text-white/90">{shortCaption}</div>
+                    <div className="mt-2 line-clamp-4 text-[15px] leading-7 text-white/92">
+                      {shortCaption}
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div className="absolute inset-x-4 bottom-4 z-20 flex items-center gap-3 text-white">
+                    <div className="flex-1 rounded-full border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white/65 backdrop-blur-md">
+                      Enviar mensagem
+                    </div>
+                    <Heart className="h-5 w-5 shrink-0" />
+                    <Send className="h-5 w-5 shrink-0" />
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/55 via-black/18 to-transparent px-4 pt-4 pb-10 text-white">
+                    <div className="flex items-center gap-3">
+                      <div className="text-base font-semibold tracking-[0.01em]">Reels</div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Heart className="h-4 w-4 opacity-0" />
+                      <MoreHorizontal className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  <PreviewMediaSurface
+                    postType={postType}
+                    mediaUrl={mediaUrl}
+                    mediaIsVideo={mediaIsVideo}
+                    showVideoIntent={showVideoIntent || postType === "REELS"}
+                    accentLabel={accentLabel}
+                    showAccentBadge={false}
+                  />
+
+                  <div className="absolute bottom-7 right-4 z-20 flex flex-col items-center gap-5 text-white">
+                    <div className="flex flex-col items-center gap-1">
+                      <Heart className="h-6 w-6" />
+                      <span className="text-[10px] font-semibold">1,2 mil</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <MessageCircle className="h-6 w-6" />
+                      <span className="text-[10px] font-semibold">84</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <Send className="h-6 w-6" />
+                      <span className="text-[10px] font-semibold">Enviar</span>
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-7 left-4 right-20 z-20 text-white">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full border border-white/35 bg-[linear-gradient(135deg,#f97316,#facc15,#22c55e)] p-[1.5px]">
+                        <div className="h-full w-full rounded-full bg-white/15" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{displayAccountLabel}</div>
+                      </div>
+                      <div className="rounded-full border border-white/35 px-3 py-1 text-[11px] font-semibold">
+                        Seguir
+                      </div>
+                    </div>
+                    <div className="mt-3 line-clamp-3 text-sm leading-6 text-white/92">
+                      {shortCaption}
+                    </div>
+                    <div className="mt-2 text-[11px] text-white/65">Audio original</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1946,6 +2024,193 @@ function InstagramPreviewMock({
           </div>
         </div>
       ) : null}
+
+      {isSequentialPreview ? (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="font-semibold">Video longo unico</div>
+          <div className="mt-1 text-amber-800">
+            O resultado esperado aqui e uma unica publicacao de {normalizedTotalDuration || 30} segundos. Os segmentos internos servem apenas para compor esse video longo.
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatSequentialSegmentRange(item: AiPostRecord["media"][number]) {
+  if (
+    typeof item.segmentStartSeconds !== "number" ||
+    typeof item.segmentEndSeconds !== "number"
+  ) {
+    return "";
+  }
+
+  return `${item.segmentStartSeconds}s - ${item.segmentEndSeconds}s`;
+}
+
+function getSequentialSegmentTitle(
+  item: AiPostRecord["media"][number],
+  index: number,
+  storyBeats: string[],
+) {
+  return String(item.segmentTitle || "").trim() || storyBeats[index] || `Segmento ${index + 1}`;
+}
+
+function formatContinuityStrategyLabel(value?: string) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.replace(/[_-]+/g, " ");
+}
+
+function GeneratedMediaSection({
+  postType,
+  media,
+  isSequential,
+  storyBeats,
+  totalDurationSeconds,
+}: {
+  postType: AiPostType;
+  media: AiPostRecord["media"];
+  isSequential: boolean;
+  storyBeats: string[];
+  totalDurationSeconds?: number;
+}) {
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
+  const resolvedActiveSegmentIndex = Math.min(activeSegmentIndex, media.length - 1);
+
+  if (media.length === 0) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+        Nenhum asset retornado para este rascunho.
+      </div>
+    );
+  }
+
+  if (!isSequential) {
+    return (
+      <div className="space-y-4">
+        {media.map((item, index) => (
+          <div
+            key={item.id || `${item.url}-${index}`}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+          >
+            {isVideoMedia(item) ? (
+              <video
+                src={item.url}
+                controls
+                className={getGeneratedMediaClass(postType, true)}
+              />
+            ) : (
+              <img
+                src={item.url}
+                alt="Asset gerado pela IA"
+                className={getGeneratedMediaClass(postType, false)}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const activeSegmentItem = media[resolvedActiveSegmentIndex] || media[0];
+  const normalizedTotalDuration =
+    typeof totalDurationSeconds === "number" && Number.isFinite(totalDurationSeconds)
+      ? normalizeTotalDurationSeconds(totalDurationSeconds)
+      : undefined;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-full border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            1 publicacao
+          </span>
+          {normalizedTotalDuration ? (
+            <span className="inline-flex rounded-full border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              {normalizedTotalDuration}s totais
+            </span>
+          ) : null}
+          <span className="inline-flex rounded-full border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            {media.length} segmentos internos
+          </span>
+        </div>
+        <div className="mt-2">
+          Este video longo sera uma unica publicacao de {getPostTypeLabel(postType).toLowerCase()}. Os blocos abaixo sao segmentos internos usados para montar o resultado final.
+        </div>
+      </div>
+
+      {activeSegmentItem ? (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600">
+            <span>
+              {getSequentialSegmentTitle(
+                activeSegmentItem,
+                resolvedActiveSegmentIndex,
+                storyBeats,
+              )}
+            </span>
+            <span>
+              {formatSequentialSegmentRange(activeSegmentItem) ||
+                `Segmento ${resolvedActiveSegmentIndex + 1}`}
+            </span>
+          </div>
+          {isVideoMedia(activeSegmentItem) ? (
+            <video
+              src={activeSegmentItem.url}
+              controls
+              className={getGeneratedMediaClass(postType, true)}
+            />
+          ) : (
+            <img
+              src={activeSegmentItem.url}
+              alt="Segmento gerado pela IA"
+              className={getGeneratedMediaClass(postType, false)}
+            />
+          )}
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {media.map((item, index) => {
+          const title = getSequentialSegmentTitle(item, index, storyBeats);
+          const timeRange = formatSequentialSegmentRange(item);
+          const continuityStrategy = formatContinuityStrategyLabel(item.continuityStrategy);
+          const isActive = index === resolvedActiveSegmentIndex;
+
+          return (
+            <button
+              key={item.id || `${item.url}-${index}-segment`}
+              type="button"
+              onClick={() => setActiveSegmentIndex(index)}
+              className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                isActive
+                  ? "border-primary-200 bg-primary-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Segmento {index + 1}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {timeRange || `${index + 1}/${media.length}`}
+                </span>
+              </div>
+              <div className="mt-2 font-semibold text-slate-900">{title}</div>
+              <div className="mt-2 text-xs text-slate-500">
+                {continuityStrategy
+                  ? `Estrategia: ${continuityStrategy}`
+                  : "Continuidade visual e narrativa"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -4681,6 +4946,8 @@ export default function PublicacoesIaPage() {
             mediaUrl={selectedPreviewMediaUrl}
             mediaIsVideo={selectedPreviewMediaIsVideo}
             showVideoIntent={selectedPreviewShowsVideoIntent}
+            continuityMode={currentDraft.continuityMode}
+            totalDurationSeconds={currentDraft.totalDurationSeconds}
           />
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -4688,46 +4955,14 @@ export default function PublicacoesIaPage() {
               <ImageIcon className="h-4 w-4 text-slate-500" />
               Midia gerada
             </div>
-            {selectedPost.media.length === 0 ? (
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                Nenhum asset retornado para este rascunho.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {selectedPost.media.map((item, index) => (
-                  <div
-                    key={item.id || `${item.url}-${index}`}
-                    className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-                  >
-                    {isCurrentDraftSequential ? (
-                      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">
-                        <span>Segmento {index + 1}</span>
-                        <span>{parsedStoryBeats[index] || "Beat livre"}</span>
-                      </div>
-                    ) : null}
-                    {isVideoMedia(item) ? (
-                      <video
-                        src={item.url}
-                        controls
-                        className={getGeneratedMediaClass(
-                          selectedPost.postType as AiPostType,
-                          true,
-                        )}
-                      />
-                    ) : (
-                      <img
-                        src={item.url}
-                        alt="Asset gerado pela IA"
-                        className={getGeneratedMediaClass(
-                          selectedPost.postType as AiPostType,
-                          false,
-                        )}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <GeneratedMediaSection
+              key={`${selectedPost.id}-${selectedPost.media.length}-${currentDraft.totalDurationSeconds}`}
+              postType={selectedPost.postType as AiPostType}
+              media={selectedPost.media}
+              isSequential={isCurrentDraftSequential}
+              storyBeats={parsedStoryBeats}
+              totalDurationSeconds={currentDraft.totalDurationSeconds}
+            />
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -5741,6 +5976,8 @@ export default function PublicacoesIaPage() {
               showVideoIntent={generateForm.generateVideo}
               sequenceCount={generateForm.sequenceCount}
               sequenceSteps={parsedGenerateSequenceSteps}
+              continuityMode={generateForm.continuityMode}
+              totalDurationSeconds={generateForm.totalDurationSeconds}
             />
           </div>
 
@@ -5918,11 +6155,13 @@ export default function PublicacoesIaPage() {
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <ImageIcon className="h-3.5 w-3.5" />
-                          {post.media.length}
+                          {isSequentialPost
+                            ? `${post.totalDurationSeconds || 30}s`
+                            : post.media.length}
                         </span>
                         {isSequentialPost ? (
                           <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
-                            Video longo
+                            {post.media.length} segmentos internos
                           </span>
                         ) : null}
                       </div>
@@ -6490,6 +6729,8 @@ export default function PublicacoesIaPage() {
                       mediaUrl={selectedPreviewMediaUrl}
                       mediaIsVideo={selectedPreviewMediaIsVideo}
                       showVideoIntent={selectedPreviewShowsVideoIntent}
+                      continuityMode={currentDraft.continuityMode}
+                      totalDurationSeconds={currentDraft.totalDurationSeconds}
                     />
 
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -6497,40 +6738,14 @@ export default function PublicacoesIaPage() {
                         <ImageIcon className="h-4 w-4 text-slate-500" />
                         Mídia gerada
                       </div>
-                      {selectedPost.media.length === 0 ? (
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                          Nenhum asset retornado para este rascunho.
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {selectedPost.media.map((item, index) => (
-                            <div
-                              key={item.id || `${item.url}-${index}`}
-                              className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-                            >
-                              {isVideoMedia(item) ? (
-                                <video
-                                  src={item.url}
-                                  controls
-                                  className={getGeneratedMediaClass(
-                                    selectedPost.postType as AiPostType,
-                                    true,
-                                  )}
-                                />
-                              ) : (
-                                <img
-                                  src={item.url}
-                                  alt="Asset gerado pela IA"
-                                  className={getGeneratedMediaClass(
-                                    selectedPost.postType as AiPostType,
-                                    false,
-                                  )}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <GeneratedMediaSection
+                        key={`${selectedPost.id}-${selectedPost.media.length}-${currentDraft.totalDurationSeconds}-modal`}
+                        postType={selectedPost.postType as AiPostType}
+                        media={selectedPost.media}
+                        isSequential={isCurrentDraftSequential}
+                        storyBeats={parsedStoryBeats}
+                        totalDurationSeconds={currentDraft.totalDurationSeconds}
+                      />
                     </div>
 
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
