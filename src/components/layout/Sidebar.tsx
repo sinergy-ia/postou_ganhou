@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -76,7 +76,11 @@ export default function Sidebar({
   const isConfigRoute =
     pathname === "/dashboard/configuracoes" ||
     pathname.startsWith("/dashboard/configuracoes/");
-  const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
+  const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(isConfigRoute);
+
+  useEffect(() => {
+    setIsConfigMenuOpen(isConfigRoute);
+  }, [isConfigRoute]);
 
   const { data: user } = useQuery({
     queryKey: ["establishment-me"],
@@ -136,8 +140,7 @@ export default function Sidebar({
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPlanLocked = Boolean(item.proScaleOnly && !hasAiPostsPlan);
             const shouldShowConfigSubmenu =
-              item.href === "/dashboard/configuracoes" &&
-              (isConfigRoute || isConfigMenuOpen);
+              item.href === "/dashboard/configuracoes" && isConfigMenuOpen;
 
             if (item.href === "/dashboard/configuracoes") {
               return (
@@ -147,6 +150,7 @@ export default function Sidebar({
                     onClick={(event) => {
                       if (isConfigRoute) {
                         event.preventDefault();
+                        setIsConfigMenuOpen((currentState) => !currentState);
                         return;
                       }
 

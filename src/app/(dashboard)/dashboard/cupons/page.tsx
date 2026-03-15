@@ -364,17 +364,16 @@ export default function CuponsPage() {
 
       {selectedCoupon ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-center"
+          onClick={(event) => {
             if (event.target === event.currentTarget) {
               closeSelectedCouponModal();
             }
           }}
         >
           <div
-            className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
           >
@@ -411,7 +410,7 @@ export default function CuponsPage() {
               </button>
             </div>
 
-            <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-5 md:grid-cols-2">
               {[
                 { label: 'Codigo', value: selectedCoupon.code || 'Nao informado' },
                 { label: 'Status', value: selectedCoupon.status || 'Nao informado' },
