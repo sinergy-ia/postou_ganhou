@@ -129,12 +129,7 @@ export default function ParaEstabelecimentosPage() {
           <p className="text-center text-sm font-bold text-slate-500 uppercase tracking-wider mb-6">Confiado por grandes marcas</p>
           <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
             {/* Fake logos using text for mockup */}
-            <div className="font-heading font-black text-2xl text-slate-700">BURGER KING</div>
-            <div className="font-heading font-black text-2xl text-slate-700">YURUZU SUSHI</div>
-            <div className="font-heading font-black text-2xl text-slate-700">CAFÉ DO BREJO</div>
-            <div className="font-heading font-black text-2xl text-slate-700">OAKBERRY</div>
-            <div className="font-heading font-black text-2xl text-slate-700">OUTBACK</div>
-            <div className="font-heading font-black text-2xl text-primary-700">Sinergy IA</div>
+            <div className="font-heading font-black text-2xl text-primary-700">SINERGY IA</div>
           </div>
         </div>
       </section>
