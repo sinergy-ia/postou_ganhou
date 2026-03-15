@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PaginationControls from "@/components/dashboard/PaginationControls";
 import FeatureUpgradeNotice from "@/components/dashboard/FeatureUpgradeNotice";
@@ -2543,7 +2543,7 @@ function isScheduledWithinOneHour(value?: string | null) {
   return diffMs > 0 && diffMs <= 60 * 60 * 1000;
 }
 
-export default function PublicacoesIaPage() {
+function PublicacoesIaPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -6941,5 +6941,24 @@ export default function PublicacoesIaPage() {
       ) : null}
       </div>
     </div>
+  );
+}
+
+function PublicacoesIaPageFallback() {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-3 text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm font-medium">Carregando Publicacoes IA...</span>
+      </div>
+    </section>
+  );
+}
+
+export default function PublicacoesIaPage() {
+  return (
+    <Suspense fallback={<PublicacoesIaPageFallback />}>
+      <PublicacoesIaPageContent />
+    </Suspense>
   );
 }
