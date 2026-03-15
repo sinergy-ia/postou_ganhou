@@ -117,12 +117,37 @@ type AnalyticsScopeParams = {
 export type AiPostMode = "CAMPAIGN" | "EDITORIAL";
 export type AiPostType = "STORY" | "FEED" | "REELS";
 export type AiVideoDurationSeconds = 4 | 6 | 8;
+export type AiPostQualityProfile = "BALANCED" | "PROFESSIONAL";
+export type AiVideoResolution = "720p" | "1080p";
+export type AiVideoContinuityMode = "SINGLE" | "SEQUENTIAL";
+export type AiPostUploadBucket = "midiahub-v1" | "report-new-nlp-v1";
 
 export interface AiPostMediaItem {
   id?: string;
   url: string;
   type: string;
   mimeType?: string;
+  segmentIndex?: number;
+  segmentStartSeconds?: number;
+  segmentEndSeconds?: number;
+  segmentTitle?: string;
+  continuityStrategy?: string;
+}
+
+export interface AiPostUploadedAsset {
+  url: string;
+  storageKey: string;
+  mimeType?: string;
+  fileName?: string;
+  bucket?: AiPostUploadBucket | string;
+}
+
+export interface AiPostAsyncGenerationResponse {
+  aiPostId: string;
+  status: string;
+  messageId?: string;
+  notificationChannelId?: string;
+  message?: string;
 }
 
 export interface AiPostRecord {
@@ -134,8 +159,17 @@ export interface AiPostRecord {
   generateImage: boolean;
   generateVideo: boolean;
   durationSeconds?: AiVideoDurationSeconds;
+  qualityProfile: AiPostQualityProfile;
+  videoResolution?: AiVideoResolution;
+  continuityMode: AiVideoContinuityMode;
+  totalDurationSeconds?: number;
   imagePrompt: string;
   videoPrompt: string;
+  visualStyle: string;
+  negativePrompt: string;
+  referenceImageUrls: string[];
+  storyOutline: string;
+  storyBeats: string[];
   prompt: string;
   topic: string;
   briefing: string;
@@ -153,6 +187,50 @@ export interface AiPostRecord {
   campaign?: Record<string, any> | null;
 }
 
+function normalizeAiPostTextValue(value: unknown): string {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized === "[object Object]" ? "" : normalized;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeAiPostTextValue(item))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const candidateKeys = [
+      "text",
+      "content",
+      "value",
+      "message",
+      "caption",
+      "prompt",
+      "description",
+      "title",
+      "label",
+    ];
+
+    for (const key of candidateKeys) {
+      const normalizedCandidate = normalizeAiPostTextValue(record[key]);
+
+      if (normalizedCandidate) {
+        return normalizedCandidate;
+      }
+    }
+  }
+
+  return "";
+}
+
 function normalizeAiPost(record: Record<string, any> | null | undefined): AiPostRecord | null {
   if (!record) {
     return null;
@@ -165,6 +243,16 @@ function normalizeAiPost(record: Record<string, any> | null | undefined): AiPost
       ? record.hashtags
           .split(/[\s,]+/)
           .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+  const referenceImageUrls = Array.isArray(record.referenceImageUrls)
+    ? record.referenceImageUrls
+        .map((item: unknown) => String(item || "").trim())
+        .filter(Boolean)
+    : typeof record.referenceImageUrls === "string"
+      ? record.referenceImageUrls
+          .split(/[\n,\s]+/)
+          .map((item: string) => item.trim())
           .filter(Boolean)
       : [];
   const media = Array.isArray(record.media)
@@ -192,6 +280,33 @@ function normalizeAiPost(record: Record<string, any> | null | undefined): AiPost
             url,
             type: String(item.type ?? item.mediaType ?? "IMAGE").toUpperCase(),
             mimeType: String(item.mimeType ?? item.contentType ?? "").trim() || undefined,
+            segmentIndex:
+              typeof item.segmentIndex === "number" && Number.isFinite(item.segmentIndex)
+                ? Math.trunc(item.segmentIndex)
+                : typeof item.segmentIndex === "string" &&
+                    Number.isFinite(Number(item.segmentIndex))
+                  ? Math.trunc(Number(item.segmentIndex))
+                  : undefined,
+            segmentStartSeconds:
+              typeof item.segmentStartSeconds === "number" &&
+              Number.isFinite(item.segmentStartSeconds)
+                ? item.segmentStartSeconds
+                : typeof item.segmentStartSeconds === "string" &&
+                    Number.isFinite(Number(item.segmentStartSeconds))
+                  ? Number(item.segmentStartSeconds)
+                  : undefined,
+            segmentEndSeconds:
+              typeof item.segmentEndSeconds === "number" &&
+              Number.isFinite(item.segmentEndSeconds)
+                ? item.segmentEndSeconds
+                : typeof item.segmentEndSeconds === "string" &&
+                    Number.isFinite(Number(item.segmentEndSeconds))
+                  ? Number(item.segmentEndSeconds)
+                  : undefined,
+            segmentTitle:
+              String(item.segmentTitle ?? item.title ?? "").trim() || undefined,
+            continuityStrategy:
+              String(item.continuityStrategy ?? "").trim() || undefined,
           };
         })
         .filter(Boolean)
@@ -210,16 +325,45 @@ function normalizeAiPost(record: Record<string, any> | null | undefined): AiPost
       record.durationSeconds === 4 || record.durationSeconds === 6 || record.durationSeconds === 8
         ? record.durationSeconds
         : undefined,
-    imagePrompt: String(record.imagePrompt || ""),
-    videoPrompt: String(record.videoPrompt || ""),
-    prompt: String(record.prompt || ""),
-    topic: String(record.topic || ""),
-    briefing: String(record.briefing || ""),
-    targetAudience: String(record.targetAudience || ""),
-    callToAction: String(record.callToAction || ""),
-    caption: String(record.caption || record.publishPreview || ""),
+    qualityProfile:
+      String(record.qualityProfile || "").toUpperCase() === "PROFESSIONAL"
+        ? "PROFESSIONAL"
+        : "BALANCED",
+    videoResolution:
+      String(record.videoResolution || "").toLowerCase() === "1080p" ? "1080p" : "720p",
+    continuityMode:
+      String(record.continuityMode || "").toUpperCase() === "SEQUENTIAL"
+        ? "SEQUENTIAL"
+        : "SINGLE",
+    totalDurationSeconds:
+      typeof record.totalDurationSeconds === "number" && Number.isFinite(record.totalDurationSeconds)
+        ? Math.max(1, Math.trunc(record.totalDurationSeconds))
+        : typeof record.totalDurationSeconds === "string" &&
+            Number.isFinite(Number(record.totalDurationSeconds))
+          ? Math.max(1, Math.trunc(Number(record.totalDurationSeconds)))
+          : undefined,
+    imagePrompt: normalizeAiPostTextValue(record.imagePrompt),
+    videoPrompt: normalizeAiPostTextValue(record.videoPrompt),
+    visualStyle: normalizeAiPostTextValue(record.visualStyle),
+    negativePrompt: normalizeAiPostTextValue(record.negativePrompt),
+    referenceImageUrls,
+    storyOutline: normalizeAiPostTextValue(record.storyOutline),
+    storyBeats: Array.isArray(record.storyBeats)
+      ? record.storyBeats.map((item: unknown) => String(item || "").trim()).filter(Boolean)
+      : typeof record.storyBeats === "string"
+        ? record.storyBeats
+            .split(/[\n,]+/)
+            .map((item: string) => item.trim())
+            .filter(Boolean)
+        : [],
+    prompt: normalizeAiPostTextValue(record.prompt),
+    topic: normalizeAiPostTextValue(record.topic),
+    briefing: normalizeAiPostTextValue(record.briefing),
+    targetAudience: normalizeAiPostTextValue(record.targetAudience),
+    callToAction: normalizeAiPostTextValue(record.callToAction),
+    caption: normalizeAiPostTextValue(record.caption || record.publishPreview),
     hashtags,
-    publishPreview: String(record.publishPreview || record.caption || ""),
+    publishPreview: normalizeAiPostTextValue(record.publishPreview || record.caption),
     media: media as AiPostMediaItem[],
     timezone: String(record.timezone || "America/Sao_Paulo"),
     scheduledAt: record.scheduledAt ? String(record.scheduledAt) : undefined,
@@ -553,11 +697,88 @@ export const establishmentApi = {
     generateImage?: boolean;
     generateVideo?: boolean;
     durationSeconds?: AiVideoDurationSeconds;
+    qualityProfile?: AiPostQualityProfile;
+    videoResolution?: AiVideoResolution;
+    continuityMode?: AiVideoContinuityMode;
+    totalDurationSeconds?: number;
     imagePrompt?: string;
     videoPrompt?: string;
+    visualStyle?: string;
+    negativePrompt?: string;
+    referenceImageUrls?: string[];
+    storyOutline?: string;
+    storyBeats?: string[];
   }) => {
     const { data } = await api.post("/api/ai-posts/generate", payload);
     return normalizeAiPost(data);
+  },
+
+  generateAiPostAsync: async (payload: {
+    mode: AiPostMode;
+    campaignId?: string;
+    postType: AiPostType;
+    prompt: string;
+    topic?: string;
+    briefing?: string;
+    targetAudience?: string;
+    callToAction?: string;
+    timezone?: string;
+    generateImage?: boolean;
+    generateVideo?: boolean;
+    durationSeconds?: AiVideoDurationSeconds;
+    qualityProfile?: AiPostQualityProfile;
+    videoResolution?: AiVideoResolution;
+    continuityMode?: AiVideoContinuityMode;
+    totalDurationSeconds?: number;
+    imagePrompt?: string;
+    videoPrompt?: string;
+    visualStyle?: string;
+    negativePrompt?: string;
+    referenceImageUrls?: string[];
+    storyOutline?: string;
+    storyBeats?: string[];
+    notificationChannelId?: string;
+  }): Promise<AiPostAsyncGenerationResponse> => {
+    const { data } = await api.post("/api/ai-posts/generate-async", payload);
+    return {
+      aiPostId: String(data?.aiPostId || data?._id || data?.id || "").trim(),
+      status: String(data?.status || "").trim(),
+      messageId: String(data?.messageId || "").trim() || undefined,
+      notificationChannelId:
+        String(data?.notificationChannelId || "").trim() || undefined,
+      message: String(data?.message || "").trim() || undefined,
+    };
+  },
+
+  uploadAiPostReferenceImage: async (payload: {
+    dataUrl: string;
+    fileName?: string;
+    bucket?: AiPostUploadBucket;
+  }): Promise<AiPostUploadedAsset> => {
+    const { data } = await api.post("/api/ai-posts/reference-images", payload);
+    return {
+      url: String(data?.url || "").trim(),
+      storageKey: String(data?.storageKey || "").trim(),
+      mimeType: String(data?.mimeType || "").trim() || undefined,
+      fileName: String(data?.fileName || "").trim() || undefined,
+      bucket: String(data?.bucket || "").trim() || undefined,
+    };
+  },
+
+  uploadAiPostAsset: async (payload: {
+    dataUrl: string;
+    fileName?: string;
+    folder?: string;
+    bucket?: AiPostUploadBucket;
+  }): Promise<AiPostUploadedAsset> => {
+    const { data } = await api.post("/api/ai-posts/assets/upload", payload);
+    return {
+      url: String(data?.url || "").trim(),
+      storageKey: String(data?.storageKey || "").trim(),
+      mimeType: String(data?.mimeType || "").trim() || undefined,
+      fileName: String(data?.fileName || "").trim() || undefined,
+      bucket: String(data?.bucket || "").trim() || undefined,
+    };
   },
 
   getAiPosts: async (params?: {
@@ -596,8 +817,17 @@ export const establishmentApi = {
       generateImage?: boolean;
       generateVideo?: boolean;
       durationSeconds?: AiVideoDurationSeconds;
+      qualityProfile?: AiPostQualityProfile;
+      videoResolution?: AiVideoResolution;
+      continuityMode?: AiVideoContinuityMode;
+      totalDurationSeconds?: number;
       imagePrompt?: string;
       videoPrompt?: string;
+      visualStyle?: string;
+      negativePrompt?: string;
+      referenceImageUrls?: string[];
+      storyOutline?: string;
+      storyBeats?: string[];
       caption?: string;
       hashtags?: string[];
       timezone?: string;

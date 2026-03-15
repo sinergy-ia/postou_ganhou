@@ -22,6 +22,10 @@ import {
   dashboardConfigSections,
   isDashboardConfigSectionId,
 } from "@/lib/dashboard-config-sections";
+import {
+  aiPostsSections,
+  isAiPostsSectionId,
+} from "@/lib/ai-posts-sections";
 import { establishmentApi } from "@/services/establishment-api";
 
 function cn(...inputs: ClassValue[]) {
@@ -76,11 +80,19 @@ export default function Sidebar({
   const isConfigRoute =
     pathname === "/dashboard/configuracoes" ||
     pathname.startsWith("/dashboard/configuracoes/");
+  const isAiPostsRoute =
+    pathname === "/dashboard/publicacoes-ia" ||
+    pathname.startsWith("/dashboard/publicacoes-ia/");
   const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(isConfigRoute);
+  const [isAiPostsMenuOpen, setIsAiPostsMenuOpen] = useState(isAiPostsRoute);
 
   useEffect(() => {
     setIsConfigMenuOpen(isConfigRoute);
   }, [isConfigRoute]);
+
+  useEffect(() => {
+    setIsAiPostsMenuOpen(isAiPostsRoute);
+  }, [isAiPostsRoute]);
 
   const { data: user } = useQuery({
     queryKey: ["establishment-me"],
@@ -109,6 +121,10 @@ export default function Sidebar({
     ? searchParams.get("section")
     : "profile";
   const configHref = `/dashboard/configuracoes?section=${activeConfigSection}`;
+  const activeAiPostsSection = isAiPostsSectionId(searchParams.get("section"))
+    ? searchParams.get("section")
+    : "generate";
+  const aiPostsHref = `/dashboard/publicacoes-ia?section=${activeAiPostsSection}`;
 
   return (
     <aside
@@ -209,6 +225,93 @@ export default function Sidebar({
                                   Em breve
                                 </span>
                               ) : null}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
+
+            if (item.href === "/dashboard/publicacoes-ia") {
+              const shouldShowAiPostsSubmenu = isAiPostsMenuOpen;
+
+              return (
+                <div key={item.name}>
+                  <Link
+                    href={aiPostsHref}
+                    onClick={(event) => {
+                      if (isAiPostsRoute) {
+                        event.preventDefault();
+                        setIsAiPostsMenuOpen((currentState) => !currentState);
+                        return;
+                      }
+
+                      setIsAiPostsMenuOpen(true);
+                      onClose?.();
+                    }}
+                    className={cn(
+                      isActive
+                        ? "bg-primary-600 text-white"
+                        : "hover:bg-slate-800 hover:text-white",
+                      isPlanLocked && !isActive ? "text-slate-400" : "",
+                      "group flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    )}
+                    aria-expanded={shouldShowAiPostsSubmenu}
+                  >
+                    <span className="flex min-w-0 items-center">
+                      <item.icon
+                        className={cn(
+                          isActive ? "text-white" : "text-slate-400 group-hover:text-white",
+                          "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isPlanLocked ? (
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                            isActive ? "bg-white/15 text-white" : "bg-slate-800 text-slate-400",
+                          )}
+                        >
+                          Pro/Scale
+                        </span>
+                      ) : null}
+                      <ChevronRight
+                        className={cn(
+                          isActive ? "text-white/85" : "text-slate-400 group-hover:text-white",
+                          "h-4 w-4 shrink-0 transition-transform",
+                          shouldShowAiPostsSubmenu ? "rotate-90" : "",
+                        )}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </Link>
+
+                  {shouldShowAiPostsSubmenu ? (
+                    <div className="ml-5 mt-2 overflow-hidden border-l border-slate-800 pl-3">
+                      <div className="space-y-1">
+                        {aiPostsSections.map((section) => {
+                          const isSectionActive = activeAiPostsSection === section.id;
+
+                          return (
+                            <Link
+                              key={section.id}
+                              href={`/dashboard/publicacoes-ia?section=${section.id}`}
+                              onClick={() => onClose?.()}
+                              className={cn(
+                                isSectionActive
+                                  ? "bg-slate-800 text-white"
+                                  : "text-slate-400 hover:bg-slate-800/80 hover:text-white",
+                                "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                              )}
+                            >
+                              <span className="min-w-0 flex-1 truncate">{section.label}</span>
                             </Link>
                           );
                         })}
