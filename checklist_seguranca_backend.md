@@ -9,7 +9,7 @@ Uso recomendado:
 
 ## 1. Modelo de isolamento multi-tenant
 
-- [ ] Existe uma regra unica e clara de tenant no backend.
+- [ ] Existe uma regra única e clara de tenant no backend.
 - [ ] O tenant efetivo e derivado da sessao/JWT, nunca apenas de parametros enviados pelo frontend.
 - [ ] Todo recurso sensivel pertence explicitamente a um tenant no banco.
 - [ ] Toda query sensivel usa filtro por tenant.

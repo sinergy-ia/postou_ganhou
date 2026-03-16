@@ -31,6 +31,7 @@ import {
 import {
   AlertTriangle,
   Bookmark,
+  Camera,
   Calendar,
   CheckCircle2,
   Clock3,
@@ -40,6 +41,7 @@ import {
   Megaphone,
   MessageCircle,
   MoreHorizontal,
+  Music2,
   Play,
   RefreshCw,
   Save,
@@ -247,12 +249,12 @@ const QUALITY_PROFILE_OPTIONS: Array<{
   {
     value: "BALANCED",
     label: "Balanced",
-    helper: "Mais rapido e indicado para testes, iteracoes e pecas do dia a dia.",
+    helper: "Mais rapido e indicado para testes, iteracoes e Peças do dia a dia.",
   },
   {
     value: "PROFESSIONAL",
     label: "Professional",
-    helper: "Melhor escolha para criativos principais, campanhas pagas e pecas de maior impacto.",
+    helper: "Melhor escolha para criativos principais, campanhas pagas e Peças de maior impacto.",
   },
 ];
 const VIDEO_LANGUAGE_OPTIONS: Array<{
@@ -540,7 +542,7 @@ const TOPIC_SUGGESTIONS: FieldSuggestion[] = [
 const CTA_SUGGESTIONS: FieldSuggestion[] = [
   { label: "WhatsApp", value: "Chame no WhatsApp para agendar agora" },
   { label: "Vaga", value: "Garanta sua vaga hoje" },
-  { label: "Orcamento", value: "Peca seu orcamento agora" },
+  { label: "Orcamento", value: "Peça seu orcamento agora" },
   { label: "Direct", value: "Fale com nossa equipe no direct" },
 ];
 
@@ -796,7 +798,7 @@ function getVisualStyleHelper(postType: AiPostType) {
     return "Descreva o look visual do video: luz, energia, camera, acabamento e tipo de campanha que ele deve lembrar.";
   }
 
-  return "Descreva a linguagem visual da peca: fotografia, direcao de arte, luz, textura, paleta e sensacao de marca.";
+  return "Descreva a linguagem visual da Peça: fotografia, direcao de arte, luz, textura, paleta e sensacao de marca.";
 }
 
 function getFormatDirectionTip(postType: AiPostType) {
@@ -846,7 +848,7 @@ function normalizeSequenceCount(value: number) {
 
 function getSequenceCollectionLabel(postType: AiPostType, count: number) {
   if (count <= 1) {
-    return "Peca unica";
+    return "Peça única";
   }
 
   switch (postType) {
@@ -871,7 +873,7 @@ function getSequenceItemTitle(
   }
 
   if (count <= 1) {
-    return postType === "REELS" ? "Reel principal" : "Peca principal";
+    return postType === "REELS" ? "Reel principal" : "Peça principal";
   }
 
   switch (postType) {
@@ -899,9 +901,9 @@ function buildSequencePrompt(
   }
 
   const instructions = [
-    `Esta peca faz parte de uma sequencia de ${count} itens para Instagram.`,
+    `Esta Peça faz parte de uma sequencia de ${count} itens para Instagram.`,
     `Crie o item ${index + 1} de ${count}.`,
-    explicitStep ? `Foco deste item: ${explicitStep}.` : "Crie uma variacao complementar as demais pecas, sem repetir tudo igual.",
+    explicitStep ? `Foco deste item: ${explicitStep}.` : "Crie uma variacao complementar as demais Peças, sem repetir tudo igual.",
     postType === "FEED"
       ? "Pense como um card de carrossel que precisa funcionar sozinho e em conjunto."
       : postType === "STORY"
@@ -1321,7 +1323,7 @@ function createInitialAiBriefingChatMessages() {
   return [
     createAiBriefingChatMessage(
       "assistant",
-      "Preencha o briefing por etapas para definir objetivo, formato, direcao visual e detalhes complementares da peca.",
+      "Preencha o briefing por etapas para definir objetivo, formato, direcao visual e detalhes complementares da Peça.",
       "prompt",
     ),
   ];
@@ -1362,13 +1364,13 @@ function getAiBriefingTimelineSteps(
   const steps: AiBriefingTimelineStep[] = [
     {
       field: "prompt",
-      title: "Objetivo da peca",
+      title: "Objetivo da Peça",
       helper: "O que a publicacao precisa divulgar, vender ou movimentar agora.",
     },
     {
       field: "topic",
       title: "Tema ou oferta",
-      helper: "Produto, servico, campanha ou assunto principal da peca.",
+      helper: "Produto, servico, campanha ou assunto principal da Peça.",
     },
     {
       field: "targetAudience",
@@ -1624,7 +1626,7 @@ function buildAiBriefingAssistantMessage(
     case "videoPrompt":
       return "Descreva a direcao do video: cena, movimento de camera, ritmo, ambiente e o que precisa acontecer para vender bem a ideia.";
     case "visualStyle":
-      return "Defina o estilo visual da peca. Vale falar de luz, enquadramento, materiais, cores e nivel de sofisticacao.";
+      return "Defina o estilo visual da Peça. Vale falar de luz, enquadramento, materiais, cores e nivel de sofisticacao.";
     case "negativePrompt":
       return "Liste o que deve ser evitado no resultado, como excesso de texto, cara de panfleto, deformacoes ou poluicao visual.";
     case "storyOutline":
@@ -2282,7 +2284,7 @@ function DirectionVisualSection({
         <div className="md:col-span-2">
           <AssistantTextareaField
             title="Assistente de restricoes visuais"
-            assistantMessage="Se quiser, me diga o que precisa ser evitado no render: texto ruim, excesso de elementos, deformacoes, cara de panfleto ou qualquer ruido que atrapalhe a peca."
+            assistantMessage="Se quiser, me diga o que precisa ser evitado no render: texto ruim, excesso de elementos, deformacoes, cara de panfleto ou qualquer ruido que atrapalhe a Peça."
             suggestions={NEGATIVE_PROMPT_SUGGESTIONS}
             onSuggestionSelect={onNegativePromptChange}
             value={negativePrompt}
@@ -2558,6 +2560,30 @@ function PreviewMediaSurface({
   );
 }
 
+function getInstagramPreviewCopy(caption: string) {
+  const blocks = caption
+    .split(/\n+/)
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const hashtags = Array.from(
+    new Set(
+      (caption.match(/#[^\s#]+/g) || [])
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+  const textBlocks = blocks.filter((block) => {
+    const words = block.split(/\s+/).filter(Boolean);
+    return !words.every((word) => word.startsWith("#"));
+  });
+
+  return {
+    primaryLine: textBlocks[0] || "Sua mensagem principal aparecera aqui.",
+    secondaryLine: textBlocks[1] || "",
+    hashtags,
+  };
+}
+
 function InstagramPreviewMock({
   postType,
   caption,
@@ -2605,6 +2631,24 @@ function InstagramPreviewMock({
       : "Preview de imagem";
   const displayAccountLabel =
     accountLabel.replace(/^@/, "").trim().replace(/\s+/g, "_") || "seu_negocio";
+  const previewCopy = getInstagramPreviewCopy(previewCaption);
+  const storyStickerLabels = [`@${displayAccountLabel}`, ...previewCopy.hashtags].slice(0, 3);
+  const reelAudioLabel =
+    previewCopy.hashtags.slice(0, 2).join(" ") || `Audio original - ${displayAccountLabel}`;
+  const storyPrimaryLine =
+    previewCopy.primaryLine.length > 88
+      ? `${previewCopy.primaryLine.slice(0, 85).trim()}...`
+      : previewCopy.primaryLine;
+  const storySecondaryLine =
+    previewCopy.secondaryLine.length > 80
+      ? `${previewCopy.secondaryLine.slice(0, 77).trim()}...`
+      : previewCopy.secondaryLine;
+  const reelCaption = [previewCopy.primaryLine, previewCopy.secondaryLine]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const verticalPreviewFrameClass =
+    "w-full max-w-[380px] overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-28px_rgba(15,23,42,0.45)]";
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -2689,11 +2733,12 @@ function InstagramPreviewMock({
             </div>
           </div>
         ) : (
-          <div className="w-full max-w-[320px] rounded-[38px] bg-[#090b12] p-3 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.65)]">
-            <div className="overflow-hidden rounded-[30px] bg-black">
+          <div className={verticalPreviewFrameClass}>
+            <div className="p-3">
+              <div className="overflow-hidden rounded-[28px] bg-black">
               {postType === "STORY" ? (
                 <div className="relative">
-                  <div className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/55 via-black/20 to-transparent px-3 pt-3 pb-8">
+                  <div className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/60 via-black/22 to-transparent px-3 pt-3 pb-10">
                     <div className="flex gap-1">
                       {items.map((item, index) => (
                         <span
@@ -2728,18 +2773,37 @@ function InstagramPreviewMock({
                     showAccentBadge={false}
                   />
 
-                  <div className="absolute inset-x-4 bottom-16 z-20 rounded-[28px] border border-white/15 bg-black/30 px-4 py-3 text-white shadow-[0_20px_40px_-24px_rgba(0,0,0,0.9)] backdrop-blur-md">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                      Story
-                    </div>
-                    <div className="mt-2 line-clamp-4 text-[15px] leading-7 text-white/92">
-                      {shortCaption}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[52%] z-10 bg-gradient-to-t from-black/78 via-black/24 to-transparent" />
+
+                  <div className="absolute inset-x-5 bottom-24 z-20">
+                    <div className="max-w-[76%]">
+                      <div className="line-clamp-4 text-[24px] font-semibold leading-[1.08] text-white [text-shadow:0_8px_20px_rgba(0,0,0,0.55)]">
+                        {storyPrimaryLine}
+                      </div>
+                      {storySecondaryLine ? (
+                        <div className="mt-3 max-w-[88%] text-[13px] leading-5 text-white/92 [text-shadow:0_8px_20px_rgba(0,0,0,0.45)]">
+                          {storySecondaryLine}
+                        </div>
+                      ) : null}
+                      {storyStickerLabels.length > 0 ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {storyStickerLabels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full border border-white/18 bg-white/96 px-3 py-1.5 text-[11px] font-semibold text-slate-900 shadow-[0_12px_24px_-20px_rgba(0,0,0,0.85)]"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
                   <div className="absolute inset-x-4 bottom-4 z-20 flex items-center gap-3 text-white">
-                    <div className="flex-1 rounded-full border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white/65 backdrop-blur-md">
-                      Enviar mensagem
+                    <div className="flex h-11 flex-1 items-center gap-3 rounded-full border border-white/20 bg-black/25 px-4 text-sm text-white/68 backdrop-blur-md">
+                      <Camera className="h-4 w-4 shrink-0 text-white/72" />
+                      <span>Enviar mensagem</span>
                     </div>
                     <Heart className="h-5 w-5 shrink-0" />
                     <Send className="h-5 w-5 shrink-0" />
@@ -2747,13 +2811,11 @@ function InstagramPreviewMock({
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/55 via-black/18 to-transparent px-4 pt-4 pb-10 text-white">
-                    <div className="flex items-center gap-3">
-                      <div className="text-base font-semibold tracking-[0.01em]">Reels</div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Heart className="h-4 w-4 opacity-0" />
-                      <MoreHorizontal className="h-4 w-4" />
+                  <div className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/72 via-black/24 to-transparent px-4 pt-4 pb-10 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10" />
+                      <div className="text-[15px] font-semibold tracking-[0.01em]">Reels</div>
+                      <Camera className="h-4 w-4" />
                     </div>
                   </div>
 
@@ -2766,22 +2828,45 @@ function InstagramPreviewMock({
                     showAccentBadge={false}
                   />
 
-                  <div className="absolute bottom-7 right-4 z-20 flex flex-col items-center gap-5 text-white">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[56%] z-10 bg-gradient-to-t from-black/84 via-black/28 to-transparent" />
+
+                  <div className="absolute bottom-8 right-4 z-20 flex flex-col items-center gap-4 text-white">
+                    <div className="relative">
+                      <div className="rounded-full border border-white/25 bg-black/30 p-[2px] backdrop-blur">
+                        <div className="h-10 w-10 rounded-full bg-[linear-gradient(135deg,#f97316,#facc15,#22c55e)] p-[2px]">
+                          <div className="h-full w-full rounded-full bg-[#0f172a]" />
+                        </div>
+                      </div>
+                      <span className="absolute -bottom-1 left-1/2 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full bg-[#ff2f6d] text-[11px] font-bold text-white">
+                        +
+                      </span>
+                    </div>
                     <div className="flex flex-col items-center gap-1">
-                      <Heart className="h-6 w-6" />
+                      <Heart className="h-7 w-7" />
                       <span className="text-[10px] font-semibold">1,2 mil</span>
                     </div>
                     <div className="flex flex-col items-center gap-1">
-                      <MessageCircle className="h-6 w-6" />
+                      <MessageCircle className="h-7 w-7" />
                       <span className="text-[10px] font-semibold">84</span>
                     </div>
                     <div className="flex flex-col items-center gap-1">
-                      <Send className="h-6 w-6" />
-                      <span className="text-[10px] font-semibold">Enviar</span>
+                      <Send className="h-7 w-7" />
+                      <span className="text-[10px] font-semibold">Compart.</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <MoreHorizontal className="h-7 w-7" />
+                      <span className="text-[10px] font-semibold">Mais</span>
+                    </div>
+                    <div className="rounded-full border border-white/20 bg-black/35 p-[2px] backdrop-blur">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[conic-gradient(from_210deg,#fb7185,#f97316,#22c55e,#60a5fa,#fb7185)]">
+                        <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-black">
+                          <Music2 className="h-4 w-4" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="absolute bottom-7 left-4 right-20 z-20 text-white">
+                  <div className="absolute bottom-7 left-4 right-24 z-20 text-white">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full border border-white/35 bg-[linear-gradient(135deg,#f97316,#facc15,#22c55e)] p-[1.5px]">
                         <div className="h-full w-full rounded-full bg-white/15" />
@@ -2794,12 +2879,16 @@ function InstagramPreviewMock({
                       </div>
                     </div>
                     <div className="mt-3 line-clamp-3 text-sm leading-6 text-white/92">
-                      {shortCaption}
+                      {reelCaption || shortCaption}
                     </div>
-                    <div className="mt-2 text-[11px] text-white/65">Audio original</div>
+                    <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/28 px-3 py-2 text-[11px] text-white/78 backdrop-blur">
+                      <Music2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{reelAudioLabel}</span>
+                    </div>
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -2834,7 +2923,7 @@ function InstagramPreviewMock({
         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <div className="font-semibold">Video longo unico</div>
           <div className="mt-1 text-amber-800">
-            O resultado esperado aqui e uma unica publicacao de {normalizedTotalDuration || 30} segundos. Os segmentos internos servem apenas para compor esse video longo.
+            O resultado esperado aqui e uma única publicacao de {normalizedTotalDuration || 30} segundos. Os segmentos internos servem apenas para compor esse video longo.
           </div>
         </div>
       ) : null}
@@ -2945,7 +3034,7 @@ function GeneratedMediaSection({
           </span>
         </div>
         <div className="mt-2">
-          Este video longo sera uma unica publicacao de {getPostTypeLabel(postType).toLowerCase()}. Os blocos abaixo sao segmentos internos usados para montar o resultado final.
+          Este video longo sera uma única publicacao de {getPostTypeLabel(postType).toLowerCase()}. Os blocos abaixo sao segmentos internos usados para montar o resultado final.
         </div>
       </div>
 
@@ -3359,7 +3448,6 @@ function PublicacoesIaPageContent() {
   const [postTypeFilter, setPostTypeFilter] = useState("");
   const [libraryPage, setLibraryPage] = useState(1);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isPostDetailModalOpen, setIsPostDetailModalOpen] = useState(false);
   const [batchGenerationProgress, setBatchGenerationProgress] =
     useState<BatchGenerationProgress>(null);
@@ -3529,36 +3617,10 @@ function PublicacoesIaPageContent() {
     router.replace(`${pathname}?${nextParams.toString()}`);
   }, [activeSection, pathname, router, searchParams, searchParamsString]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const mediaQuery = window.matchMedia("(max-width: 1023px)");
-    const syncViewport = (matches: boolean) => {
-      setIsMobileViewport(matches);
-    };
-
-    syncViewport(mediaQuery.matches);
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      syncViewport(event.matches);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
   const handleSelectPost = (postId: string) => {
     setSelectedPostId(postId);
     setDraftReferenceUrlInput("");
-
-    if (isMobileViewport) {
-      setIsPostDetailModalOpen(true);
-    }
+    setIsPostDetailModalOpen(true);
   };
 
   const isMetaConnected = Boolean(me?.metaConnected);
@@ -4586,7 +4648,7 @@ function PublicacoesIaPageContent() {
       } catch (error) {
         if (queuedJobs.length > 0) {
           const partialError = new Error(
-            `Enviamos ${queuedJobs.length} de ${normalizedSequenceCount} pecas para a fila antes da interrupcao. ${getErrorMessage(error, "Nao foi possivel concluir o envio da sequencia.")}`,
+            `Enviamos ${queuedJobs.length} de ${normalizedSequenceCount} Peças para a fila antes da interrupcao. ${getErrorMessage(error, "Nao foi possivel concluir o envio da sequencia.")}`,
           ) as Error & { partialQueuedJobs?: AiPostAsyncGenerationResponse[] };
           partialError.partialQueuedJobs = queuedJobs;
           throw partialError;
@@ -4643,9 +4705,7 @@ function PublicacoesIaPageContent() {
       if (latestQueuedJob?.aiPostId) {
         setSelectedPostId(latestQueuedJob.aiPostId);
         navigateToSection("library");
-        if (isMobileViewport) {
-          setIsPostDetailModalOpen(true);
-        }
+        setIsPostDetailModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["ai-post", latestQueuedJob.aiPostId] });
       }
 
@@ -4720,9 +4780,7 @@ function PublicacoesIaPageContent() {
         if (latestPartialJob?.aiPostId) {
           setSelectedPostId(latestPartialJob.aiPostId);
           navigateToSection("library");
-          if (isMobileViewport) {
-            setIsPostDetailModalOpen(true);
-          }
+          setIsPostDetailModalOpen(true);
         }
       }
 
@@ -4989,9 +5047,7 @@ function PublicacoesIaPageContent() {
           navigateToSection("library");
         }
 
-        if (isMobileViewport) {
-          setIsPostDetailModalOpen(true);
-        }
+        setIsPostDetailModalOpen(true);
       }
 
       setFeedback({
@@ -5072,7 +5128,6 @@ function PublicacoesIaPageContent() {
     };
   }, [
     activeSection,
-    isMobileViewport,
     navigateToSection,
     queryClient,
     shouldNotifyAsyncTerminalStatus,
@@ -6803,14 +6858,14 @@ function PublicacoesIaPageContent() {
             <div className="mb-4">
               <div className="text-sm font-bold text-slate-900">Sequencia de publicacoes</div>
               <div className="mt-1 text-xs text-slate-500">
-                Gere uma peca unica ou uma sequencia inteira de feed, story ou reels no mesmo fluxo.
+                Gere uma Peça única ou uma sequencia inteira de feed, story ou reels no mesmo fluxo.
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Quantidade de pecas
+                  Quantidade de Peças
                 </label>
                 <select
                   value={String(generateForm.sequenceCount)}
@@ -6824,7 +6879,7 @@ function PublicacoesIaPageContent() {
                 >
                   {SEQUENCE_COUNT_OPTIONS.map((count) => (
                     <option key={count} value={count}>
-                      {count === 1 ? "1 peca" : `${count} pecas`}
+                      {count === 1 ? "1 Peça" : `${count} Peças`}
                     </option>
                   ))}
                 </select>
@@ -6935,7 +6990,7 @@ function PublicacoesIaPageContent() {
               <Sparkles className="h-5 w-5" />
             )}
             {generateForm.sequenceCount > 1
-              ? `Gerar ${generateForm.sequenceCount} pecas com IA`
+              ? `Gerar ${generateForm.sequenceCount} Peças com IA`
               : "Gerar com IA"}
           </button>
         </div>
@@ -7023,9 +7078,24 @@ function PublicacoesIaPageContent() {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row">
-          <div className="w-full border-b border-slate-100 lg:h-[760px] lg:w-[360px] lg:border-b-0 lg:border-r">
-            <div className="max-h-[420px] overflow-y-auto lg:h-full lg:max-h-none">
+        <div className="border-t border-slate-100 bg-slate-50/40 p-4 sm:p-6">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              Clique em uma publicacao para abrir os detalhes em modal sem apertar a listagem.
+            </p>
+            {selectedPost ? (
+              <button
+                type="button"
+                onClick={() => setIsPostDetailModalOpen(true)}
+                className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Revisar selecionada
+              </button>
+            ) : null}
+          </div>
+
+          <div className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white">
+            <div className="max-h-[720px] overflow-y-auto">
               {isLoadingPosts ? (
                 <div className="flex justify-center p-10">
                   <Loader2 className="h-7 w-7 animate-spin text-primary-500" />
@@ -7116,7 +7186,7 @@ function PublicacoesIaPageContent() {
             </div>
           </div>
 
-          <div className="hidden min-w-0 flex-1 bg-slate-50/50 p-6 lg:block">
+          {/*
             {selectedPost ? (
               <div className="space-y-6">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -7833,13 +7903,12 @@ function PublicacoesIaPageContent() {
                 </div>
               </div>
             )}
-          </div>
+          */}
         </div>
 
         <DashboardDialog
           open={
             activeSection === "library" &&
-            isMobileViewport &&
             isPostDetailModalOpen &&
             Boolean(selectedPost)
           }
