@@ -7039,42 +7039,52 @@ function PublicacoesIaPageContent() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {modeFilters.map((filter) => (
-              <button
-                key={filter.label}
-                type="button"
-                onClick={() => {
-                  setModeFilter(filter.value);
-                  setLibraryPage(1);
-                }}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                  modeFilter === filter.value
-                    ? "border-primary-200 bg-primary-50 text-primary-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Modo
+              </span>
+              {modeFilters.map((filter) => (
+                <button
+                  key={filter.label}
+                  type="button"
+                  onClick={() => {
+                    setModeFilter(filter.value);
+                    setLibraryPage(1);
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                    modeFilter === filter.value
+                      ? "border-primary-200 bg-primary-50 text-primary-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
 
-            {postTypeFilters.map((filter) => (
-              <button
-                key={filter.label}
-                type="button"
-                onClick={() => {
-                  setPostTypeFilter(filter.value);
-                  setLibraryPage(1);
-                }}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                  postTypeFilter === filter.value
-                    ? "border-primary-200 bg-primary-50 text-primary-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Formato
+              </span>
+              {postTypeFilters.map((filter) => (
+                <button
+                  key={filter.label}
+                  type="button"
+                  onClick={() => {
+                    setPostTypeFilter(filter.value);
+                    setLibraryPage(1);
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                    postTypeFilter === filter.value
+                      ? "border-primary-200 bg-primary-50 text-primary-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
