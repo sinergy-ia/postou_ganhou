@@ -160,6 +160,57 @@ type FieldSuggestion = {
   value: string;
 };
 
+type AiBriefingChatField =
+  | "prompt"
+  | "topic"
+  | "targetAudience"
+  | "callToAction"
+  | "briefing"
+  | "imagePrompt"
+  | "videoPrompt"
+  | "visualStyle"
+  | "negativePrompt"
+  | "storyOutline"
+  | "storyBeats";
+
+type AiBriefingChatRole = "assistant" | "user";
+
+type AiBriefingChatMessage = {
+  id: string;
+  role: AiBriefingChatRole;
+  content: string;
+  field: AiBriefingChatField | null;
+};
+
+type AiBriefingConversationValues = {
+  prompt: string;
+  topic: string;
+  targetAudience: string;
+  callToAction: string;
+  briefing: string;
+  imagePrompt: string;
+  videoPrompt: string;
+  visualStyle: string;
+  negativePrompt: string;
+  storyOutline: string;
+  storyBeats: string;
+  hasUserMessages: boolean;
+};
+
+type AiBriefingFlowContext = {
+  generateImage: boolean;
+  generateVideo: boolean;
+  isSequentialVideo: boolean;
+  postType: AiPostType;
+};
+
+type AiBriefingTimelineStep = {
+  field: AiBriefingChatField;
+  title: string;
+  helper: string;
+  optional?: boolean;
+};
+
 type VisualPreset = {
   label: string;
   visualStyle: string;
@@ -652,6 +703,30 @@ const NEGATIVE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   },
 ];
 
+const STORY_OUTLINE_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "Produto para oferta",
+    value:
+      "abrir com apresentacao do contexto, mostrar o produto ou servico em destaque, reforcar o principal beneficio e fechar com CTA",
+  },
+  {
+    label: "Bastidor premium",
+    value:
+      "abrir com ambiente ou bastidor, evoluir para detalhes do processo, revelar o resultado final e encerrar com clima aspiracional",
+  },
+];
+
+const STORY_BEATS_SUGGESTIONS: FieldSuggestion[] = [
+  {
+    label: "3 beats",
+    value: "abertura com contexto\nbeneficio ou transformacao\nfechamento com CTA",
+  },
+  {
+    label: "4 beats",
+    value: "gancho inicial\napresentacao do processo\nresultado final\nCTA de fechamento",
+  },
+];
+
 const PROMPT_PLACEHOLDER =
   "Ex: crie uma publicacao premium para divulgar um combo especial, com beneficio claro, valor percebido alto e CTA para WhatsApp";
 
@@ -1102,25 +1177,742 @@ function SuggestionButtons({
   suggestions,
   onSelect,
   disabled = false,
+  activeValue,
 }: {
   suggestions: FieldSuggestion[];
   onSelect: (value: string) => void;
   disabled?: boolean;
+  activeValue?: string;
 }) {
   return (
     <div className="mb-2 flex flex-wrap gap-2">
-      {suggestions.map((suggestion) => (
-        <button
-          key={`${suggestion.label}-${suggestion.value}`}
-          type="button"
-          onClick={() => onSelect(suggestion.value)}
-          disabled={disabled}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-        >
-          {suggestion.label}
-        </button>
-      ))}
+      {suggestions.map((suggestion) => {
+        const isActive =
+          Boolean(activeValue) &&
+          normalizeChatSuggestionValue(activeValue || "") ===
+            normalizeChatSuggestionValue(suggestion.value);
+
+        return (
+          <button
+            key={`${suggestion.label}-${suggestion.value}`}
+            type="button"
+            onClick={() => onSelect(suggestion.value)}
+            disabled={disabled || isActive}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              isActive
+                ? "border-primary-300 bg-primary-50 text-primary-700"
+                : "border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+            } disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400`}
+          >
+            {suggestion.label}
+          </button>
+        );
+      })}
     </div>
+  );
+}
+
+function AssistantPanel({
+  title,
+  assistantMessage,
+  children,
+  helper,
+}: {
+  title: string;
+  assistantMessage: string;
+  children: React.ReactNode;
+  helper?: string;
+}) {
+  return (
+    <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+        <MessageCircle className="h-4 w-4 text-primary-600" />
+        {title}
+      </div>
+      <div className="mt-3 flex justify-start">
+        <div className="max-w-[92%] rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+          {assistantMessage}
+        </div>
+      </div>
+      <div className="mt-4">{children}</div>
+      {helper ? <p className="mt-3 text-xs text-slate-500">{helper}</p> : null}
+    </div>
+  );
+}
+
+function AssistantTextareaField({
+  title,
+  assistantMessage,
+  suggestions,
+  onSuggestionSelect,
+  value,
+  onChange,
+  placeholder,
+  helper,
+  disabled = false,
+  rows = 2,
+}: {
+  title: string;
+  assistantMessage: string;
+  suggestions?: FieldSuggestion[];
+  onSuggestionSelect?: (value: string) => void;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  helper?: string;
+  disabled?: boolean;
+  rows?: number;
+}) {
+  return (
+    <AssistantPanel title={title} assistantMessage={assistantMessage} helper={helper}>
+      {Array.isArray(suggestions) && suggestions.length > 0 && onSuggestionSelect ? (
+        <div className="mb-3">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Atalhos do assistente
+          </div>
+          <SuggestionButtons
+            suggestions={suggestions}
+            onSelect={onSuggestionSelect}
+            disabled={disabled}
+            activeValue={value}
+          />
+        </div>
+      ) : null}
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        Sua orientacao
+      </div>
+      <textarea
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+      />
+    </AssistantPanel>
+  );
+}
+
+function getVisualStylePresetSuggestions(): FieldSuggestion[] {
+  return VISUAL_STYLE_PRESETS.map((preset) => ({
+    label: preset.label,
+    value: preset.visualStyle,
+  }));
+}
+
+function normalizeChatSuggestionValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function createAiBriefingChatMessage(
+  role: AiBriefingChatRole,
+  content: string,
+  field: AiBriefingChatField | null = null,
+): AiBriefingChatMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    role,
+    content,
+    field,
+  };
+}
+
+function createInitialAiBriefingChatMessages() {
+  return [
+    createAiBriefingChatMessage(
+      "assistant",
+      "Preencha o briefing por etapas para definir objetivo, formato, direcao visual e detalhes complementares da peca.",
+      "prompt",
+    ),
+  ];
+}
+
+function getAiBriefingFieldLabel(field: AiBriefingChatField | null) {
+  switch (field) {
+    case "prompt":
+      return "Objetivo";
+    case "topic":
+      return "Tema ou oferta";
+    case "targetAudience":
+      return "Publico";
+    case "callToAction":
+      return "CTA";
+    case "imagePrompt":
+      return "Direcao da imagem";
+    case "videoPrompt":
+      return "Direcao do video";
+    case "visualStyle":
+      return "Estilo visual";
+    case "negativePrompt":
+      return "O que evitar";
+    case "storyOutline":
+      return "Historia";
+    case "storyBeats":
+      return "Beats";
+    case "briefing":
+      return "Detalhes extras";
+    default:
+      return "Briefing";
+  }
+}
+
+function getAiBriefingTimelineSteps(
+  context: AiBriefingFlowContext,
+): AiBriefingTimelineStep[] {
+  const steps: AiBriefingTimelineStep[] = [
+    {
+      field: "prompt",
+      title: "Objetivo da peca",
+      helper: "O que a publicacao precisa divulgar, vender ou movimentar agora.",
+    },
+    {
+      field: "topic",
+      title: "Tema ou oferta",
+      helper: "Produto, servico, campanha ou assunto principal da peca.",
+    },
+    {
+      field: "targetAudience",
+      title: "Publico principal",
+      helper: "Quem precisa se identificar com a mensagem primeiro.",
+    },
+    {
+      field: "callToAction",
+      title: "Acao esperada",
+      helper: "O que a pessoa deve fazer depois de ver a publicacao.",
+    },
+  ];
+
+  if (context.generateImage) {
+    steps.push({
+      field: "imagePrompt",
+      title: "Direcao da imagem",
+      helper: "Cena, composicao, destaque de produto e sensacao visual.",
+    });
+  }
+
+  if (context.generateVideo) {
+    steps.push({
+      field: "videoPrompt",
+      title: "Direcao do video",
+      helper: "Movimento, camera, ambiente, ritmo e impacto da cena.",
+    });
+  }
+
+  steps.push(
+    {
+      field: "visualStyle",
+      title: "Estilo visual",
+      helper: "Luz, materiais, enquadramento, cores e nivel de sofisticacao.",
+    },
+    {
+      field: "negativePrompt",
+      title: "O que evitar",
+      helper: "Ruido visual, deformacoes, excesso de texto ou cara de panfleto.",
+    },
+  );
+
+  if (context.isSequentialVideo) {
+    steps.push(
+      {
+        field: "storyOutline",
+        title: "Historia do video",
+        helper: "Linha narrativa do inicio ao fim do video longo.",
+      },
+      {
+        field: "storyBeats",
+        title: "Beats obrigatorios",
+        helper: "Cenas-chave em ordem para montar a sequencia.",
+      },
+    );
+  }
+
+  steps.push({
+    field: "briefing",
+    title: "Detalhes extras",
+    helper: "Provas, restricoes ou contexto adicional. Opcional.",
+    optional: true,
+  });
+
+  return steps;
+}
+
+function buildAiBriefingConversationValues(
+  messages: AiBriefingChatMessage[],
+): AiBriefingConversationValues {
+  const userMessages = messages.filter((message) => message.role === "user");
+  const promptMessages = userMessages
+    .filter((message) => message.field === "prompt")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const topicMessages = userMessages
+    .filter((message) => message.field === "topic")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const targetAudienceMessages = userMessages
+    .filter((message) => message.field === "targetAudience")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const callToActionMessages = userMessages
+    .filter((message) => message.field === "callToAction")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const briefingMessages = userMessages
+    .filter((message) => message.field === "briefing")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const imagePromptMessages = userMessages
+    .filter((message) => message.field === "imagePrompt")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const videoPromptMessages = userMessages
+    .filter((message) => message.field === "videoPrompt")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const visualStyleMessages = userMessages
+    .filter((message) => message.field === "visualStyle")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const negativePromptMessages = userMessages
+    .filter((message) => message.field === "negativePrompt")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const storyOutlineMessages = userMessages
+    .filter((message) => message.field === "storyOutline")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const storyBeatsMessages = userMessages
+    .filter((message) => message.field === "storyBeats")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const prompt = (promptMessages[promptMessages.length - 1] || "").trim();
+  const topic = (topicMessages[topicMessages.length - 1] || "").trim();
+  const targetAudience = (targetAudienceMessages[targetAudienceMessages.length - 1] || "").trim();
+  const callToAction = (callToActionMessages[callToActionMessages.length - 1] || "").trim();
+  const imagePrompt = (imagePromptMessages[imagePromptMessages.length - 1] || "").trim();
+  const videoPrompt = (videoPromptMessages[videoPromptMessages.length - 1] || "").trim();
+  const visualStyle = (visualStyleMessages[visualStyleMessages.length - 1] || "").trim();
+  const negativePrompt = (negativePromptMessages[negativePromptMessages.length - 1] || "").trim();
+  const storyOutline = (storyOutlineMessages[storyOutlineMessages.length - 1] || "").trim();
+  const storyBeats = (storyBeatsMessages[storyBeatsMessages.length - 1] || "").trim();
+  const promptSummary = [
+    prompt,
+    topic ? `Tema/oferta principal: ${topic}.` : "",
+    targetAudience ? `Publico principal: ${targetAudience}.` : "",
+    callToAction ? `CTA esperado: ${callToAction}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+  const conversationHistory = userMessages
+    .map((message) => {
+      const label =
+        message.field === "topic"
+          ? "Tema/oferta"
+          : message.field === "targetAudience"
+            ? "Publico"
+            : message.field === "callToAction"
+              ? "CTA"
+              : message.field === "imagePrompt"
+                ? "Direcao da imagem"
+                : message.field === "videoPrompt"
+                  ? "Direcao do video"
+                  : message.field === "visualStyle"
+                    ? "Estilo visual"
+                    : message.field === "negativePrompt"
+                      ? "Evitar"
+                      : message.field === "storyOutline"
+                        ? "Historia do video longo"
+                        : message.field === "storyBeats"
+                          ? "Beats do video longo"
+              : message.field === "briefing"
+                ? "Detalhe extra"
+                : "Objetivo";
+
+      return `- ${label}: ${message.content.trim()}`;
+    })
+    .filter(Boolean);
+  const briefing = [
+    briefingMessages.length > 0
+      ? `Detalhes extras:\n${briefingMessages.map((item) => `- ${item}`).join("\n")}`
+      : "",
+    conversationHistory.length > 0
+      ? `Historico do briefing:\n${conversationHistory.join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  return {
+    prompt: promptSummary || prompt,
+    topic,
+    targetAudience,
+    callToAction,
+    briefing,
+    imagePrompt,
+    videoPrompt,
+    visualStyle,
+    negativePrompt,
+    storyOutline,
+    storyBeats,
+    hasUserMessages: userMessages.length > 0,
+  };
+}
+
+function getNextAiBriefingChatField(
+  values: AiBriefingConversationValues,
+  context: AiBriefingFlowContext,
+): AiBriefingChatField | null {
+  if (!values.prompt.trim()) {
+    return "prompt";
+  }
+
+  if (!values.topic.trim()) {
+    return "topic";
+  }
+
+  if (!values.targetAudience.trim()) {
+    return "targetAudience";
+  }
+
+  if (!values.callToAction.trim()) {
+    return "callToAction";
+  }
+
+  if (context.generateImage && !values.imagePrompt.trim()) {
+    return "imagePrompt";
+  }
+
+  if (context.generateVideo && !values.videoPrompt.trim()) {
+    return "videoPrompt";
+  }
+
+  if (!values.visualStyle.trim()) {
+    return "visualStyle";
+  }
+
+  if (!values.negativePrompt.trim()) {
+    return "negativePrompt";
+  }
+
+  if (context.isSequentialVideo && !values.storyOutline.trim()) {
+    return "storyOutline";
+  }
+
+  if (context.isSequentialVideo && !values.storyBeats.trim()) {
+    return "storyBeats";
+  }
+
+  return null;
+}
+
+function buildAiBriefingAssistantMessage(
+  field: AiBriefingChatField | null,
+  context: AiBriefingFlowContext,
+) {
+  switch (field) {
+    case "prompt":
+      return "Defina o objetivo principal da publicacao: o que precisa ser divulgado, vendido ou movimentado agora.";
+    case "topic":
+      return "Informe o tema, oferta, servico ou produto principal que essa publicacao precisa destacar.";
+    case "targetAudience":
+      return "Descreva para quem essa publicacao deve falar primeiro.";
+    case "callToAction":
+      return "Defina qual acao a pessoa deve tomar depois de ver a publicacao.";
+    case "imagePrompt":
+      return "Descreva a direcao da imagem: o que precisa aparecer, qual sensacao ela deve passar e que tipo de cena combina com a oferta.";
+    case "videoPrompt":
+      return "Descreva a direcao do video: cena, movimento de camera, ritmo, ambiente e o que precisa acontecer para vender bem a ideia.";
+    case "visualStyle":
+      return "Defina o estilo visual da peca. Vale falar de luz, enquadramento, materiais, cores e nivel de sofisticacao.";
+    case "negativePrompt":
+      return "Liste o que deve ser evitado no resultado, como excesso de texto, cara de panfleto, deformacoes ou poluicao visual.";
+    case "storyOutline":
+      return "Resuma como a historia do video longo deve evoluir do comeco ao fim.";
+    case "storyBeats":
+      return "Liste os beats ou cenas obrigatorias do video longo, um por linha, para organizar a sequencia.";
+    case "briefing":
+      return "Adicione detalhes extras de tom, prova, restricoes ou referencias antes de gerar. Esta etapa e opcional.";
+    default:
+      return context.generateVideo
+        ? "O briefing, a direcao do video e o estilo ja estao definidos. Revise qualquer etapa ou siga para Gerar com IA."
+        : "O briefing, a direcao da imagem e o estilo ja estao definidos. Revise qualquer etapa ou siga para Gerar com IA.";
+  }
+}
+
+function getAiBriefingSuggestions(
+  field: AiBriefingChatField | null,
+  context: Pick<AiBriefingFlowContext, "postType">,
+) {
+  switch (field) {
+    case "topic":
+      return TOPIC_SUGGESTIONS;
+    case "targetAudience":
+      return TARGET_AUDIENCE_SUGGESTIONS;
+    case "callToAction":
+      return CTA_SUGGESTIONS;
+    case "imagePrompt":
+      return getImagePromptSuggestions(context.postType);
+    case "videoPrompt":
+      return getVideoPromptSuggestions(context.postType);
+    case "visualStyle":
+      return getVisualStylePresetSuggestions();
+    case "negativePrompt":
+      return NEGATIVE_PROMPT_SUGGESTIONS;
+    case "storyOutline":
+      return STORY_OUTLINE_SUGGESTIONS;
+    case "storyBeats":
+      return STORY_BEATS_SUGGESTIONS;
+    case "briefing":
+      return BRIEFING_SUGGESTIONS;
+    case "prompt":
+    default:
+      return PROMPT_SUGGESTIONS;
+  }
+}
+
+function getAiBriefingInputPlaceholder(
+  field: AiBriefingChatField | null,
+  context: AiBriefingFlowContext,
+) {
+  switch (field) {
+    case "prompt":
+      return PROMPT_PLACEHOLDER;
+    case "topic":
+      return "Ex: combo executivo, consulta inicial, tratamento premium, campanha de aniversario...";
+    case "targetAudience":
+      return "Ex: mulheres da regiao buscando praticidade e resultado rapido...";
+    case "callToAction":
+      return "Ex: chamar no WhatsApp agora, agendar pelo direct, clicar no link da bio...";
+    case "imagePrompt":
+      return IMAGE_PROMPT_PLACEHOLDERS[context.postType];
+    case "videoPrompt":
+      return VIDEO_PROMPT_PLACEHOLDERS[context.postType];
+    case "visualStyle":
+      return VISUAL_STYLE_PLACEHOLDERS[context.postType];
+    case "negativePrompt":
+      return NEGATIVE_PROMPT_PLACEHOLDER;
+    case "storyOutline":
+      return "Ex: abrir com ambiente, mostrar o processo, revelar o resultado e fechar com CTA.";
+    case "storyBeats":
+      return "gancho inicial\nprova ou processo\nresultado final\nCTA";
+    case "briefing":
+    default:
+      return context.isSequentialVideo
+        ? "Adicione detalhes extras ou ajuste algo com prefixos como `video:`, `visual:`, `evitar:`, `historia:` e `beats:`."
+        : "Adicione qualquer detalhe extra de tom, prova, restricao, oferta ou referencia. Se quiser corrigir algo, use prefixos como `tema:`, `imagem:`, `video:` ou `visual:`.";
+  }
+}
+
+function getLatestAiBriefingUserContent(
+  messages: AiBriefingChatMessage[],
+  field: AiBriefingChatField | null,
+) {
+  if (!field) {
+    return "";
+  }
+
+  return (
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "user" && message.field === field)
+      ?.content.trim() || ""
+  );
+}
+
+function rebuildAiBriefingChatMessages(
+  userMessages: AiBriefingChatMessage[],
+  context: AiBriefingFlowContext,
+) {
+  const nextMessages = createInitialAiBriefingChatMessages();
+
+  userMessages
+    .filter((message) => message.role === "user")
+    .map((message) => ({
+      ...message,
+      content: message.content.trim(),
+    }))
+    .filter((message) => message.content)
+    .forEach((message) => {
+      const currentValues = buildAiBriefingConversationValues(nextMessages);
+      const resolvedField =
+        message.field ||
+        getNextAiBriefingChatField(currentValues, context) ||
+        "briefing";
+      const userMessage: AiBriefingChatMessage = {
+        ...message,
+        field: resolvedField,
+      };
+
+      nextMessages.push(userMessage);
+
+      const nextValues = buildAiBriefingConversationValues(nextMessages);
+      const nextField = getNextAiBriefingChatField(nextValues, context);
+
+      nextMessages.push(
+        createAiBriefingChatMessage(
+          "assistant",
+          buildAiBriefingAssistantMessage(nextField, context),
+          nextField || null,
+        ),
+      );
+    });
+
+  return nextMessages;
+}
+
+function AiBriefingTimelineEditor({
+  step,
+  context,
+  currentValue,
+  suggestions,
+  disabled,
+  isCurrentStep,
+  onClose,
+  onSubmit,
+  onClear,
+}: {
+  step: AiBriefingTimelineStep | null;
+  context: AiBriefingFlowContext;
+  currentValue: string;
+  suggestions: FieldSuggestion[];
+  disabled: boolean;
+  isCurrentStep: boolean;
+  onClose: () => void;
+  onSubmit: (value: string, field: AiBriefingChatField) => void;
+  onClear: (field: AiBriefingChatField) => void;
+}) {
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [draftValue, setDraftValue] = useState(currentValue);
+
+  useEffect(() => {
+    if (!step?.field) {
+      return;
+    }
+
+    inputRef.current?.focus();
+  }, [step?.field]);
+
+  if (!step) {
+    return (
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <div className="text-sm font-bold text-emerald-950">Linha do tempo concluida</div>
+        <p className="mt-2 text-sm leading-6 text-emerald-900">
+          O briefing base ja esta pronto. Se quiser, selecione qualquer etapa da linha do
+          tempo para revisar ou siga direto com Gerar com IA.
+        </p>
+      </div>
+    );
+  }
+
+  const normalizedDraftValue = draftValue.trim();
+  const hasChanged =
+    normalizeChatSuggestionValue(normalizedDraftValue) !==
+    normalizeChatSuggestionValue(currentValue);
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {isCurrentStep ? "Etapa atual" : "Revisao de etapa"}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={disabled}
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <X className="h-3.5 w-3.5" />
+          Fechar edicao
+        </button>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-lg font-bold text-slate-900">{step.title}</div>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          {buildAiBriefingAssistantMessage(step.field, context)}
+        </p>
+      </div>
+
+      {currentValue ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Resposta atual
+          </div>
+          <div className="mt-2 whitespace-pre-line text-sm text-slate-800">{currentValue}</div>
+        </div>
+      ) : null}
+
+      {suggestions.length > 0 ? (
+        <div className="mt-4">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Sugestoes de preenchimento
+          </div>
+          <SuggestionButtons
+            suggestions={suggestions}
+            onSelect={(value) => setDraftValue(value)}
+            disabled={disabled}
+            activeValue={draftValue || currentValue}
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          Conteudo da etapa
+        </div>
+        <textarea
+          ref={inputRef}
+          rows={4}
+          value={draftValue}
+          onChange={(event) => setDraftValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+
+              if (normalizedDraftValue) {
+                onSubmit(normalizedDraftValue, step.field);
+              }
+            }
+          }}
+          placeholder={getAiBriefingInputPlaceholder(step.field, context)}
+          disabled={disabled}
+          className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => onSubmit(normalizedDraftValue, step.field)}
+          disabled={disabled || !normalizedDraftValue || !hasChanged}
+          className="inline-flex items-center justify-center gap-2 rounded-3xl bg-slate-900 px-5 py-3 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Send className="h-4 w-4" />
+          {isCurrentStep ? "Salvar e continuar" : "Salvar etapa"}
+        </button>
+
+        {currentValue ? (
+          <button
+            type="button"
+            onClick={() => onClear(step.field)}
+            disabled={disabled}
+            className="inline-flex items-center justify-center rounded-3xl border border-rose-200 bg-rose-50 px-5 py-3 font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Limpar esta etapa
+          </button>
+        ) : step.optional ? (
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={disabled}
+            className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Deixar para depois
+          </button>
+        ) : null}
+      </div>
+    </>
   );
 }
 
@@ -1389,6 +2181,7 @@ function DirectionVisualSection({
   storyBeats,
   quickReferenceOptions,
   isImportingReferenceFiles = false,
+  hideTextControls = false,
   disabled = false,
 }: {
   postType: AiPostType;
@@ -1422,6 +2215,7 @@ function DirectionVisualSection({
   storyBeats: string;
   quickReferenceOptions: ReferenceQuickOption[];
   isImportingReferenceFiles?: boolean;
+  hideTextControls?: boolean;
   disabled?: boolean;
 }) {
   const isSequentialMode = isSequentialVideoMode(continuityMode, generateVideo);
@@ -1450,54 +2244,56 @@ function DirectionVisualSection({
         isImporting={isImportingReferenceFiles}
       />
 
-      <div className="mt-5">
-        <label className="mb-1.5 block text-sm font-bold text-slate-700">
-          Presets rapidos por nicho
-        </label>
-        <VisualPresetButtons
-          presets={VISUAL_STYLE_PRESETS}
-          onSelect={onApplyPreset}
-          disabled={disabled}
-        />
-      </div>
+      {!hideTextControls ? (
+        <div className="mt-5">
+        <AssistantPanel
+          title="Assistente de direcao visual"
+          assistantMessage="Posso comecar por um preset rapido do nicho e voce ajusta os detalhes depois. Isso ajuda a IA a sair de um ponto de partida mais coerente."
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Presets sugeridos
+          </div>
+          <div className="mt-2">
+            <VisualPresetButtons
+              presets={VISUAL_STYLE_PRESETS}
+              onSelect={onApplyPreset}
+              disabled={disabled}
+            />
+          </div>
+        </AssistantPanel>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {!hideTextControls ? (
+          <>
         <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-bold text-slate-700">
-            Estilo visual desejado
-          </label>
-          <textarea
-            rows={2}
+          <AssistantTextareaField
+            title="Assistente do estilo visual"
+            assistantMessage="Descreva o clima visual que voce quer ver no resultado: composicao, luz, materiais, enquadramento e nivel de sofisticaçao."
             value={visualStyle}
-            onChange={(event) => onVisualStyleChange(event.target.value)}
+            onChange={onVisualStyleChange}
             disabled={disabled}
             placeholder={VISUAL_STYLE_PLACEHOLDERS[postType]}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            helper={getVisualStyleHelper(postType)}
           />
-          <p className="mt-2 text-xs text-slate-500">{getVisualStyleHelper(postType)}</p>
         </div>
 
         <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-bold text-slate-700">
-            O que evitar na geracao
-          </label>
-          <SuggestionButtons
+          <AssistantTextareaField
+            title="Assistente de restricoes visuais"
+            assistantMessage="Se quiser, me diga o que precisa ser evitado no render: texto ruim, excesso de elementos, deformacoes, cara de panfleto ou qualquer ruido que atrapalhe a peca."
             suggestions={NEGATIVE_PROMPT_SUGGESTIONS}
-            onSelect={onNegativePromptChange}
-            disabled={disabled}
-          />
-          <textarea
-            rows={2}
+            onSuggestionSelect={onNegativePromptChange}
             value={negativePrompt}
-            onChange={(event) => onNegativePromptChange(event.target.value)}
+            onChange={onNegativePromptChange}
             disabled={disabled}
             placeholder={NEGATIVE_PROMPT_PLACEHOLDER}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            helper="Use este campo para cortar artefatos comuns como texto ruim, deformacoes, poluicao visual e baixa nitidez."
           />
-          <p className="mt-2 text-xs text-slate-500">
-            Use este campo para cortar artefatos comuns como texto ruim, deformacoes, poluicao visual e baixa nitidez.
-          </p>
         </div>
+          </>
+        ) : null}
 
         <div>
           <label className="mb-1.5 block text-sm font-bold text-slate-700">
@@ -1616,39 +2412,48 @@ function DirectionVisualSection({
               </div>
             </div>
 
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                Historia resumida
-              </label>
-              <textarea
-                rows={2}
-                value={storyOutline}
-                onChange={(event) => onStoryOutlineChange(event.target.value)}
-                disabled={disabled}
-                placeholder="Ex: abrir com ambiente, mostrar preparo do prato, revelar hero shot e fechar com clima premium"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Resuma a progressao da historia em uma frase clara. Isso ajuda a manter inicio, meio e fim entre os segmentos.
-              </p>
-            </div>
+            {!hideTextControls ? (
+              <>
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Historia resumida
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={storyOutline}
+                    onChange={(event) => onStoryOutlineChange(event.target.value)}
+                    disabled={disabled}
+                    placeholder="Ex: abrir com ambiente, mostrar preparo do prato, revelar hero shot e fechar com clima premium"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Resuma a progressao da historia em uma frase clara. Isso ajuda a manter inicio, meio e fim entre os segmentos.
+                  </p>
+                </div>
 
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                Beats e cenas obrigatorias
-              </label>
-              <textarea
-                rows={4}
-                value={storyBeats}
-                onChange={(event) => onStoryBeatsChange(event.target.value)}
-                disabled={disabled}
-                placeholder={"ambiente e chegada\npreparo final do prato\nclose hero do prato\nencerramento aspiracional"}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Use uma linha por beat. A ordem informada orienta a sequencia narrativa dos segmentos.
-              </p>
-            </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    Beats e cenas obrigatorias
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={storyBeats}
+                    onChange={(event) => onStoryBeatsChange(event.target.value)}
+                    disabled={disabled}
+                    placeholder={"ambiente e chegada\npreparo final do prato\nclose hero do prato\nencerramento aspiracional"}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Use uma linha por beat. A ordem informada orienta a sequencia narrativa dos segmentos.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                A narrativa do video longo esta sendo definida no chat acima. Se quiser ajustar,
+                use os prefixos `historia:` e `beats:`.
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -2566,6 +3371,11 @@ function PublicacoesIaPageContent() {
   const toastTimeoutByIdRef = useRef<Record<string, number>>({});
   const handledAsyncTerminalStatusRef = useRef<Record<string, true>>({});
   const [generateForm, setGenerateForm] = useState<GenerateFormState>(defaultGenerateForm);
+  const [generateBriefingChatMessages, setGenerateBriefingChatMessages] = useState<
+    AiBriefingChatMessage[]
+  >(() => createInitialAiBriefingChatMessages());
+  const [generateBriefingFocusedField, setGenerateBriefingFocusedField] =
+    useState<AiBriefingChatField | null>(null);
   const [draftState, setDraftState] = useState<DraftState>(createEmptyDraftState());
   const [generateReferencePreviewUrlByReference, setGenerateReferencePreviewUrlByReference] =
     useState<Record<string, string>>({});
@@ -2819,6 +3629,10 @@ function PublicacoesIaPageContent() {
     generateForm.generateVideo,
     generateForm.referenceImageUrls,
   );
+  const isGenerateSequentialMode = isSequentialVideoMode(
+    generateForm.continuityMode,
+    generateForm.generateVideo,
+  );
   const isCurrentDraftVideoReferenceMode = hasVideoReferenceImages(
     currentDraft.generateVideo,
     currentDraft.referenceImageUrls,
@@ -2841,6 +3655,58 @@ function PublicacoesIaPageContent() {
   ).length;
   const asyncPublishingCount = trackedAsyncGenerationJobs.filter(
     (job) => normalizeAiPostStatus(job.status) === "PUBLISHING",
+  ).length;
+  const generateBriefingValues = useMemo(
+    () => buildAiBriefingConversationValues(generateBriefingChatMessages),
+    [generateBriefingChatMessages],
+  );
+  const generateBriefingContext = useMemo<AiBriefingFlowContext>(
+    () => ({
+      generateImage: generateForm.generateImage,
+      generateVideo: generateForm.generateVideo,
+      isSequentialVideo: isGenerateSequentialMode,
+      postType: generateForm.postType,
+    }),
+    [
+      generateForm.generateImage,
+      generateForm.generateVideo,
+      generateForm.postType,
+      isGenerateSequentialMode,
+    ],
+  );
+  const nextGenerateBriefingField = useMemo(
+    () => getNextAiBriefingChatField(generateBriefingValues, generateBriefingContext),
+    [generateBriefingContext, generateBriefingValues],
+  );
+  const generateBriefingTimelineSteps = useMemo(
+    () => getAiBriefingTimelineSteps(generateBriefingContext),
+    [generateBriefingContext],
+  );
+  const activeGenerateBriefingField =
+    generateBriefingFocusedField || nextGenerateBriefingField || null;
+  const activeGenerateBriefingStep =
+    generateBriefingTimelineSteps.find((step) => step.field === activeGenerateBriefingField) ||
+    null;
+  const generateBriefingActionSuggestions = useMemo(
+    () =>
+      activeGenerateBriefingField
+        ? getAiBriefingSuggestions(activeGenerateBriefingField, {
+            postType: generateBriefingContext.postType,
+          })
+        : [],
+    [activeGenerateBriefingField, generateBriefingContext.postType],
+  );
+  const generateBriefingCurrentFieldValue = activeGenerateBriefingField
+    ? getLatestAiBriefingUserContent(
+        generateBriefingChatMessages,
+        activeGenerateBriefingField,
+      )
+    : "";
+  const generateBriefingCompletedRequiredSteps = generateBriefingTimelineSteps.filter(
+    (step) => !step.optional && getLatestAiBriefingUserContent(generateBriefingChatMessages, step.field),
+  ).length;
+  const generateBriefingRequiredStepCount = generateBriefingTimelineSteps.filter(
+    (step) => !step.optional,
   ).length;
   const previewAccountLabel =
     String(me?.instagramHandle || me?.slug || me?.name || "seu_negocio")
@@ -2868,9 +3734,9 @@ function PublicacoesIaPageContent() {
     hashtags: currentDraft.hashtags,
   });
   const generatePreviewCaption = buildPreviewCaptionText({
-    prompt: generateForm.prompt,
-    topic: generateForm.topic,
-    callToAction: generateForm.callToAction,
+    prompt: generateBriefingValues.prompt,
+    topic: generateBriefingValues.topic,
+    callToAction: generateBriefingValues.callToAction,
   });
   const generatePreviewMediaUrl =
     generateReferencePreviewUrlByReference[generateForm.referenceImageUrls[0] || ""] ||
@@ -2889,6 +3755,83 @@ function PublicacoesIaPageContent() {
       });
     });
   };
+
+  const resetGenerateBriefingChat = useCallback(() => {
+    setGenerateBriefingChatMessages(createInitialAiBriefingChatMessages());
+    setGenerateBriefingFocusedField(null);
+  }, []);
+
+  const selectGenerateBriefingTimelineStep = useCallback(
+    (field: AiBriefingChatField) => {
+      setGenerateBriefingFocusedField(field);
+    },
+    [],
+  );
+
+  const clearGenerateBriefingTimelineStep = useCallback(
+    (field: AiBriefingChatField) => {
+      setGenerateBriefingChatMessages((current) => {
+        const nextUserMessages = current.filter(
+          (message) => !(message.role === "user" && message.field === field),
+        );
+
+        return rebuildAiBriefingChatMessages(nextUserMessages, generateBriefingContext);
+      });
+
+      setGenerateBriefingFocusedField(field);
+    },
+    [generateBriefingContext],
+  );
+
+  const submitGenerateBriefingChatMessage = useCallback(
+    (rawValue: string, forcedField?: AiBriefingChatField | null) => {
+      const normalizedValue = rawValue.trim();
+
+      if (!normalizedValue) {
+        return;
+      }
+
+      const currentField =
+        forcedField ||
+        generateBriefingFocusedField ||
+        nextGenerateBriefingField ||
+        "prompt";
+      const currentFieldValue = getLatestAiBriefingUserContent(
+        generateBriefingChatMessages,
+        currentField,
+      );
+      const isDuplicateLatestValue =
+        normalizeChatSuggestionValue(currentFieldValue) ===
+        normalizeChatSuggestionValue(normalizedValue);
+
+      if (isDuplicateLatestValue) {
+        return;
+      }
+
+      const currentUserMessages = generateBriefingChatMessages.filter(
+        (message) => message.role === "user" && message.field !== currentField,
+      );
+      const nextUserMessages = [
+        ...currentUserMessages,
+        createAiBriefingChatMessage("user", normalizedValue, currentField),
+      ];
+      const nextMessages = rebuildAiBriefingChatMessages(
+        nextUserMessages,
+        generateBriefingContext,
+      );
+      const nextValues = buildAiBriefingConversationValues(nextMessages);
+      const nextField = getNextAiBriefingChatField(nextValues, generateBriefingContext);
+
+      setGenerateBriefingChatMessages(nextMessages);
+      setGenerateBriefingFocusedField(nextField);
+    },
+    [
+      generateBriefingContext,
+      generateBriefingChatMessages,
+      generateBriefingFocusedField,
+      nextGenerateBriefingField,
+    ],
+  );
 
   const appendReferenceUrl = (
     currentUrls: string[],
@@ -3481,7 +4424,7 @@ function PublicacoesIaPageContent() {
         generateForm.videoResolution,
         generateForm.continuityMode,
       );
-      const normalizedStoryBeats = parseStoryBeatsInput(generateForm.storyBeats);
+      const normalizedStoryBeats = parseStoryBeatsInput(generateBriefingValues.storyBeats);
       const normalizedSequenceCount = normalizeSequenceCount(generateForm.sequenceCount);
       const normalizedSequenceSteps = parseSequenceStepsInput(generateForm.sequenceSteps);
 
@@ -3520,7 +4463,7 @@ function PublicacoesIaPageContent() {
         throw new Error("Selecione uma campanha para gerar uma publicação vinculada.");
       }
 
-      if (!generateForm.prompt.trim()) {
+      if (!generateBriefingValues.prompt.trim()) {
         throw new Error("Descreva o que a IA deve gerar antes de continuar.");
       }
 
@@ -3557,8 +4500,8 @@ function PublicacoesIaPageContent() {
         throw new Error(videoReferenceValidationMessage);
       }
 
-      if (isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)) {
-        if (!generateForm.storyOutline.trim()) {
+      if (isGenerateSequentialMode) {
+        if (!generateBriefingValues.storyOutline.trim()) {
           throw new Error(
             "Descreva a historia resumida do video longo antes de gerar o modo sequencial.",
           );
@@ -3575,10 +4518,10 @@ function PublicacoesIaPageContent() {
         campaignId:
           generateForm.mode === "CAMPAIGN" ? generateForm.campaignId : undefined,
         postType: generateForm.postType,
-        topic: generateForm.topic.trim() || undefined,
-        briefing: generateForm.briefing.trim() || undefined,
-        targetAudience: generateForm.targetAudience.trim() || undefined,
-        callToAction: generateForm.callToAction.trim() || undefined,
+        topic: generateBriefingValues.topic.trim() || undefined,
+        briefing: generateBriefingValues.briefing.trim() || undefined,
+        targetAudience: generateBriefingValues.targetAudience.trim() || undefined,
+        callToAction: generateBriefingValues.callToAction.trim() || undefined,
         timezone: generateForm.timezone.trim() || DEFAULT_TIMEZONE,
         generateImage: generateForm.generateImage,
         generateVideo: generateForm.generateVideo,
@@ -3589,29 +4532,29 @@ function PublicacoesIaPageContent() {
           generateForm.generateVideo ? normalizedVideoSettings.videoResolution : undefined,
         continuityMode: generateForm.generateVideo ? generateForm.continuityMode : undefined,
         totalDurationSeconds:
-          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)
+          isGenerateSequentialMode
             ? normalizeTotalDurationSeconds(generateForm.totalDurationSeconds)
             : undefined,
-        imagePrompt: generateForm.imagePrompt.trim() || undefined,
+        imagePrompt: generateForm.generateImage
+          ? generateBriefingValues.imagePrompt.trim() || undefined
+          : undefined,
         videoPrompt: generateForm.generateVideo
           ? buildVideoPromptWithLanguage(
-              generateForm.videoPrompt,
+              generateBriefingValues.videoPrompt,
               generateForm.videoLanguage,
             )
           : undefined,
-        visualStyle: generateForm.visualStyle.trim() || undefined,
-        negativePrompt: generateForm.negativePrompt.trim() || undefined,
+        visualStyle: generateBriefingValues.visualStyle.trim() || undefined,
+        negativePrompt: generateBriefingValues.negativePrompt.trim() || undefined,
         referenceImageUrls:
           normalizedReferenceImageUrls.length > 0
             ? normalizedReferenceImageUrls
             : undefined,
-        storyOutline:
-          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo)
-            ? generateForm.storyOutline.trim()
-            : undefined,
+        storyOutline: isGenerateSequentialMode
+          ? generateBriefingValues.storyOutline.trim()
+          : undefined,
         storyBeats:
-          isSequentialVideoMode(generateForm.continuityMode, generateForm.generateVideo) &&
-          normalizedStoryBeats.length > 0
+          isGenerateSequentialMode && normalizedStoryBeats.length > 0
             ? normalizedStoryBeats
             : undefined,
       };
@@ -3626,7 +4569,7 @@ function PublicacoesIaPageContent() {
           const queuedJob = await establishmentApi.generateAiPostAsync({
             ...basePayload,
             prompt: buildSequencePrompt(
-              generateForm.prompt,
+              generateBriefingValues.prompt,
               generateForm.postType,
               index,
               normalizedSequenceCount,
@@ -3715,9 +4658,14 @@ function PublicacoesIaPageContent() {
         callToAction: "",
         imagePrompt: "",
         videoPrompt: "",
+        visualStyle: "",
+        negativePrompt: "",
+        storyOutline: "",
+        storyBeats: "",
         sequenceCount: 1,
         sequenceSteps: "",
       }));
+      resetGenerateBriefingChat();
       setReferenceUrlInput("");
     },
     onError: (error) => {
@@ -3821,6 +4769,24 @@ function PublicacoesIaPageContent() {
   }, [generateMutation.isPending]);
 
   useEffect(() => {
+    setGenerateBriefingChatMessages((current) =>
+      rebuildAiBriefingChatMessages(
+        current.filter((message) => message.role === "user"),
+        generateBriefingContext,
+      ),
+    );
+  }, [generateBriefingContext]);
+
+  useEffect(() => {
+    if (
+      generateBriefingFocusedField &&
+      !generateBriefingTimelineSteps.some((step) => step.field === generateBriefingFocusedField)
+    ) {
+      setGenerateBriefingFocusedField(null);
+    }
+  }, [generateBriefingFocusedField, generateBriefingTimelineSteps]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -3916,14 +4882,19 @@ function PublicacoesIaPageContent() {
   }, []);
 
   useEffect(() => {
-    if (trackedAsyncGenerationJobs.length === 0) {
+    const polledTrackedAsyncGenerationJobs = trackedAsyncGenerationJobs.filter(
+      (job) => !job.notificationChannelId,
+    );
+
+    if (polledTrackedAsyncGenerationJobs.length === 0) {
       return;
     }
 
     let isCancelled = false;
 
     const pollTrackedAsyncGenerationJobs = async () => {
-      const jobsSnapshot = [...trackedAsyncGenerationJobs];
+      const jobsSnapshot = [...polledTrackedAsyncGenerationJobs];
+      const jobsSnapshotIds = new Set(jobsSnapshot.map((job) => job.aiPostId));
       const results = await Promise.allSettled(
         jobsSnapshot.map((job) => establishmentApi.getAiPost(job.aiPostId)),
       );
@@ -3932,7 +4903,7 @@ function PublicacoesIaPageContent() {
         return;
       }
 
-      const nextTrackedJobs: TrackedAsyncGenerationJob[] = [];
+      const nextTrackedJobsById = new Map<string, TrackedAsyncGenerationJob>();
       const readyPosts: AiPostRecord[] = [];
       const failedCountByStatus: Record<string, number> = {};
       let shouldRefreshLibrary = false;
@@ -3945,14 +4916,14 @@ function PublicacoesIaPageContent() {
         }
 
         if (result.status === "rejected") {
-          nextTrackedJobs.push(job);
+          nextTrackedJobsById.set(job.aiPostId, job);
           return;
         }
 
         const post = result.value;
 
         if (!post?.id) {
-          nextTrackedJobs.push(job);
+          nextTrackedJobsById.set(job.aiPostId, job);
           return;
         }
 
@@ -3978,13 +4949,22 @@ function PublicacoesIaPageContent() {
           return;
         }
 
-        nextTrackedJobs.push({
+        nextTrackedJobsById.set(job.aiPostId, {
           ...job,
           status: normalizedStatus,
         });
       });
 
-      setTrackedAsyncGenerationJobs(nextTrackedJobs);
+      setTrackedAsyncGenerationJobs((current) =>
+        current.flatMap((job) => {
+          if (job.notificationChannelId || !jobsSnapshotIds.has(job.aiPostId)) {
+            return [job];
+          }
+
+          const nextJob = nextTrackedJobsById.get(job.aiPostId);
+          return nextJob ? [nextJob] : [];
+        }),
+      );
 
       if (shouldRefreshLibrary) {
         queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
@@ -4754,43 +5734,33 @@ function PublicacoesIaPageContent() {
 
               {currentDraft.generateImage ? (
                 <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Prompt da imagem
-                  </label>
-                  <textarea
-                    rows={2}
+                  <AssistantTextareaField
+                    title="Assistente da imagem"
+                    assistantMessage="Ajuste aqui a descricao visual da imagem final. Se quiser, use um atalho e depois refine com seus detalhes."
+                    suggestions={getImagePromptSuggestions(currentDraft.postType)}
+                    onSuggestionSelect={(value) => updateDraft({ imagePrompt: value })}
                     value={currentDraft.imagePrompt}
-                    onChange={(event) =>
-                      updateDraft({ imagePrompt: event.target.value })
-                    }
+                    onChange={(value) => updateDraft({ imagePrompt: value })}
                     disabled={!canEditAiPosts}
                     placeholder={IMAGE_PROMPT_PLACEHOLDERS[currentDraft.postType]}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    helper={getImagePromptHelper(currentDraft.postType)}
                   />
-                  <p className="mt-2 text-xs text-slate-500">
-                    {getImagePromptHelper(currentDraft.postType)}
-                  </p>
                 </div>
               ) : null}
 
               {currentDraft.generateVideo ? (
                 <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Prompt do video
-                  </label>
-                  <textarea
-                    rows={2}
+                  <AssistantTextareaField
+                    title="Assistente do video"
+                    assistantMessage="Refine aqui a direcao do video em movimento. Camera, ritmo, gesto, ambiente e clima ajudam bastante no resultado."
+                    suggestions={getVideoPromptSuggestions(currentDraft.postType)}
+                    onSuggestionSelect={(value) => updateDraft({ videoPrompt: value })}
                     value={currentDraft.videoPrompt}
-                    onChange={(event) =>
-                      updateDraft({ videoPrompt: event.target.value })
-                    }
+                    onChange={(value) => updateDraft({ videoPrompt: value })}
                     disabled={!canEditAiPosts}
                     placeholder={VIDEO_PROMPT_PLACEHOLDERS[currentDraft.postType]}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    helper={getVideoPromptHelper(currentDraft.postType)}
                   />
-                  <p className="mt-2 text-xs text-slate-500">
-                    {getVideoPromptHelper(currentDraft.postType)}
-                  </p>
                 </div>
               ) : null}
 
@@ -5517,67 +6487,155 @@ function PublicacoesIaPageContent() {
             </div>
           ) : null}
 
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Prompt principal
-            </label>
-            <SuggestionButtons
-              suggestions={PROMPT_SUGGESTIONS}
-              onSelect={(value) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  prompt: value,
-                }))
-              }
-            />
-            <textarea
-              rows={3}
-              value={generateForm.prompt}
-              onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  prompt: event.target.value,
-                }))
-              }
-              placeholder={PROMPT_PLACEHOLDER}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              Quanto mais claro o objetivo comercial e o tom da peca, melhor a IA acerta copy e direcao criativa.
+          <div className="md:col-span-2 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <CheckCircle2 className="h-4 w-4 text-primary-600" />
+                  Briefing guiado
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Preencha o briefing em etapas. A linha do tempo organiza objetivo,
+                  midia, direcao visual e detalhes extras no mesmo fluxo.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={resetGenerateBriefingChat}
+                disabled={!canEditAiPosts || generateMutation.isPending}
+                className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Limpar briefing
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                {generateBriefingCompletedRequiredSteps}/{generateBriefingRequiredStepCount} etapas principais concluidas
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                {nextGenerateBriefingField
+                  ? `Proxima etapa: ${getAiBriefingFieldLabel(nextGenerateBriefingField)}`
+                  : "Briefing base concluido"}
+              </span>
+            </div>
+
+            <div className="mt-5">
+              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Linha do tempo
+                </div>
+                <div className="mt-4 overflow-x-auto pb-2">
+                  <div className="flex min-w-max items-stretch gap-0">
+                    {generateBriefingTimelineSteps.map((step, index) => {
+                      const currentValue = getLatestAiBriefingUserContent(
+                        generateBriefingChatMessages,
+                        step.field,
+                      );
+                      const isCompleted = Boolean(currentValue);
+                      const isActive = activeGenerateBriefingField === step.field;
+
+                      return (
+                        <div key={step.field} className="flex items-start">
+                          <div className="w-[248px] flex-none">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                                  isActive
+                                    ? "border-slate-900 bg-slate-900 text-white"
+                                    : isCompleted
+                                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                      : "border-slate-300 bg-white text-slate-500"
+                                }`}
+                              >
+                                {isCompleted && !isActive ? (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                ) : (
+                                  index + 1
+                                )}
+                              </div>
+                              <div
+                                className={`h-px flex-1 ${
+                                  index === generateBriefingTimelineSteps.length - 1
+                                    ? "bg-transparent"
+                                    : isCompleted
+                                      ? "bg-emerald-200"
+                                      : "bg-slate-200"
+                                }`}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => selectGenerateBriefingTimelineStep(step.field)}
+                              disabled={!canEditAiPosts || generateMutation.isPending}
+                              className={`mt-3 flex h-[196px] w-[228px] flex-col rounded-2xl border p-4 text-left transition-all ${
+                                isActive
+                                  ? "border-slate-900 bg-white shadow-sm"
+                                  : "border-slate-200 bg-white hover:border-slate-300"
+                              } disabled:cursor-not-allowed disabled:opacity-60`}
+                            >
+                              <div className="flex min-h-[52px] items-start justify-between gap-2">
+                                <div className="text-sm font-bold text-slate-900">
+                                  {step.title}
+                                </div>
+                                <span
+                                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    isActive
+                                      ? "bg-slate-900 text-white"
+                                      : isCompleted
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : step.optional
+                                          ? "bg-amber-50 text-amber-700"
+                                          : "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {isActive
+                                    ? "Atual"
+                                    : isCompleted
+                                      ? "Ok"
+                                      : step.optional
+                                        ? "Opcional"
+                                        : "Pendente"}
+                                </span>
+                              </div>
+                              <div className="mt-2 text-xs text-slate-500">{step.helper}</div>
+                              <div className="mt-3 h-[60px] overflow-hidden whitespace-pre-line text-sm text-slate-800">
+                                {currentValue || "Selecionar etapa"}
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <AiBriefingTimelineEditor
+                  key={`${activeGenerateBriefingStep?.field || "done"}:${generateBriefingCurrentFieldValue}`}
+                  step={activeGenerateBriefingStep}
+                  context={generateBriefingContext}
+                  currentValue={generateBriefingCurrentFieldValue}
+                  suggestions={generateBriefingActionSuggestions}
+                  disabled={!canEditAiPosts || generateMutation.isPending}
+                  isCurrentStep={
+                    Boolean(activeGenerateBriefingStep) &&
+                    nextGenerateBriefingField === activeGenerateBriefingStep?.field
+                  }
+                  onClose={() => setGenerateBriefingFocusedField(null)}
+                  onSubmit={submitGenerateBriefingChatMessage}
+                  onClear={clearGenerateBriefingTimelineStep}
+                />
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs text-slate-500">
+              Cada etapa guarda uma resposta final. Voce pode preencher em ordem,
+              revisar depois e manter a geracao organizada sem depender de conversa.
             </p>
           </div>
-
-          {generateForm.generateImage ? (
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                Prompt da imagem
-              </label>
-              <SuggestionButtons
-                suggestions={getImagePromptSuggestions(generateForm.postType)}
-                onSelect={(value) =>
-                  setGenerateForm((current) => ({
-                    ...current,
-                    imagePrompt: value,
-                  }))
-                }
-              />
-              <textarea
-                rows={2}
-                value={generateForm.imagePrompt}
-                onChange={(event) =>
-                  setGenerateForm((current) => ({
-                    ...current,
-                    imagePrompt: event.target.value,
-                  }))
-                }
-                placeholder={IMAGE_PROMPT_PLACEHOLDERS[generateForm.postType]}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                {getImagePromptHelper(generateForm.postType)}
-              </p>
-            </div>
-          ) : null}
 
           {generateForm.generateVideo ? (
             <div className="md:col-span-2">
@@ -5639,34 +6697,6 @@ function PublicacoesIaPageContent() {
                   O idioma escolhido será anexado ao final do prompt do vídeo.
                 </p>
               </div>
-
-              <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                Prompt do vídeo
-              </label>
-              <SuggestionButtons
-                suggestions={getVideoPromptSuggestions(generateForm.postType)}
-                onSelect={(value) =>
-                  setGenerateForm((current) => ({
-                    ...current,
-                    videoPrompt: value,
-                  }))
-                }
-              />
-              <textarea
-                rows={2}
-                value={generateForm.videoPrompt}
-                onChange={(event) =>
-                  setGenerateForm((current) => ({
-                    ...current,
-                    videoPrompt: event.target.value,
-                  }))
-                }
-                placeholder={VIDEO_PROMPT_PLACEHOLDERS[generateForm.postType]}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                {getVideoPromptHelper(generateForm.postType)}
-              </p>
             </div>
           ) : null}
 
@@ -5677,8 +6707,8 @@ function PublicacoesIaPageContent() {
             videoResolution={generateForm.videoResolution}
             continuityMode={generateForm.continuityMode}
             totalDurationSeconds={generateForm.totalDurationSeconds}
-            visualStyle={generateForm.visualStyle}
-            negativePrompt={generateForm.negativePrompt}
+            visualStyle={generateBriefingValues.visualStyle}
+            negativePrompt={generateBriefingValues.negativePrompt}
             referenceImageUrls={generateForm.referenceImageUrls}
             referencePreviewUrlByReference={generateReferencePreviewUrlByReference}
             referenceAccessStateByReference={generateReferenceAccessStateByReference}
@@ -5761,10 +6791,11 @@ function PublicacoesIaPageContent() {
                 storyBeats: value,
               }))
             }
-            storyOutline={generateForm.storyOutline}
-            storyBeats={generateForm.storyBeats}
+            storyOutline={generateBriefingValues.storyOutline}
+            storyBeats={generateBriefingValues.storyBeats}
             quickReferenceOptions={quickReferenceOptions}
             isImportingReferenceFiles={referenceImageImportMutation.isPending}
+            hideTextControls
             disabled={!canEditAiPosts}
           />
 
@@ -5843,87 +6874,6 @@ function PublicacoesIaPageContent() {
 
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Tópico
-            </label>
-            <SuggestionButtons
-              suggestions={TOPIC_SUGGESTIONS}
-              onSelect={(value) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  topic: value,
-                }))
-              }
-            />
-            <input
-              type="text"
-              value={generateForm.topic}
-              onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  topic: event.target.value,
-                }))
-              }
-              placeholder="Ex: lancamento de combo executivo, makeover capilar ou consulta inicial"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Chamada para ação
-            </label>
-            <SuggestionButtons
-              suggestions={CTA_SUGGESTIONS}
-              onSelect={(value) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  callToAction: value,
-                }))
-              }
-            />
-            <input
-              type="text"
-              value={generateForm.callToAction}
-              onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  callToAction: event.target.value,
-                }))
-              }
-              placeholder="Ex: Reserve pelo WhatsApp agora"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Público alvo
-            </label>
-            <SuggestionButtons
-              suggestions={TARGET_AUDIENCE_SUGGESTIONS}
-              onSelect={(value) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  targetAudience: value,
-                }))
-              }
-            />
-            <input
-              type="text"
-              value={generateForm.targetAudience}
-              onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  targetAudience: event.target.value,
-                }))
-              }
-              placeholder="Ex: pessoas da regiao buscando qualidade, praticidade e bom atendimento"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-bold text-slate-700">
               Timezone
             </label>
             <input
@@ -5935,33 +6885,6 @@ function PublicacoesIaPageContent() {
                   timezone: event.target.value,
                 }))
               }
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Briefing
-            </label>
-            <SuggestionButtons
-              suggestions={BRIEFING_SUGGESTIONS}
-              onSelect={(value) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  briefing: value,
-                }))
-              }
-            />
-            <textarea
-              rows={3}
-              value={generateForm.briefing}
-              onChange={(event) =>
-                setGenerateForm((current) => ({
-                  ...current,
-                  briefing: event.target.value,
-                }))
-              }
-              placeholder="Ex: tom premium, visual limpo, beneficio claro, sem poluicao visual e com CTA direto"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -5999,6 +6922,7 @@ function PublicacoesIaPageContent() {
             disabled={
               generateMutation.isPending ||
               !canEditAiPosts ||
+              !generateBriefingValues.hasUserMessages ||
               hasReachedAiPostsGenerationLimit ||
               (generateForm.generateVideo && hasReachedAiPostsVideoGenerationLimit) ||
               isGenerateBlockedByProtectedReferences
