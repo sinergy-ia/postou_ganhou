@@ -249,7 +249,7 @@ const QUALITY_PROFILE_OPTIONS: Array<{
   {
     value: "BALANCED",
     label: "Balanced",
-    helper: "Mais rapido e indicado para testes, iteracoes e Peças do dia a dia.",
+    helper: "Mais rápido e indicado para testes, iterações e Peças do dia a dia.",
   },
   {
     value: "PROFESSIONAL",
@@ -467,22 +467,22 @@ const PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Oferta premium",
     value:
-      "Crie uma publicacao para Instagram com proposta premium, beneficio principal cristalino, copy curta e sofisticada, valor percebido alto e CTA direto para WhatsApp, direct ou agendamento. Evite linguagem vaga e visual de panfleto.",
+      "Crie uma publicação para Instagram com proposta premium, benefício principal cristalino, copy curta e sofisticada, valor percebido alto e CTA direto para WhatsApp, direct ou agendamento. Evite linguagem vaga e visual de panfleto.",
   },
   {
     label: "Movimento hoje",
     value:
-      "Crie uma publicacao para gerar visitas ainda hoje, destacando o motivo para agir agora, mensagem objetiva para mobile, senso de oportunidade e CTA simples para reservar, chamar ou comparecer.",
+      "Crie uma publicação para gerar visitas ainda hoje, destacando o motivo para agir agora, mensagem objetiva para mobile, senso de oportunidade e CTA simples para reservar, chamar ou comparecer.",
   },
   {
     label: "Autoridade visual",
     value:
-      "Crie uma publicacao editorial que fortalece o posicionamento da marca, transmite confianca e acabamento premium, com texto enxuto, linguagem segura e foco em diferenciar o negocio da concorrencia.",
+      "Crie uma publicação editorial que fortalece o posicionamento da marca, transmite confiança e acabamento premium, com texto enxuto, linguagem segura e foco em diferenciar o negócio da concorrência.",
   },
   {
     label: "Prova social",
     value:
-      "Crie uma publicacao baseada em experiencia real de cliente, destaque a transformacao percebida, reduza objecoes com naturalidade e finalize com convite para falar com a equipe.",
+      "Crie uma publicação baseada em experiência real de cliente, destaque a transformação percebida, reduza objeções com naturalidade e finalize com convite para falar com a equipe.",
   },
 ];
 
@@ -490,22 +490,22 @@ const FEED_IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Hero premium",
     value:
-      "Crie uma arte vertical 4:5 para Instagram com visual premium, elemento principal em destaque, iluminacao refinada, profundidade sutil, tipografia curta de alto impacto, area de respiro e acabamento publicitario. Evite poluicao visual, excesso de texto e aspecto de panfleto.",
+      "Crie uma arte vertical 4:5 para Instagram com visual premium, elemento principal em destaque, iluminação refinada, profundidade sutil, tipografia curta de alto impacto, área de respiro e acabamento publicitário. Evite poluição visual, excesso de texto e aspecto de panfleto.",
   },
   {
     label: "Oferta elegante",
     value:
-      "Crie uma arte promocional vertical com headline forte, selo de oferta sofisticado, hierarquia visual clara, cores de marca bem aplicadas e CTA evidente. O resultado deve parecer campanha profissional de Instagram Ads, nao arte amadora.",
+      "Crie uma arte promocional vertical com headline forte, selo de oferta sofisticado, hierarquia visual clara, cores de marca bem aplicadas e CTA evidente. O resultado deve parecer campanha profissional de Instagram Ads, não arte amadora.",
   },
   {
     label: "Lifestyle",
     value:
-      "Crie uma imagem estilo editorial lifestyle, com cena realista, contexto de uso do produto ou servico, luz bonita, enquadramento premium e atmosfera aspiracional. O resultado deve parecer ensaio de marca bem produzido.",
+      "Crie uma imagem estilo editorial lifestyle, com cena realista, contexto de uso do produto ou serviço, luz bonita, enquadramento premium e atmosfera aspiracional. O resultado deve parecer ensaio de marca bem produzido.",
   },
   {
     label: "Close de produto",
     value:
-      "Crie uma imagem com close hero do produto ou servico, textura valorizada, fundo refinado, contraste controlado e direcao de arte comercial. Inserir apenas um titulo curto e elegante.",
+      "Crie uma imagem com close hero do produto ou serviço, textura valorizada, fundo refinado, contraste controlado e direção de arte comercial. Inserir apenas um título curto e elegante.",
   },
 ];
 
@@ -513,78 +513,78 @@ const STORY_IMAGE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Story de oferta",
     value:
-      "Crie um story vertical 9:16 com headline curta, oferta muito clara, contraste alto para leitura no celular, CTA forte e composicao limpa. Reservar area segura para arroba e hashtag visiveis.",
+      "Crie um story vertical 9:16 com headline curta, oferta muito clara, contraste alto para leitura no celular, CTA forte e composição limpa. Reservar área segura para arroba e hashtag visíveis.",
   },
   {
     label: "Story premium",
     value:
-      "Crie um story vertical sofisticado, com fundo elegante, tipografia editorial curta, foco em valor percebido e atmosfera premium. Manter leitura imediata e espaco livre para marcacao visivel.",
+      "Crie um story vertical sofisticado, com fundo elegante, tipografia editorial curta, foco em valor percebido e atmosfera premium. Manter leitura imediata e espaço livre para marcação visível.",
   },
   {
     label: "Story prova social",
     value:
-      "Crie um story com prova social, frase curta de impacto, visual confiavel e resultado percebido em destaque. Deixar area limpa para inserir arroba e hashtag sem perder legibilidade.",
+      "Crie um story com prova social, frase curta de impacto, visual confiável e resultado percebido em destaque. Deixar área limpa para inserir arroba e hashtag sem perder legibilidade.",
   },
   {
     label: "Story bastidor",
     value:
-      "Crie um story com visual autentico de bastidor, enquadramento vertical, luz natural bonita, informacao rapida e CTA discreto. Priorizar aparencia real, atual e profissional.",
+      "Crie um story com visual autêntico de bastidor, enquadramento vertical, luz natural bonita, informação rápida e CTA discreto. Priorizar aparência real, atual e profissional.",
   },
 ];
 
 const TOPIC_SUGGESTIONS: FieldSuggestion[] = [
-  { label: "Captacao", value: "captacao de novos clientes na regiao" },
-  { label: "Promocao", value: "oferta limitada com beneficio imediato" },
-  { label: "Autoridade", value: "dica especializada que gera confianca" },
+  { label: "Captação", value: "captação de novos clientes na região" },
+  { label: "Promoção", value: "oferta limitada com benefício imediato" },
+  { label: "Autoridade", value: "dica especializada que gera confiança" },
   { label: "Resultado", value: "resultado real e prova social" },
 ];
 
 const CTA_SUGGESTIONS: FieldSuggestion[] = [
   { label: "WhatsApp", value: "Chame no WhatsApp para agendar agora" },
   { label: "Vaga", value: "Garanta sua vaga hoje" },
-  { label: "Orcamento", value: "Peça seu orcamento agora" },
+  { label: "Orçamento", value: "Peça seu orçamento agora" },
   { label: "Direct", value: "Fale com nossa equipe no direct" },
 ];
 
 const TARGET_AUDIENCE_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Novos clientes",
-    value: "pessoas da regiao prontas para contratar nas proximas semanas",
+    value: "pessoas da região prontas para contratar nas próximas semanas",
   },
   {
     label: "Seguidores mornos",
-    value: "seguidores que demonstraram interesse, mas ainda nao converteram",
+    value: "seguidores que demonstraram interesse, mas ainda não converteram",
   },
   {
-    label: "Comparando opcoes",
-    value: "pessoas que estao comparando opcoes e buscam seguranca para decidir",
+    label: "Comparando opções",
+    value: "pessoas que estão comparando opções e buscam segurança para decidir",
   },
   {
-    label: "Publico premium",
-    value: "publico que valoriza qualidade, praticidade e atendimento confiavel",
+    label: "Público premium",
+    value: "público que valoriza qualidade, praticidade e atendimento confiável",
   },
 ];
 
 const BRIEFING_SUGGESTIONS: FieldSuggestion[] = [
   {
-    label: "Conversao",
+    label: "Conversão",
     value:
-      "Tom persuasivo, humano e direto, com foco em beneficio claro, baixa friccao e CTA forte no fechamento.",
+      "Tom persuasivo, humano e direto, com foco em benefício claro, baixa fricção e CTA forte no fechamento.",
   },
   {
     label: "Premium",
     value:
-      "Tom premium e confiavel, destacando valor percebido, exclusividade e atendimento diferenciado.",
+      "Tom premium e confiável, destacando valor percebido, exclusividade e atendimento diferenciado.",
   },
   {
     label: "Acolhedor",
     value:
-      "Tom acolhedor com prova social, reduzindo objecoes e transmitindo seguranca para o primeiro contato.",
+      "Tom acolhedor com prova social, reduzindo objeções e transmitindo segurança para o primeiro contato.",
   },
   {
     label: "Autoridade",
     value:
-      "Tom didatico e estrategico, informando com clareza, gerando autoridade e convertendo sem parecer venda agressiva.",
+      "Tom didático e estratégico, informando com clareza, gerando autoridade e convertendo sem parecer venda agressiva.",
   },
 ];
 
@@ -592,35 +592,35 @@ const FEED_VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Motion premium",
     value:
-      "Crie um video curto para feed com visual premium, movimentos suaves de camera, close-ups elegantes, texto minimo na tela, color grading comercial e fechamento com CTA discreto.",
+      "Crie um vídeo curto para feed com visual premium, movimentos suaves de câmera, close-ups elegantes, texto mínimo na tela, color grading comercial e fechamento com CTA discreto.",
   },
   {
     label: "Oferta em motion",
     value:
-      "Crie um video promocional curto para feed destacando a oferta principal com ritmo agil, tipografia impactante, detalhes do produto ou servico e CTA final muito claro.",
+      "Crie um vídeo promocional curto para feed destacando a oferta principal com ritmo ágil, tipografia impactante, detalhes do produto ou serviço e CTA final muito claro.",
   },
   {
     label: "Institucional",
     value:
-      "Crie um video institucional curto para feed reforcando autoridade, ambiente, atendimento e qualidade percebida, com edicao limpa e sofisticada.",
+      "Crie um vídeo institucional curto para feed reforçando autoridade, ambiente, atendimento e qualidade percebida, com edição limpa e sofisticada.",
   },
   {
     label: "Prova social",
     value:
-      "Crie um video curto com resultado de cliente, cenas que mostrem antes e depois ou beneficio percebido, narrativa clara e encerramento convidando para contato.",
+      "Crie um vídeo curto com resultado de cliente, cenas que mostrem antes e depois ou benefício percebido, narrativa clara e encerramento convidando para contato.",
   },
 ];
 
 const REELS_VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
   {
-    label: "Reels cinematico",
+    label: "Reels cinemático",
     value:
-      "Crie um reels vertical 9:16 com gancho forte no primeiro segundo, cenas premium, camera motion suave, cortes ritmados, texto curto na tela, color grading comercial e CTA final. Deve parecer anuncio profissional.",
+      "Crie um reels vertical 9:16 com gancho forte no primeiro segundo, cenas premium, câmera motion suave, cortes ritmados, texto curto na tela, color grading comercial e CTA final. Deve parecer anúncio profissional.",
   },
   {
-    label: "Reels de conversao",
+    label: "Reels de conversão",
     value:
-      "Crie um reels promocional de alta conversao, com abertura que prende, destaque da oferta, valor percebido claro, urgencia elegante e encerramento chamando para direct ou WhatsApp.",
+      "Crie um reels promocional de alta conversão, com abertura que prende, destaque da oferta, valor percebido claro, urgência elegante e encerramento chamando para direct ou WhatsApp.",
   },
   {
     label: "Reels bastidores",
@@ -628,9 +628,9 @@ const REELS_VIDEO_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
       "Crie um reels mostrando bastidores ou processo com planos curtos, close-ups fortes, autenticidade, energia e acabamento de marca premium. Usar legendas curtas e limpas.",
   },
   {
-    label: "Transformacao",
+    label: "Transformação",
     value:
-      "Crie um reels de transformacao ou antes e depois com contraste visual forte, narrativa imediata, foco no resultado final e CTA para falar com a equipe.",
+      "Crie um reels de transformação ou antes e depois com contraste visual forte, narrativa imediata, foco no resultado final e CTA para falar com a equipe.",
   },
 ];
 
@@ -645,14 +645,14 @@ const VISUAL_STYLE_PRESETS: VisualPreset[] = [
   {
     label: "Clean",
     visualStyle:
-      "visual clean e contemporaneo, fundo organizado, foco central claro, paleta equilibrada e leitura imediata",
+      "visual clean e contemporâneo, fundo organizado, foco central claro, paleta equilibrada e leitura imediata",
     negativePrompt:
       "bagunca visual, excesso de props, tipografia exagerada, ruido, distracoes no fundo",
   },
   {
     label: "Gastronomia",
     visualStyle:
-      "fotografia gastronomica premium, close apetitoso, luz quente, textura valorizada e apresentacao elegante",
+      "fotografia gastronômica premium, close apetitoso, luz quente, textura valorizada e apresentação elegante",
     negativePrompt:
       "comida deformada, prato confuso, ingredientes duplicados, aspecto artificial, blur",
   },
@@ -666,21 +666,21 @@ const VISUAL_STYLE_PRESETS: VisualPreset[] = [
   {
     label: "Fitness",
     visualStyle:
-      "energia alta, luz dramatica, contraste forte, movimento controlado e acabamento cinematografico",
+      "energia alta, luz dramática, contraste forte, movimento controlado e acabamento cinematográfico",
     negativePrompt:
       "corpo deformado, membros estranhos, borrado de movimento ruim, academia baguncada, anatomia errada",
   },
   {
     label: "Luxo",
     visualStyle:
-      "estetica de luxo, materiais nobres, brilho controlado, profundidade suave e direcao de arte exclusiva",
+      "estética de luxo, materiais nobres, brilho controlado, profundidade suave e direção de arte exclusiva",
     negativePrompt:
       "visual popular demais, excesso de cores, poluicao, reflexos ruins, acabamento barato",
   },
   {
     label: "Urbano",
     visualStyle:
-      "linguagem urbana premium, contraste moderno, composicao dinamica, atitude contemporanea e look de campanha",
+      "linguagem urbana premium, contraste moderno, composição dinâmica, atitude contemporânea e look de campanha",
     negativePrompt:
       "caos visual, baixa definicao, cenarios aleatorios, texto excessivo, ruido exagerado",
   },
@@ -692,12 +692,12 @@ const NEGATIVE_PROMPT_SUGGESTIONS: FieldSuggestion[] = [
     value: "texto na arte, letras deformadas, tipografia quebrada",
   },
   {
-    label: "Sem distorcoes",
+    label: "Sem distorções",
     value: "anatomia estranha, dedos extras, rosto distorcido, objetos duplicados",
   },
   {
-    label: "Sem poluicao",
-    value: "composicao poluida, excesso de elementos, fundo confuso, bagunca visual",
+    label: "Sem poluição",
+    value: "composição poluída, excesso de elementos, fundo confuso, bagunça visual",
   },
   {
     label: "Sem blur ruim",
@@ -709,7 +709,7 @@ const STORY_OUTLINE_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "Produto para oferta",
     value:
-      "abrir com apresentacao do contexto, mostrar o produto ou servico em destaque, reforcar o principal beneficio e fechar com CTA",
+      "abrir com apresentação do contexto, mostrar o produto ou serviço em destaque, reforçar o principal benefício e fechar com CTA",
   },
   {
     label: "Bastidor premium",
@@ -721,45 +721,45 @@ const STORY_OUTLINE_SUGGESTIONS: FieldSuggestion[] = [
 const STORY_BEATS_SUGGESTIONS: FieldSuggestion[] = [
   {
     label: "3 beats",
-    value: "abertura com contexto\nbeneficio ou transformacao\nfechamento com CTA",
+    value: "abertura com contexto\nbenefício ou transformação\nfechamento com CTA",
   },
   {
     label: "4 beats",
-    value: "gancho inicial\napresentacao do processo\nresultado final\nCTA de fechamento",
+    value: "gancho inicial\napresentação do processo\nresultado final\nCTA de fechamento",
   },
 ];
 
 const PROMPT_PLACEHOLDER =
-  "Ex: crie uma publicacao premium para divulgar um combo especial, com beneficio claro, valor percebido alto e CTA para WhatsApp";
+  "Ex: crie uma publicação premium para divulgar um combo especial, com benefício claro, valor percebido alto e CTA para WhatsApp";
 
 const IMAGE_PROMPT_PLACEHOLDERS: Record<AiPostType, string> = {
   STORY:
-    "Ex: Story 9:16 premium, headline curta, oferta clara, contraste alto e area segura para arroba e hashtag visiveis",
+    "Ex: Story 9:16 premium, headline curta, oferta clara, contraste alto e área segura para arroba e hashtag visíveis",
   FEED:
-    "Ex: Arte 4:5 premium com close do produto, iluminacao refinada, tipografia curta e acabamento publicitario",
+    "Ex: Arte 4:5 premium com close do produto, iluminação refinada, tipografia curta e acabamento publicitário",
   REELS:
-    "Ex: Arte premium para Instagram com composicao clean, foco total no produto e texto minimo",
+    "Ex: Arte premium para Instagram com composição clean, foco total no produto e texto mínimo",
 };
 
 const VIDEO_PROMPT_PLACEHOLDERS: Record<AiPostType, string> = {
   STORY: "",
   FEED:
-    "Ex: Video curto para feed com close-ups elegantes, camera suave, texto minimo e CTA discreto no final",
+    "Ex: Vídeo curto para feed com close-ups elegantes, câmera suave, texto mínimo e CTA discreto no final",
   REELS:
     "Ex: Reels 9:16 com gancho forte, cortes ritmados, cenas premium, texto curto na tela e CTA final",
 };
 
 const VISUAL_STYLE_PLACEHOLDERS: Record<AiPostType, string> = {
   STORY:
-    "Ex: visual premium para story, leitura instantanea, foco central, contraste alto e espaco livre para marcacao",
+    "Ex: visual premium para story, leitura instantânea, foco central, contraste alto e espaço livre para marcação",
   FEED:
-    "Ex: fotografia publicitaria premium, luz lateral quente, close elegante e composicao hero equilibrada",
+    "Ex: fotografia publicitária premium, luz lateral quente, close elegante e composição hero equilibrada",
   REELS:
-    "Ex: comercial premium com energia alta, camera suave, clima aspiracional e acabamento cinematografico",
+    "Ex: comercial premium com energia alta, câmera suave, clima aspiracional e acabamento cinematográfico",
 };
 
 const NEGATIVE_PROMPT_PLACEHOLDER =
-  "Ex: texto na arte, blur, composicao poluida, anatomia estranha, logo deformado, objetos duplicados";
+  "Ex: texto na arte, blur, composição poluída, anatomia estranha, logo deformado, objetos duplicados";
 
 function getImagePromptSuggestions(postType: AiPostType) {
   return postType === "STORY"
@@ -775,10 +775,10 @@ function getVideoPromptSuggestions(postType: AiPostType) {
 
 function getImagePromptHelper(postType: AiPostType) {
   if (postType === "STORY") {
-    return "Descreva hierarquia visual, contraste, area segura para marcacao e o clima da arte.";
+    return "Descreva hierarquia visual, contraste, área segura para marcação e o clima da arte.";
   }
 
-  return "Descreva composicao, luz, enquadramento, nivel de texto e acabamento que a imagem deve ter.";
+  return "Descreva composição, luz, enquadramento, nível de texto e acabamento que a imagem deve ter.";
 }
 
 function getVideoPromptHelper(postType: AiPostType) {
@@ -786,30 +786,30 @@ function getVideoPromptHelper(postType: AiPostType) {
     return "Descreva o gancho inicial, os tipos de cena, o ritmo dos cortes, o texto na tela e o fechamento.";
   }
 
-  return "Descreva cenas, movimentos de camera, ritmo, presenca de texto e a sensacao final do video.";
+  return "Descreva cenas, movimentos de câmera, ritmo, presença de texto e a sensação final do vídeo.";
 }
 
 function getVisualStyleHelper(postType: AiPostType) {
   if (postType === "STORY") {
-    return "Descreva o clima visual, o contraste, o nivel de sofisticao e como a arte deve se comportar no formato vertical.";
+    return "Descreva o clima visual, o contraste, o nível de sofisticação e como a arte deve se comportar no formato vertical.";
   }
 
   if (postType === "REELS") {
-    return "Descreva o look visual do video: luz, energia, camera, acabamento e tipo de campanha que ele deve lembrar.";
+    return "Descreva o look visual do vídeo: luz, energia, câmera, acabamento e tipo de campanha que ele deve lembrar.";
   }
 
-  return "Descreva a linguagem visual da Peça: fotografia, direcao de arte, luz, textura, paleta e sensacao de marca.";
+  return "Descreva a linguagem visual da Peça: fotografia, direção de arte, luz, textura, paleta e sensação de marca.";
 }
 
 function getFormatDirectionTip(postType: AiPostType) {
   switch (postType) {
     case "STORY":
-      return "Story funciona melhor com foco central, leitura rapida, contraste alto e poucos elementos.";
+      return "Story funciona melhor com foco central, leitura rápida, contraste alto e poucos elementos.";
     case "REELS":
-      return "Reels ganha muito com referencia principal forte, gancho visual e energia alta desde o primeiro segundo.";
+      return "Reels ganha muito com referência principal forte, gancho visual e energia alta desde o primeiro segundo.";
     case "FEED":
     default:
-      return "Feed costuma performar melhor com composicao hero limpa, acabamento premium e hierarquia visual clara.";
+      return "Feed costuma performar melhor com composição hero limpa, acabamento premium e hierarquia visual clara.";
   }
 }
 
@@ -853,7 +853,7 @@ function getSequenceCollectionLabel(postType: AiPostType, count: number) {
 
   switch (postType) {
     case "STORY":
-      return `${count} stories em sequencia`;
+      return `${count} stories em sequência`;
     case "REELS":
       return `${count} reels em serie`;
     case "FEED":
@@ -901,14 +901,14 @@ function buildSequencePrompt(
   }
 
   const instructions = [
-    `Esta Peça faz parte de uma sequencia de ${count} itens para Instagram.`,
+    `Esta Peça faz parte de uma sequência de ${count} itens para Instagram.`,
     `Crie o item ${index + 1} de ${count}.`,
-    explicitStep ? `Foco deste item: ${explicitStep}.` : "Crie uma variacao complementar as demais Peças, sem repetir tudo igual.",
+    explicitStep ? `Foco deste item: ${explicitStep}.` : "Crie uma variação complementar às demais Peças, sem repetir tudo igual.",
     postType === "FEED"
       ? "Pense como um card de carrossel que precisa funcionar sozinho e em conjunto."
       : postType === "STORY"
-        ? "Pense como um story em sequencia, com leitura rapida e continuidade clara."
-        : "Pense como um reel de uma serie curta, com continuidade de linguagem visual.",
+        ? "Pense como um story em sequência, com leitura rápida e continuidade clara."
+        : "Pense como um reel de uma série curta, com continuidade de linguagem visual.",
   ];
 
   return [normalizedPrompt, instructions.join(" ")].filter(Boolean).join("\n\n");
@@ -944,7 +944,7 @@ function buildPreviewCaptionText(input: {
     content.push(hashtags.slice(0, 4).join(" "));
   }
 
-  return content.join("\n\n").trim() || "Sua legenda e o CTA aparecerao aqui.";
+  return content.join("\n\n").trim() || "Sua legenda e o CTA aparecerão aqui.";
 }
 
 function sanitizeAiPostDisplayText(value?: string | null) {
@@ -1013,7 +1013,7 @@ function readFileAsDataUrl(file: File) {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
     reader.onerror = () =>
-      reject(new Error(`Nao foi possivel ler o arquivo "${file.name}".`));
+      reject(new Error(`Não foi possível ler o arquivo "${file.name}".`));
     reader.readAsDataURL(file);
   });
 }
@@ -1048,8 +1048,8 @@ function getProtectedReferenceGenerationMessage(protectedReferenceUrls: string[]
   }
 
   return protectedReferenceUrls.length > 1
-    ? "Algumas imagens importadas do PC ficaram com preview local apenas. A geracao foi bloqueada porque a IA nao consegue baixar essas URLs protegidas."
-    : "A imagem importada do PC ficou com preview local apenas. A geracao foi bloqueada porque a IA nao consegue baixar essa URL protegida.";
+    ? "Algumas imagens importadas do PC ficaram com preview local apenas. A geração foi bloqueada porque a IA não consegue baixar essas URLs protegidas."
+    : "A imagem importada do PC ficou com preview local apenas. A geração foi bloqueada porque a IA não consegue baixar essa URL protegida.";
 }
 
 function isReferenceDownloadForbiddenMessage(message: string) {
@@ -1100,7 +1100,7 @@ function getVideoReferenceValidationMessage({
   }
 
   if (durationSeconds !== 8) {
-    return "Video com imagem de referencia exige 8 segundos no modelo atual.";
+    return "Vídeo com imagem de referência exige 8 segundos no modelo atual.";
   }
 
   return null;
@@ -1281,7 +1281,7 @@ function AssistantTextareaField({
         </div>
       ) : null}
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-        Sua orientacao
+        Sua orientação
       </div>
       <textarea
         rows={rows}
@@ -1323,7 +1323,7 @@ function createInitialAiBriefingChatMessages() {
   return [
     createAiBriefingChatMessage(
       "assistant",
-      "Preencha o briefing por etapas para definir objetivo, formato, direcao visual e detalhes complementares da Peça.",
+      "Preencha o briefing por etapas para definir objetivo, formato, direção visual e detalhes complementares da Peça.",
       "prompt",
     ),
   ];
@@ -1336,19 +1336,19 @@ function getAiBriefingFieldLabel(field: AiBriefingChatField | null) {
     case "topic":
       return "Tema ou oferta";
     case "targetAudience":
-      return "Publico";
+      return "Público";
     case "callToAction":
       return "CTA";
     case "imagePrompt":
-      return "Direcao da imagem";
+      return "Direção da imagem";
     case "videoPrompt":
-      return "Direcao do video";
+      return "Direção do vídeo";
     case "visualStyle":
       return "Estilo visual";
     case "negativePrompt":
       return "O que evitar";
     case "storyOutline":
-      return "Historia";
+      return "História";
     case "storyBeats":
       return "Beats";
     case "briefing":
@@ -1365,38 +1365,38 @@ function getAiBriefingTimelineSteps(
     {
       field: "prompt",
       title: "Objetivo da Peça",
-      helper: "O que a publicacao precisa divulgar, vender ou movimentar agora.",
+      helper: "O que a publicação precisa divulgar, vender ou movimentar agora.",
     },
     {
       field: "topic",
       title: "Tema ou oferta",
-      helper: "Produto, servico, campanha ou assunto principal da Peça.",
+      helper: "Produto, serviço, campanha ou assunto principal da Peça.",
     },
     {
       field: "targetAudience",
-      title: "Publico principal",
+      title: "Público principal",
       helper: "Quem precisa se identificar com a mensagem primeiro.",
     },
     {
       field: "callToAction",
-      title: "Acao esperada",
-      helper: "O que a pessoa deve fazer depois de ver a publicacao.",
+      title: "Ação esperada",
+      helper: "O que a pessoa deve fazer depois de ver a publicação.",
     },
   ];
 
   if (context.generateImage) {
     steps.push({
       field: "imagePrompt",
-      title: "Direcao da imagem",
-      helper: "Cena, composicao, destaque de produto e sensacao visual.",
+      title: "Direção da imagem",
+      helper: "Cena, composição, destaque de produto e sensação visual.",
     });
   }
 
   if (context.generateVideo) {
     steps.push({
       field: "videoPrompt",
-      title: "Direcao do video",
-      helper: "Movimento, camera, ambiente, ritmo e impacto da cena.",
+      title: "Direção do vídeo",
+      helper: "Movimento, câmera, ambiente, ritmo e impacto da cena.",
     });
   }
 
@@ -1404,12 +1404,12 @@ function getAiBriefingTimelineSteps(
     {
       field: "visualStyle",
       title: "Estilo visual",
-      helper: "Luz, materiais, enquadramento, cores e nivel de sofisticacao.",
+      helper: "Luz, materiais, enquadramento, cores e nível de sofisticação.",
     },
     {
       field: "negativePrompt",
       title: "O que evitar",
-      helper: "Ruido visual, deformacoes, excesso de texto ou cara de panfleto.",
+      helper: "Ruído visual, deformações, excesso de texto ou cara de panfleto.",
     },
   );
 
@@ -1417,13 +1417,13 @@ function getAiBriefingTimelineSteps(
     steps.push(
       {
         field: "storyOutline",
-        title: "Historia do video",
-        helper: "Linha narrativa do inicio ao fim do video longo.",
+        title: "História do vídeo",
+        helper: "Linha narrativa do início ao fim do vídeo longo.",
       },
       {
         field: "storyBeats",
-        title: "Beats obrigatorios",
-        helper: "Cenas-chave em ordem para montar a sequencia.",
+        title: "Beats obrigatórios",
+        helper: "Cenas-chave em ordem para montar a sequência.",
       },
     );
   }
@@ -1431,7 +1431,7 @@ function getAiBriefingTimelineSteps(
   steps.push({
     field: "briefing",
     title: "Detalhes extras",
-    helper: "Provas, restricoes ou contexto adicional. Opcional.",
+    helper: "Provas, restrições ou contexto adicional. Opcional.",
     optional: true,
   });
 
@@ -1499,7 +1499,7 @@ function buildAiBriefingConversationValues(
   const promptSummary = [
     prompt,
     topic ? `Tema/oferta principal: ${topic}.` : "",
-    targetAudience ? `Publico principal: ${targetAudience}.` : "",
+    targetAudience ? `Público principal: ${targetAudience}.` : "",
     callToAction ? `CTA esperado: ${callToAction}.` : "",
   ]
     .filter(Boolean)
@@ -1511,21 +1511,21 @@ function buildAiBriefingConversationValues(
         message.field === "topic"
           ? "Tema/oferta"
           : message.field === "targetAudience"
-            ? "Publico"
+            ? "Público"
             : message.field === "callToAction"
               ? "CTA"
               : message.field === "imagePrompt"
-                ? "Direcao da imagem"
+                ? "Direção da imagem"
                 : message.field === "videoPrompt"
-                  ? "Direcao do video"
+                  ? "Direção do vídeo"
                   : message.field === "visualStyle"
                     ? "Estilo visual"
                     : message.field === "negativePrompt"
                       ? "Evitar"
                       : message.field === "storyOutline"
-                        ? "Historia do video longo"
+                        ? "História do vídeo longo"
                         : message.field === "storyBeats"
-                          ? "Beats do video longo"
+                          ? "Beats do vídeo longo"
               : message.field === "briefing"
                 ? "Detalhe extra"
                 : "Objetivo";
@@ -1538,7 +1538,7 @@ function buildAiBriefingConversationValues(
       ? `Detalhes extras:\n${briefingMessages.map((item) => `- ${item}`).join("\n")}`
       : "",
     conversationHistory.length > 0
-      ? `Historico do briefing:\n${conversationHistory.join("\n")}`
+      ? `Histórico do briefing:\n${conversationHistory.join("\n")}`
       : "",
   ]
     .filter(Boolean)
@@ -1614,31 +1614,31 @@ function buildAiBriefingAssistantMessage(
 ) {
   switch (field) {
     case "prompt":
-      return "Defina o objetivo principal da publicacao: o que precisa ser divulgado, vendido ou movimentado agora.";
+      return "Defina o objetivo principal da publicação: o que precisa ser divulgado, vendido ou movimentado agora.";
     case "topic":
-      return "Informe o tema, oferta, servico ou produto principal que essa publicacao precisa destacar.";
+      return "Informe o tema, oferta, serviço ou produto principal que essa publicação precisa destacar.";
     case "targetAudience":
-      return "Descreva para quem essa publicacao deve falar primeiro.";
+      return "Descreva para quem essa publicação deve falar primeiro.";
     case "callToAction":
-      return "Defina qual acao a pessoa deve tomar depois de ver a publicacao.";
+      return "Defina qual ação a pessoa deve tomar depois de ver a publicação.";
     case "imagePrompt":
-      return "Descreva a direcao da imagem: o que precisa aparecer, qual sensacao ela deve passar e que tipo de cena combina com a oferta.";
+      return "Descreva a direção da imagem: o que precisa aparecer, qual sensação ela deve passar e que tipo de cena combina com a oferta.";
     case "videoPrompt":
-      return "Descreva a direcao do video: cena, movimento de camera, ritmo, ambiente e o que precisa acontecer para vender bem a ideia.";
+      return "Descreva a direção do vídeo: cena, movimento de câmera, ritmo, ambiente e o que precisa acontecer para vender bem a ideia.";
     case "visualStyle":
-      return "Defina o estilo visual da Peça. Vale falar de luz, enquadramento, materiais, cores e nivel de sofisticacao.";
+      return "Defina o estilo visual da Peça. Vale falar de luz, enquadramento, materiais, cores e nível de sofisticação.";
     case "negativePrompt":
-      return "Liste o que deve ser evitado no resultado, como excesso de texto, cara de panfleto, deformacoes ou poluicao visual.";
+      return "Liste o que deve ser evitado no resultado, como excesso de texto, cara de panfleto, deformações ou poluição visual.";
     case "storyOutline":
-      return "Resuma como a historia do video longo deve evoluir do comeco ao fim.";
+      return "Resuma como a história do vídeo longo deve evoluir do começo ao fim.";
     case "storyBeats":
-      return "Liste os beats ou cenas obrigatorias do video longo, um por linha, para organizar a sequencia.";
+      return "Liste os beats ou cenas obrigatórias do vídeo longo, um por linha, para organizar a sequência.";
     case "briefing":
-      return "Adicione detalhes extras de tom, prova, restricoes ou referencias antes de gerar. Esta etapa e opcional.";
+      return "Adicione detalhes extras de tom, prova, restrições ou referências antes de gerar. Esta etapa é opcional.";
     default:
       return context.generateVideo
-        ? "O briefing, a direcao do video e o estilo ja estao definidos. Revise qualquer etapa ou siga para Gerar com IA."
-        : "O briefing, a direcao da imagem e o estilo ja estao definidos. Revise qualquer etapa ou siga para Gerar com IA.";
+        ? "O briefing, a direção do vídeo e o estilo já estão definidos. Revise qualquer etapa ou siga para Gerar com IA."
+        : "O briefing, a direção da imagem e o estilo já estão definidos. Revise qualquer etapa ou siga para Gerar com IA.";
   }
 }
 
@@ -1681,9 +1681,9 @@ function getAiBriefingInputPlaceholder(
     case "prompt":
       return PROMPT_PLACEHOLDER;
     case "topic":
-      return "Ex: combo executivo, consulta inicial, tratamento premium, campanha de aniversario...";
+      return "Ex: combo executivo, consulta inicial, tratamento premium, campanha de aniversário...";
     case "targetAudience":
-      return "Ex: mulheres da regiao buscando praticidade e resultado rapido...";
+      return "Ex: mulheres da região buscando praticidade e resultado rápido...";
     case "callToAction":
       return "Ex: chamar no WhatsApp agora, agendar pelo direct, clicar no link da bio...";
     case "imagePrompt":
@@ -1702,7 +1702,7 @@ function getAiBriefingInputPlaceholder(
     default:
       return context.isSequentialVideo
         ? "Adicione detalhes extras ou ajuste algo com prefixos como `video:`, `visual:`, `evitar:`, `historia:` e `beats:`."
-        : "Adicione qualquer detalhe extra de tom, prova, restricao, oferta ou referencia. Se quiser corrigir algo, use prefixos como `tema:`, `imagem:`, `video:` ou `visual:`.";
+        : "Adicione qualquer detalhe extra de tom, prova, restrição, oferta ou referência. Se quiser corrigir algo, use prefixos como `tema:`, `imagem:`, `video:` ou `visual:`.";
   }
 }
 
@@ -1798,9 +1798,9 @@ function AiBriefingTimelineEditor({
   if (!step) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-        <div className="text-sm font-bold text-emerald-950">Linha do tempo concluida</div>
+        <div className="text-sm font-bold text-emerald-950">Linha do tempo concluída</div>
         <p className="mt-2 text-sm leading-6 text-emerald-900">
-          O briefing base ja esta pronto. Se quiser, selecione qualquer etapa da linha do
+          O briefing base já está pronto. Se quiser, selecione qualquer etapa da linha do
           tempo para revisar ou siga direto com Gerar com IA.
         </p>
       </div>
@@ -1816,7 +1816,7 @@ function AiBriefingTimelineEditor({
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-          {isCurrentStep ? "Etapa atual" : "Revisao de etapa"}
+          {isCurrentStep ? "Etapa atual" : "Revisão de etapa"}
         </span>
         <button
           type="button"
@@ -1825,7 +1825,7 @@ function AiBriefingTimelineEditor({
           className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <X className="h-3.5 w-3.5" />
-          Fechar edicao
+          Fechar edição
         </button>
       </div>
 
@@ -1848,7 +1848,7 @@ function AiBriefingTimelineEditor({
       {suggestions.length > 0 ? (
         <div className="mt-4">
           <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Sugestoes de preenchimento
+            Sugestões de preenchimento
           </div>
           <SuggestionButtons
             suggestions={suggestions}
@@ -1861,7 +1861,7 @@ function AiBriefingTimelineEditor({
 
       <div className="mt-4">
         <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Conteudo da etapa
+          Conteúdo da etapa
         </div>
         <textarea
           ref={inputRef}
@@ -1984,10 +1984,10 @@ function ReferenceImageManager({
     <div className="space-y-3">
       <div>
         <div className="mb-1.5 block text-sm font-bold text-slate-700">
-          Imagens de referencia
+          Imagens de referência
         </div>
         <p className="text-xs text-slate-500">
-          Adicione ate 3 referencias por URL publica ou importando do computador. A primeira vira a principal e, em video, serve como ancora visual inicial.
+          Adicione até 3 referências por URL pública ou importando do computador. A primeira vira a principal e, em vídeo, serve como âncora visual inicial.
         </p>
       </div>
 
@@ -2037,13 +2037,13 @@ function ReferenceImageManager({
         </label>
       </div>
       <p className="text-[11px] text-slate-500">
-        Arquivos do PC sao enviados para o bucket publico de referencias da IA antes de entrar aqui como URL publica.
+        Arquivos do PC são enviados para o bucket público de referências da IA antes de entrar aqui como URL pública.
       </p>
 
       {quickOptions.length > 0 ? (
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Referencias rapidas da marca
+            Referências rápidas da marca
           </div>
           <div className="flex flex-wrap gap-2">
             {quickOptions.map((option) => (
@@ -2064,22 +2064,22 @@ function ReferenceImageManager({
 
       {generateVideo && value.length === 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Video sem referencia ainda pode gerar, mas costuma perder consistencia de produto, ambiente e identidade visual.
+          Vídeo sem referência ainda pode gerar, mas costuma perder consistência de produto, ambiente e identidade visual.
         </div>
       ) : null}
 
       {generateVideo && value.length > 0 ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Video com imagem de referencia exige 8 segundos no modelo atual. A imagem principal vira a base do video e melhora a consistencia do resultado.
+          Vídeo com imagem de referência exige 8 segundos no modelo atual. A imagem principal vira a base do vídeo e melhora a consistência do resultado.
         </div>
       ) : null}
 
       {protectedReferenceCount > 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {protectedReferenceCount > 1
-            ? "Algumas referencias importadas do PC ficaram apenas com preview local. A IA nao consegue baixar essas URLs protegidas ate elas ficarem publicas."
-            : "Esta referencia importada do PC ficou apenas com preview local. A IA nao consegue baixar essa URL protegida ate ela ficar publica."}{" "}
-          Remova a referencia ou use uma URL publica.
+            ? "Algumas referências importadas do PC ficaram apenas com preview local. A IA não consegue baixar essas URLs protegidas até elas ficarem públicas."
+            : "Esta referência importada do PC ficou apenas com preview local. A IA não consegue baixar essa URL protegida até ela ficar pública."}{" "}
+          Remova a referência ou use uma URL pública.
         </div>
       ) : null}
 
@@ -2104,7 +2104,7 @@ function ReferenceImageManager({
                       : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {index === 0 ? "Principal" : `Referencia ${index + 1}`}
+                  {index === 0 ? "Principal" : `Referência ${index + 1}`}
                 </span>
                 <span className="truncate text-xs text-slate-500">{url}</span>
               </div>
@@ -2144,7 +2144,7 @@ function ReferenceImageManager({
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-          Nenhuma referencia adicionada ainda. Voce pode colar uma URL publica, importar do PC ou reutilizar imagens da propria marca.
+          Nenhuma referência adicionada ainda. Você pode colar uma URL pública, importar do PC ou reutilizar imagens da própria marca.
         </div>
       )}
     </div>
@@ -2225,7 +2225,7 @@ function DirectionVisualSection({
   return (
     <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="mb-4">
-        <div className="text-sm font-bold text-slate-900">Direcao visual</div>
+        <div className="text-sm font-bold text-slate-900">Direção visual</div>
         <div className="mt-1 text-xs text-slate-500">{getFormatDirectionTip(postType)}</div>
       </div>
 
@@ -2249,8 +2249,8 @@ function DirectionVisualSection({
       {!hideTextControls ? (
         <div className="mt-5">
         <AssistantPanel
-          title="Assistente de direcao visual"
-          assistantMessage="Posso comecar por um preset rapido do nicho e voce ajusta os detalhes depois. Isso ajuda a IA a sair de um ponto de partida mais coerente."
+          title="Assistente de direção visual"
+          assistantMessage="Posso começar por um preset rápido do nicho e você ajusta os detalhes depois. Isso ajuda a IA a sair de um ponto de partida mais coerente."
         >
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Presets sugeridos
@@ -2272,7 +2272,7 @@ function DirectionVisualSection({
         <div className="md:col-span-2">
           <AssistantTextareaField
             title="Assistente do estilo visual"
-            assistantMessage="Descreva o clima visual que voce quer ver no resultado: composicao, luz, materiais, enquadramento e nivel de sofisticaçao."
+            assistantMessage="Descreva o clima visual que você quer ver no resultado: composição, luz, materiais, enquadramento e nível de sofisticação."
             value={visualStyle}
             onChange={onVisualStyleChange}
             disabled={disabled}
@@ -2283,15 +2283,15 @@ function DirectionVisualSection({
 
         <div className="md:col-span-2">
           <AssistantTextareaField
-            title="Assistente de restricoes visuais"
-            assistantMessage="Se quiser, me diga o que precisa ser evitado no render: texto ruim, excesso de elementos, deformacoes, cara de panfleto ou qualquer ruido que atrapalhe a Peça."
+            title="Assistente de restrições visuais"
+            assistantMessage="Se quiser, me diga o que precisa ser evitado no render: texto ruim, excesso de elementos, deformações, cara de panfleto ou qualquer ruído que atrapalhe a Peça."
             suggestions={NEGATIVE_PROMPT_SUGGESTIONS}
             onSuggestionSelect={onNegativePromptChange}
             value={negativePrompt}
             onChange={onNegativePromptChange}
             disabled={disabled}
             placeholder={NEGATIVE_PROMPT_PLACEHOLDER}
-            helper="Use este campo para cortar artefatos comuns como texto ruim, deformacoes, poluicao visual e baixa nitidez."
+            helper="Use este campo para cortar artefatos comuns como texto ruim, deformações, poluição visual e baixa nitidez."
           />
         </div>
           </>
@@ -2326,7 +2326,7 @@ function DirectionVisualSection({
         {generateVideo ? (
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-700">
-              Resolucao do video
+              Resolução do vídeo
             </label>
             <select
               value={videoResolution}
@@ -2345,7 +2345,7 @@ function DirectionVisualSection({
             <p className="mt-2 text-xs text-slate-500">
               {isSequentialMode
                 ? "O modo sequencial trabalha apenas em 720p para manter a continuidade entre segmentos."
-                : "1080p trava a duracao em 8 segundos. Se a Gemini rejeitar essa resolucao, o backend faz fallback e o resultado final pode voltar em 720p."}
+                : "1080p trava a duração em 8 segundos. Se a Gemini rejeitar essa resolução, o backend faz fallback e o resultado final pode voltar em 720p."}
             </p>
           </div>
         ) : null}
@@ -2365,12 +2365,12 @@ function DirectionVisualSection({
             >
               {VIDEO_CONTINUITY_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option === "SEQUENTIAL" ? "Video longo com continuidade" : "Video unico"}
+                  {option === "SEQUENTIAL" ? "Vídeo longo com continuidade" : "Vídeo único"}
                 </option>
               ))}
             </select>
             <p className="mt-2 text-xs text-slate-500">
-              Ative o modo sequencial para 30s ou 60s. O backend devolve segmentos e a publicacao automatica fica bloqueada ate a consolidacao final.
+              Ative o modo sequencial para 30s ou 60s. O backend devolve segmentos e a publicação automática fica bloqueada até a consolidação final.
             </p>
           </div>
         ) : null}
@@ -2379,16 +2379,16 @@ function DirectionVisualSection({
       {generateVideo && isSequentialMode ? (
         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <div className="text-sm font-bold text-amber-950">
-            Video longo com continuidade
+            Vídeo longo com continuidade
           </div>
           <p className="mt-1 text-xs text-amber-900">
-            Neste modo, o backend divide a narrativa em segmentos compativeis, mantem continuidade visual e retorna varios videos em `media[]`. O fluxo de publicar/agendar fica bloqueado ate consolidar tudo em um MP4 final.
+            Neste modo, o backend divide a narrativa em segmentos compatíveis, mantém continuidade visual e retorna vários vídeos em `media[]`. O fluxo de publicar/agendar fica bloqueado até consolidar tudo em um MP4 final.
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                Duracao total
+                Duração total
               </label>
               <select
                 value={String(totalDurationSeconds)}
@@ -2403,14 +2403,14 @@ function DirectionVisualSection({
                 ))}
               </select>
               <p className="mt-2 text-xs text-slate-500">
-                O modo sequencial opera em 720p e e indicado para historias mais completas, nao para um criativo unico curtinho. Com referencia visual, a continuidade atual trabalha em segmentos de 8 segundos.
+                O modo sequencial opera em 720p e é indicado para histórias mais completas, não para um criativo único curtinho. Com referência visual, a continuidade atual trabalha em segmentos de 8 segundos.
               </p>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
               <div className="font-semibold text-slate-900">Comportamento esperado</div>
               <div className="mt-2">
-                O video volta quebrado em segmentos. A consolidacao posterior continua necessaria antes de publicar automaticamente.
+                O vídeo volta quebrado em segmentos. A consolidação posterior continua necessária antes de publicar automaticamente.
               </div>
             </div>
 
@@ -2418,7 +2418,7 @@ function DirectionVisualSection({
               <>
                 <div className="md:col-span-2">
                   <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Historia resumida
+                    História resumida
                   </label>
                   <textarea
                     rows={2}
@@ -2429,13 +2429,13 @@ function DirectionVisualSection({
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
                   <p className="mt-2 text-xs text-slate-500">
-                    Resuma a progressao da historia em uma frase clara. Isso ajuda a manter inicio, meio e fim entre os segmentos.
+                    Resuma a progressão da história em uma frase clara. Isso ajuda a manter início, meio e fim entre os segmentos.
                   </p>
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Beats e cenas obrigatorias
+                    Beats e cenas obrigatórias
                   </label>
                   <textarea
                     rows={4}
@@ -2446,13 +2446,13 @@ function DirectionVisualSection({
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
                   <p className="mt-2 text-xs text-slate-500">
-                    Use uma linha por beat. A ordem informada orienta a sequencia narrativa dos segmentos.
+                    Use uma linha por beat. A ordem informada orienta a sequência narrativa dos segmentos.
                   </p>
                 </div>
               </>
             ) : (
               <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                A narrativa do video longo esta sendo definida no chat acima. Se quiser ajustar,
+                A narrativa do vídeo longo está sendo definida no chat acima. Se quiser ajustar,
                 use os prefixos `historia:` e `beats:`.
               </div>
             )}
@@ -2545,7 +2545,7 @@ function PreviewMediaSurface({
         <div className="absolute inset-x-6 bottom-6 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-white/90 backdrop-blur">
           <div className="text-xs uppercase tracking-[0.22em] text-white/65">{accentLabel}</div>
           <div className="mt-2 text-sm font-medium">
-            A IA vai posicionar a midia principal aqui com enquadramento otimizado para {postType.toLowerCase()}.
+            A IA vai posicionar a mídia principal aqui com enquadramento otimizado para {postType.toLowerCase()}.
           </div>
         </div>
       ) : null}
@@ -2578,7 +2578,7 @@ function getInstagramPreviewCopy(caption: string) {
   });
 
   return {
-    primaryLine: textBlocks[0] || "Sua mensagem principal aparecera aqui.",
+    primaryLine: textBlocks[0] || "Sua mensagem principal aparecerá aqui.",
     secondaryLine: textBlocks[1] || "",
     hashtags,
   };
@@ -2613,7 +2613,7 @@ function InstagramPreviewMock({
       ? normalizeTotalDurationSeconds(totalDurationSeconds)
       : undefined;
   const isSequentialPreview = continuityMode === "SEQUENTIAL" && showVideoIntent;
-  const previewCaption = caption.trim() || "Sua legenda aparecera aqui.";
+  const previewCaption = caption.trim() || "Sua legenda aparecerá aqui.";
   const captionSnippet = previewCaption.replace(/\s+/g, " ").trim();
   const shortCaption =
     captionSnippet.length > 160 ? `${captionSnippet.slice(0, 157).trim()}...` : captionSnippet;
@@ -2622,12 +2622,12 @@ function InstagramPreviewMock({
   );
   const accentLabel = mediaUrl
     ? mediaIsVideo
-      ? "Video gerado"
+      ? "Vídeo gerado"
       : showVideoIntent
-        ? "Referencia visual"
+        ? "Referência visual"
         : "Imagem gerada"
     : showVideoIntent
-      ? "Preview de video"
+      ? "Preview de vídeo"
       : "Preview de imagem";
   const displayAccountLabel =
     accountLabel.replace(/^@/, "").trim().replace(/\s+/g, "_") || "seu_negocio";
@@ -2657,7 +2657,7 @@ function InstagramPreviewMock({
           <div className="font-bold text-slate-900">Preview do Instagram</div>
           <div className="text-xs text-slate-500">
             {isSequentialPreview
-              ? `${getPostTypeLabel(postType)} - Video continuo de ${normalizedTotalDuration || 30}s`
+              ? `${getPostTypeLabel(postType)} - Vídeo contínuo de ${normalizedTotalDuration || 30}s`
               : `${getPostTypeLabel(postType)} - ${getSequenceCollectionLabel(postType, normalizedCount)}`}
           </div>
         </div>
@@ -2667,7 +2667,7 @@ function InstagramPreviewMock({
             : postType === "FEED"
               ? normalizedCount > 1
                 ? "Feed em carrossel"
-                : "Feed unico"
+                : "Feed único"
               : postType === "STORY"
                 ? "Story vertical"
                 : "Reels vertical"}
@@ -2726,9 +2726,9 @@ function InstagramPreviewMock({
                 <span className="mr-1 font-semibold text-slate-900">{displayAccountLabel}</span>
                 {shortCaption}
               </div>
-              <div className="text-xs text-slate-400">Ver todos os 84 comentarios</div>
+              <div className="text-xs text-slate-400">Ver todos os 84 comentários</div>
               <div className="border-t border-slate-100 pt-3 text-xs uppercase tracking-[0.2em] text-slate-400">
-                Ha 12 minutos
+                Há 12 minutos
               </div>
             </div>
           </div>
@@ -2897,7 +2897,7 @@ function InstagramPreviewMock({
       {normalizedCount > 1 ? (
         <div className="mt-5">
           <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Sequencia planejada
+            Sequência planejada
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((item, index) => (
@@ -2921,9 +2921,9 @@ function InstagramPreviewMock({
 
       {isSequentialPreview ? (
         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div className="font-semibold">Video longo unico</div>
+          <div className="font-semibold">Vídeo longo único</div>
           <div className="mt-1 text-amber-800">
-            O resultado esperado aqui e uma única publicacao de {normalizedTotalDuration || 30} segundos. Os segmentos internos servem apenas para compor esse video longo.
+            O resultado esperado aqui é uma única publicação de {normalizedTotalDuration || 30} segundos. Os segmentos internos servem apenas para compor esse vídeo longo.
           </div>
         </div>
       ) : null}
@@ -3022,7 +3022,7 @@ function GeneratedMediaSection({
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex rounded-full border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800">
-            1 publicacao
+            1 publicação
           </span>
           {normalizedTotalDuration ? (
             <span className="inline-flex rounded-full border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -3034,7 +3034,7 @@ function GeneratedMediaSection({
           </span>
         </div>
         <div className="mt-2">
-          Este video longo sera uma única publicacao de {getPostTypeLabel(postType).toLowerCase()}. Os blocos abaixo sao segmentos internos usados para montar o resultado final.
+          Este vídeo longo será uma única publicação de {getPostTypeLabel(postType).toLowerCase()}. Os blocos abaixo são segmentos internos usados para montar o resultado final.
         </div>
       </div>
 
@@ -3136,7 +3136,7 @@ const postTypeFilters = [
 function getErrorMessage(error: unknown, fallback: string) {
   const appendReferenceAccessHint = (message: string) => {
     if (isReferenceDownloadForbiddenMessage(message)) {
-      return `${message} A imagem importada do PC ficou com preview local, mas a URL retornada pelo upload de referencia parece protegida. Para a IA baixar a referencia sem falhar, essa URL precisa ser publica.`;
+      return `${message} A imagem importada do PC ficou com preview local, mas a URL retornada pelo upload de referência parece protegida. Para a IA baixar a referência sem falhar, essa URL precisa ser pública.`;
     }
 
     return message;
@@ -3188,8 +3188,8 @@ function buildAsyncGenerationFeedbackMessage({
 }) {
   if (readyCount > 0 && failedCount === 0) {
     return readyCount > 1
-      ? `${readyCount} rascunhos sairam da fila e ja estao prontos para revisao.`
-      : "Seu rascunho saiu da fila e ja esta pronto para revisao.";
+      ? `${readyCount} rascunhos saíram da fila e já estão prontos para revisão.`
+      : "Seu rascunho saiu da fila e já está pronto para revisão.";
   }
 
   if (readyCount > 0 && failedCount > 0) {
@@ -3197,8 +3197,8 @@ function buildAsyncGenerationFeedbackMessage({
   }
 
   return failedCount > 1
-    ? `${failedCount} geracoes falharam no processamento. Revise o briefing e tente novamente.`
-    : "A geracao falhou no processamento. Revise o briefing e tente novamente.";
+    ? `${failedCount} gerações falharam no processamento. Revise o briefing e tente novamente.`
+    : "A geração falhou no processamento. Revise o briefing e tente novamente.";
 }
 
 function parseAiPostSocketEvent(rawValue: string) {
@@ -3314,12 +3314,12 @@ function getPostTypeLabel(postType?: string | null) {
 function getMediaRecommendation(postType: AiPostType) {
   switch (postType) {
     case "STORY":
-      return "Story pode sair como imagem ou video vertical. Priorize foco central, leitura rapida e area segura para hashtag e arroba.";
+      return "Story pode sair como imagem ou vídeo vertical. Priorize foco central, leitura rápida e área segura para hashtag e arroba.";
     case "REELS":
-      return "Reels segue com foco em video curto, gancho forte e ritmo mais dinamico.";
+      return "Reels segue com foco em vídeo curto, gancho forte e ritmo mais dinâmico.";
     case "FEED":
     default:
-      return "Feed pode sair como imagem ou video, de acordo com a estrategia.";
+      return "Feed pode sair como imagem ou vídeo, de acordo com a estratégia.";
   }
 }
 
@@ -3327,12 +3327,12 @@ function StoryPremisesBalloons() {
   return (
     <div className="mt-4 space-y-3">
       <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        Story pode ser gerado como imagem ou video, mas a composicao precisa manter
-        leitura vertical rapida e foco central para nao perder a mensagem.
+        Story pode ser gerado como imagem ou vídeo, mas a composição precisa manter
+        leitura vertical rápida e foco central para não perder a mensagem.
       </div>
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Como premissa, o cliente precisa fazer a marcacao da hashtag e do
-        arroba de forma visivel no story. Nao pode usar escrita transparente,
+        Como premissa, o cliente precisa fazer a marcação da hashtag e do
+        arroba de forma visível no story. Não pode usar escrita transparente,
         branca, escondida ou muito pequena.
       </div>
     </div>
@@ -3902,22 +3902,22 @@ function PublicacoesIaPageContent() {
     const normalizedValue = nextUrl.trim();
 
     if (!normalizedValue) {
-      return { error: "Cole uma URL publica de imagem antes de adicionar." };
+      return { error: "Cole uma URL pública de imagem antes de adicionar." };
     }
 
     if (!isValidReferenceImageUrl(normalizedValue)) {
       return {
         error:
-          "Use uma URL publica valida, com http ou https, sem espacos em branco.",
+          "Use uma URL pública válida, com http ou https, sem espaços em branco.",
       };
     }
 
     if (currentUrls.includes(normalizedValue)) {
-      return { error: "Essa referencia ja foi adicionada." };
+      return { error: "Essa referência já foi adicionada." };
     }
 
     if (currentUrls.length >= 3) {
-      return { error: "Voce pode usar no maximo 3 imagens de referencia." };
+      return { error: "Você pode usar no máximo 3 imagens de referência." };
     }
 
     return {
@@ -3977,8 +3977,8 @@ function PublicacoesIaPageContent() {
       type: "info",
       message:
         toIndex === 0
-          ? "Referencia principal atualizada."
-          : "Ordem das referencias atualizada.",
+          ? "Referência principal atualizada."
+          : "Ordem das referências atualizada.",
     });
   };
 
@@ -4003,8 +4003,8 @@ function PublicacoesIaPageContent() {
       type: "info",
       message:
         toIndex === 0
-          ? "Referencia principal atualizada."
-          : "Ordem das referencias atualizada.",
+          ? "Referência principal atualizada."
+          : "Ordem das referências atualizada.",
     });
   };
 
@@ -4039,7 +4039,7 @@ function PublicacoesIaPageContent() {
         ? {
             type: "info",
             message:
-              "Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.",
+              "Vídeo com imagem de referência exige 8 segundos no modelo atual. Ajustamos a duração automaticamente.",
           }
         : null,
     );
@@ -4073,7 +4073,7 @@ function PublicacoesIaPageContent() {
         ? {
             type: "info",
             message:
-              "Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.",
+              "Vídeo com imagem de referência exige 8 segundos no modelo atual. Ajustamos a duração automaticamente.",
           }
         : null,
     );
@@ -4099,7 +4099,7 @@ function PublicacoesIaPageContent() {
 
       for (const file of files) {
         if (!isValidReferenceImageFile(file)) {
-          throw new Error(`O arquivo "${file.name}" nao e uma imagem valida.`);
+          throw new Error(`O arquivo "${file.name}" não é uma imagem válida.`);
         }
 
         const dataUrl = await readFileAsDataUrl(file);
@@ -4112,7 +4112,7 @@ function PublicacoesIaPageContent() {
 
         if (!isValidReferenceImageUrl(uploadedUrl)) {
           throw new Error(
-            `Nao foi possivel obter a URL publica da imagem "${file.name}" depois do upload.`,
+            `Não foi possível obter a URL pública da imagem "${file.name}" depois do upload.`,
           );
         }
 
@@ -4137,19 +4137,19 @@ function PublicacoesIaPageContent() {
   ) => {
     const baseMessage =
       importedCount > 1
-        ? `${importedCount} imagens foram importadas do PC e adicionadas como referencias.`
-        : "Imagem importada do PC e adicionada como referencia.";
+        ? `${importedCount} imagens foram importadas do PC e adicionadas como referências.`
+        : "Imagem importada do PC e adicionada como referência.";
 
     const accessibilityWarning =
       inaccessibleCount > 0
-        ? ` O preview local foi mantido, mas ${inaccessibleCount > 1 ? "algumas URLs retornadas pelo upload parecem protegidas" : "a URL retornada pelo upload parece protegida"} e a geracao fica bloqueada ate voce trocar por uma URL publica.`
+        ? ` O preview local foi mantido, mas ${inaccessibleCount > 1 ? "algumas URLs retornadas pelo upload parecem protegidas" : "a URL retornada pelo upload parece protegida"} e a geração fica bloqueada até você trocar por uma URL pública.`
         : "";
 
     if (!adjustedVideoReferenceConfig) {
-      return `${baseMessage} A referencia ja entrou como URL publica no S3.${accessibilityWarning}`;
+      return `${baseMessage} A referência já entrou como URL pública no S3.${accessibilityWarning}`;
     }
 
-    return `${baseMessage} Video com imagem de referencia exige 8 segundos no modelo atual. Ajustamos a duracao automaticamente.${accessibilityWarning}`;
+    return `${baseMessage} Vídeo com imagem de referência exige 8 segundos no modelo atual. Ajustamos a duração automaticamente.${accessibilityWarning}`;
   };
 
   const handleImportGenerateReferenceFiles = async (filesList: FileList | null) => {
@@ -4162,7 +4162,7 @@ function PublicacoesIaPageContent() {
     if (generateForm.referenceImageUrls.length + files.length > 3) {
       setFeedback({
         type: "error",
-        message: "Voce pode usar no maximo 3 imagens de referencia.",
+        message: "Você pode usar no máximo 3 imagens de referência.",
       });
       return;
     }
@@ -4219,7 +4219,7 @@ function PublicacoesIaPageContent() {
         type: "error",
         message: getErrorMessage(
           error,
-          "Nao foi possivel importar a imagem de referencia pelo PC.",
+          "Não foi possível importar a imagem de referência pelo PC.",
         ),
       });
     }
@@ -4235,7 +4235,7 @@ function PublicacoesIaPageContent() {
     if (currentDraft.referenceImageUrls.length + files.length > 3) {
       setFeedback({
         type: "error",
-        message: "Voce pode usar no maximo 3 imagens de referencia.",
+        message: "Você pode usar no máximo 3 imagens de referência.",
       });
       return;
     }
@@ -4289,7 +4289,7 @@ function PublicacoesIaPageContent() {
         type: "error",
         message: getErrorMessage(
           error,
-          "Nao foi possivel importar a imagem de referencia pelo PC.",
+          "Não foi possível importar a imagem de referência pelo PC.",
         ),
       });
     }
@@ -4415,14 +4415,14 @@ function PublicacoesIaPageContent() {
           });
           addDashboardRuntimeNotification({
             type: "success",
-            title: "Publicacao pronta",
-            message: "Seu rascunho ja esta pronto para revisao.",
+            title: "Publicação pronta",
+            message: "Seu rascunho já está pronto para revisão.",
             href: AI_POSTS_LIBRARY_HREF,
           });
           showToast({
             type: "success",
-            title: "Publicacao pronta",
-            message: "Seu rascunho ja esta pronto para revisao.",
+            title: "Publicação pronta",
+            message: "Seu rascunho já está pronto para revisão.",
           });
         }
         return;
@@ -4448,13 +4448,13 @@ function PublicacoesIaPageContent() {
           });
           addDashboardRuntimeNotification({
             type: "error",
-            title: "Falha na geracao",
+            title: "Falha na geração",
             message: failedMessage,
             href: AI_POSTS_LIBRARY_HREF,
           });
           showToast({
             type: "error",
-            title: "Falha na geracao",
+            title: "Falha na geração",
             message: failedMessage,
           });
         }
@@ -4508,7 +4508,7 @@ function PublicacoesIaPageContent() {
 
       if (normalizedSequenceCount > remainingAiGenerations) {
         throw new Error(
-          `Sua sequencia pede ${normalizedSequenceCount} geracoes, mas restam apenas ${remainingAiGenerations} no plano atual.`,
+          `Sua sequência pede ${normalizedSequenceCount} gerações, mas restam apenas ${remainingAiGenerations} no plano atual.`,
         );
       }
 
@@ -4517,7 +4517,7 @@ function PublicacoesIaPageContent() {
         normalizedSequenceCount > remainingAiVideoGenerations
       ) {
         throw new Error(
-          `Sua sequencia pede ${normalizedSequenceCount} videos, mas restam apenas ${remainingAiVideoGenerations} geracoes de video no plano atual.`,
+          `Sua sequência pede ${normalizedSequenceCount} vídeos, mas restam apenas ${remainingAiVideoGenerations} gerações de vídeo no plano atual.`,
         );
       }
 
@@ -4541,7 +4541,7 @@ function PublicacoesIaPageContent() {
 
       if (generateForm.referenceImageUrls.some((url) => !isValidReferenceImageUrl(url))) {
         throw new Error(
-          "Revise as imagens de referencia. Use apenas URLs publicas validas com http ou https.",
+          "Revise as imagens de referência. Use apenas URLs públicas válidas com http ou https.",
         );
       }
 
@@ -4565,12 +4565,12 @@ function PublicacoesIaPageContent() {
       if (isGenerateSequentialMode) {
         if (!generateBriefingValues.storyOutline.trim()) {
           throw new Error(
-            "Descreva a historia resumida do video longo antes de gerar o modo sequencial.",
+            "Descreva a história resumida do vídeo longo antes de gerar o modo sequencial.",
           );
         }
 
         if (!Number.isFinite(generateForm.totalDurationSeconds)) {
-          throw new Error("Defina a duracao total do video longo.");
+          throw new Error("Defina a duração total do vídeo longo.");
         }
       }
 
@@ -4648,7 +4648,7 @@ function PublicacoesIaPageContent() {
       } catch (error) {
         if (queuedJobs.length > 0) {
           const partialError = new Error(
-            `Enviamos ${queuedJobs.length} de ${normalizedSequenceCount} Peças para a fila antes da interrupcao. ${getErrorMessage(error, "Nao foi possivel concluir o envio da sequencia.")}`,
+            `Enviamos ${queuedJobs.length} de ${normalizedSequenceCount} Peças para a fila antes da interrupção. ${getErrorMessage(error, "Não foi possível concluir o envio da sequência.")}`,
           ) as Error & { partialQueuedJobs?: AiPostAsyncGenerationResponse[] };
           partialError.partialQueuedJobs = queuedJobs;
           throw partialError;
@@ -4672,25 +4672,25 @@ function PublicacoesIaPageContent() {
         type: "success",
         message:
           queuedJobs.length > 1
-            ? `${queuedJobs.length} publicacoes foram enviadas para fila. Voce pode continuar mexendo em outras areas enquanto a biblioteca atualiza automaticamente.`
-            : "Publicacao enviada para fila com sucesso. Voce pode continuar mexendo em outras areas enquanto a biblioteca atualiza automaticamente.",
+            ? `${queuedJobs.length} publicações foram enviadas para fila. Você pode continuar mexendo em outras áreas enquanto a biblioteca atualiza automaticamente.`
+            : "Publicação enviada para fila com sucesso. Você pode continuar mexendo em outras áreas enquanto a biblioteca atualiza automaticamente.",
       });
       addDashboardRuntimeNotification({
         type: "info",
-        title: queuedJobs.length > 1 ? "Publicacoes na fila" : "Publicacao na fila",
+        title: queuedJobs.length > 1 ? "Publicações na fila" : "Publicação na fila",
         message:
           queuedJobs.length > 1
-            ? `${queuedJobs.length} publicacoes entraram na fila. Voce pode continuar usando o painel enquanto elas sao geradas.`
-            : "Sua publicacao entrou na fila. Voce pode continuar usando o painel enquanto ela e gerada.",
+            ? `${queuedJobs.length} publicações entraram na fila. Você pode continuar usando o painel enquanto elas são geradas.`
+            : "Sua publicação entrou na fila. Você pode continuar usando o painel enquanto ela é gerada.",
         href: AI_POSTS_LIBRARY_HREF,
       });
       showToast({
         type: "info",
-        title: queuedJobs.length > 1 ? "Publicacoes na fila" : "Publicacao na fila",
+        title: queuedJobs.length > 1 ? "Publicações na fila" : "Publicação na fila",
         message:
           queuedJobs.length > 1
-            ? `${queuedJobs.length} publicacoes foram para a fila. Voce pode continuar usando o sistema normalmente.`
-            : "Sua publicacao foi para a fila. Voce pode continuar usando o sistema normalmente.",
+            ? `${queuedJobs.length} publicações foram para a fila. Você pode continuar usando o sistema normalmente.`
+            : "Sua publicação foi para a fila. Você pode continuar usando o sistema normalmente.",
       });
       setStatusFilter("");
       setLibraryPage(1);
@@ -4731,7 +4731,7 @@ function PublicacoesIaPageContent() {
     onError: (error) => {
       const errorMessage = getErrorMessage(
         error,
-        "Nao foi possivel enviar a publicacao para fila.",
+        "Não foi possível enviar a publicação para fila.",
       );
       const partialQueuedJobs =
         typeof error === "object" &&
@@ -4755,8 +4755,8 @@ function PublicacoesIaPageContent() {
             partialQueuedJobs.length > 1 ? "Fila iniciada parcialmente" : "Fila iniciada",
           message:
             partialQueuedJobs.length > 1
-              ? `${partialQueuedJobs.length} publicacoes entraram na fila. O restante teve erro, mas voce pode continuar usando o painel.`
-              : "Sua publicacao entrou na fila, mas houve uma falha no restante do processo. Voce pode continuar usando o painel.",
+              ? `${partialQueuedJobs.length} publicações entraram na fila. O restante teve erro, mas você pode continuar usando o painel.`
+              : "Sua publicação entrou na fila, mas houve uma falha no restante do processo. Você pode continuar usando o painel.",
           href: AI_POSTS_LIBRARY_HREF,
         });
         showToast({
@@ -4765,8 +4765,8 @@ function PublicacoesIaPageContent() {
             partialQueuedJobs.length > 1 ? "Fila iniciada parcialmente" : "Fila iniciada",
           message:
             partialQueuedJobs.length > 1
-              ? `${partialQueuedJobs.length} publicacoes entraram na fila. Voce pode continuar usando o sistema enquanto concluimos o restante.`
-              : "Sua publicacao entrou na fila. Voce pode continuar usando o sistema enquanto concluimos o restante.",
+              ? `${partialQueuedJobs.length} publicações entraram na fila. Você pode continuar usando o sistema enquanto concluímos o restante.`
+              : "Sua publicação entrou na fila. Você pode continuar usando o sistema enquanto concluímos o restante.",
         });
         queryClient.invalidateQueries({ queryKey: ["ai-posts"] });
         partialQueuedJobs.forEach((job) => {
@@ -5073,16 +5073,16 @@ function PublicacoesIaPageContent() {
         title:
           readyPosts.length > 0
             ? readyPosts.length > 1
-              ? "Publicacoes prontas"
-              : "Publicacao pronta"
+              ? "Publicações prontas"
+              : "Publicação pronta"
             : failedCount > 1
-              ? "Falhas na geracao"
-              : "Falha na geracao",
+              ? "Falhas na geração"
+              : "Falha na geração",
         message:
           readyPosts.length > 0
             ? readyPosts.length > 1
-              ? `${readyPosts.length} rascunhos ja estao prontos para revisao.`
-              : "Seu rascunho ja esta pronto para revisao."
+              ? `${readyPosts.length} rascunhos já estão prontos para revisão.`
+              : "Seu rascunho já está pronto para revisão."
             : buildAsyncGenerationFeedbackMessage({
                 readyCount: readyPosts.length,
                 failedCount,
@@ -5098,16 +5098,16 @@ function PublicacoesIaPageContent() {
         title:
           readyPosts.length > 0
             ? readyPosts.length > 1
-              ? "Publicacoes prontas"
-              : "Publicacao pronta"
+              ? "Publicações prontas"
+              : "Publicação pronta"
             : failedCount > 1
-              ? "Falhas na geracao"
-              : "Falha na geracao",
+              ? "Falhas na geração"
+              : "Falha na geração",
         message:
           readyPosts.length > 0
             ? readyPosts.length > 1
-              ? `${readyPosts.length} rascunhos ja estao prontos para revisao.`
-              : "Seu rascunho ja esta pronto para revisao."
+              ? `${readyPosts.length} rascunhos já estão prontos para revisão.`
+              : "Seu rascunho já está pronto para revisão."
             : buildAsyncGenerationFeedbackMessage({
                 readyCount: readyPosts.length,
                 failedCount,
@@ -5149,7 +5149,7 @@ function PublicacoesIaPageContent() {
 
       if (currentDraft.referenceImageUrls.some((url) => !isValidReferenceImageUrl(url))) {
         throw new Error(
-          "Revise as imagens de referencia. Use apenas URLs publicas validas com http ou https.",
+          "Revise as imagens de referência. Use apenas URLs públicas válidas com http ou https.",
         );
       }
 
@@ -5353,7 +5353,7 @@ function PublicacoesIaPageContent() {
       setFeedback({
         type: "info",
         message:
-          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao terminar antes de salvar a revisao.",
+          "Este rascunho ainda está em fila ou processamento. Aguarde a geração terminar antes de salvar a revisão.",
       });
       return;
     }
@@ -5375,7 +5375,7 @@ function PublicacoesIaPageContent() {
       setFeedback({
         type: "info",
         message:
-          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao concluir antes de publicar.",
+          "Este rascunho ainda está em fila ou processamento. Aguarde a geração concluir antes de publicar.",
       });
       return;
     }
@@ -5384,7 +5384,7 @@ function PublicacoesIaPageContent() {
       setFeedback({
         type: "info",
         message:
-          "Videos longos em modo sequencial retornam em segmentos e precisam de consolidacao antes da publicacao automatica.",
+          "Vídeos longos em modo sequencial retornam em segmentos e precisam de consolidação antes da publicação automática.",
       });
       return;
     }
@@ -5406,7 +5406,7 @@ function PublicacoesIaPageContent() {
       setFeedback({
         type: "info",
         message:
-          "Este rascunho ainda esta em fila ou processamento. Aguarde a geracao concluir antes de agendar.",
+          "Este rascunho ainda está em fila ou processamento. Aguarde a geração concluir antes de agendar.",
       });
       return;
     }
@@ -5415,7 +5415,7 @@ function PublicacoesIaPageContent() {
       setFeedback({
         type: "info",
         message:
-          "Videos longos em modo sequencial precisam ser consolidados antes de entrar no fluxo de agendamento.",
+          "Vídeos longos em modo sequencial precisam ser consolidados antes de entrar no fluxo de agendamento.",
       });
       return;
     }
@@ -5455,7 +5455,7 @@ function PublicacoesIaPageContent() {
           </div>
 
           <h3 className="mt-3 font-heading text-2xl font-bold text-slate-900">
-            Revisar publicacao
+            Revisar publicação
           </h3>
           <p className="mt-1 text-sm text-slate-500">
             Ajuste legenda, hashtags e agendamento antes de enviar ao
@@ -5484,7 +5484,7 @@ function PublicacoesIaPageContent() {
           </div>
           {requiredCampaignHashtag ? (
             <div className="mt-1">
-              A hashtag obrigatoria {requiredCampaignHashtag} precisa
+              A hashtag obrigatória {requiredCampaignHashtag} precisa
               permanecer na legenda final ou na lista de hashtags.
             </div>
           ) : null}
@@ -5494,20 +5494,20 @@ function PublicacoesIaPageContent() {
       {isCurrentDraftSequential ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <div className="font-semibold">
-            Video longo com continuidade ativo
+            Vídeo longo com continuidade ativo
           </div>
           <div className="mt-1">
-            Este rascunho retorna segmentos em sequencia e ainda precisa de consolidacao antes do fluxo de publicar ou agendar.
+            Este rascunho retorna segmentos em sequência e ainda precisa de consolidação antes do fluxo de publicar ou agendar.
           </div>
         </div>
       ) : null}
 
       {isSelectedPostProcessing ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <div className="font-semibold">Geracao em andamento</div>
+          <div className="font-semibold">Geração em andamento</div>
           <div className="mt-1">
-            Este rascunho ainda esta {getStatusMeta(selectedPost.status).label.toLowerCase()}.
-            Aguarde a conclusao para revisar a midia final, publicar ou agendar.
+            Este rascunho ainda está {getStatusMeta(selectedPost.status).label.toLowerCase()}.
+            Aguarde a conclusão para revisar a mídia final, publicar ou agendar.
           </div>
         </div>
       ) : null}
@@ -5516,7 +5516,7 @@ function PublicacoesIaPageContent() {
         <div className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 font-bold text-slate-900">
-              Configuracao do rascunho
+              Configuração do rascunho
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -5545,7 +5545,7 @@ function PublicacoesIaPageContent() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Tipo da publicacao
+                  Tipo da publicação
                 </label>
                 <select
                   value={currentDraft.postType}
@@ -5625,7 +5625,7 @@ function PublicacoesIaPageContent() {
                         Gerar imagem
                       </span>
                       Use quando quiser uma arte fixa para feed ou story, com
-                      leitura rapida e composicao estatica.
+                      leitura rápida e composição estática.
                     </span>
                   </label>
 
@@ -5645,7 +5645,7 @@ function PublicacoesIaPageContent() {
                     />
                     <span className="text-sm text-slate-700">
                       <span className="block font-bold text-slate-900">
-                        Gerar video
+                        Gerar vídeo
                       </span>
                       Ative para feed, story ou reels quando quiser motion,
                       narrativa em movimento e mais impacto visual.
@@ -5673,7 +5673,7 @@ function PublicacoesIaPageContent() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Topico
+                  Tópico
                 </label>
                 <input
                   type="text"
@@ -5686,7 +5686,7 @@ function PublicacoesIaPageContent() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Chamada para acao
+                  Chamada para ação
                 </label>
                 <input
                   type="text"
@@ -5701,7 +5701,7 @@ function PublicacoesIaPageContent() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Publico alvo
+                  Público alvo
                 </label>
                 <input
                   type="text"
@@ -5730,7 +5730,7 @@ function PublicacoesIaPageContent() {
               {currentDraft.generateVideo ? (
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Duracao do video
+                    Duração do vídeo
                   </label>
                   <select
                     value={String(currentDraft.durationSeconds)}
@@ -5754,7 +5754,7 @@ function PublicacoesIaPageContent() {
                   </select>
                   <p className="mt-2 text-xs text-slate-500">
                     {isCurrentDraftVideoReferenceMode
-                      ? "Video com imagem de referencia fica travado em 8 segundos no modelo atual."
+                      ? "Vídeo com imagem de referência fica travado em 8 segundos no modelo atual."
                       : "O backend aceita apenas 4, 6 ou 8 segundos."}
                   </p>
                 </div>
@@ -5763,7 +5763,7 @@ function PublicacoesIaPageContent() {
               {currentDraft.generateVideo ? (
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Idioma do video
+                    Idioma do vídeo
                   </label>
                   <select
                     value={currentDraft.videoLanguage}
@@ -5806,8 +5806,8 @@ function PublicacoesIaPageContent() {
               {currentDraft.generateVideo ? (
                 <div className="md:col-span-2">
                   <AssistantTextareaField
-                    title="Assistente do video"
-                    assistantMessage="Refine aqui a direcao do video em movimento. Camera, ritmo, gesto, ambiente e clima ajudam bastante no resultado."
+                    title="Assistente do vídeo"
+                    assistantMessage="Refine aqui a direção do vídeo em movimento. Câmera, ritmo, gesto, ambiente e clima ajudam bastante no resultado."
                     suggestions={getVideoPromptSuggestions(currentDraft.postType)}
                     onSuggestionSelect={(value) => updateDraft({ videoPrompt: value })}
                     value={currentDraft.videoPrompt}
@@ -5978,7 +5978,7 @@ function PublicacoesIaPageContent() {
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2 font-bold text-slate-900">
               <ImageIcon className="h-4 w-4 text-slate-500" />
-              Midia gerada
+              Mídia gerada
             </div>
             <GeneratedMediaSection
               key={`${selectedPost.id}-${selectedPost.media.length}-${currentDraft.totalDurationSeconds}`}
@@ -6014,12 +6014,12 @@ function PublicacoesIaPageContent() {
               <div className="flex items-center justify-between gap-4">
                 <span className="text-slate-500">Continuidade</span>
                 <span className="font-semibold">
-                  {isCurrentDraftSequential ? "Sequencial" : "Video unico"}
+                  {isCurrentDraftSequential ? "Sequencial" : "Vídeo único"}
                 </span>
               </div>
               {isCurrentDraftSequential ? (
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Duracao total</span>
+                  <span className="text-slate-500">Duração total</span>
                   <span className="font-semibold">
                     {currentDraft.totalDurationSeconds} segundos
                   </span>
@@ -6042,7 +6042,7 @@ function PublicacoesIaPageContent() {
                 <span className="font-semibold">
                   {selectedPost.createdAt
                     ? new Date(selectedPost.createdAt).toLocaleString("pt-BR")
-                    : "Nao informado"}
+                    : "Não informado"}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -6050,7 +6050,7 @@ function PublicacoesIaPageContent() {
                 <span className="font-semibold">
                   {selectedPost.scheduledAt
                     ? new Date(selectedPost.scheduledAt).toLocaleString("pt-BR")
-                    : "Nao agendado"}
+                    : "Não agendado"}
                 </span>
               </div>
             </div>
@@ -6060,15 +6060,15 @@ function PublicacoesIaPageContent() {
 
       {draftProtectedReferenceUrls.length > 0 ? (
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          As referencias importadas do PC continuam com preview local apenas. Para usar essas imagens em novas geracoes, troque por URLs publicas.
+          As referências importadas do PC continuam com preview local apenas. Para usar essas imagens em novas gerações, troque por URLs públicas.
         </div>
       ) : null}
 
       <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="text-xs text-slate-500">
           {isCurrentDraftSequential
-            ? "Videos longos sequenciais retornam em segmentos e aguardam consolidacao antes da publicacao."
-            : "Reels podem exigir video e stories priorizam asset vertical."}
+            ? "Vídeos longos sequenciais retornam em segmentos e aguardam consolidação antes da publicação."
+            : "Reels podem exigir vídeo e stories priorizam asset vertical."}
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -6085,7 +6085,7 @@ function PublicacoesIaPageContent() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Salvar revisao
+            Salvar revisão
           </button>
 
           <button
@@ -6153,8 +6153,8 @@ function PublicacoesIaPageContent() {
           <div className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              A conta do estabelecimento esta conectada e pronta para publicar
-              no Instagram, sujeito as permissoes concedidas na Meta.
+              A conta do estabelecimento está conectada e pronta para publicar
+              no Instagram, sujeita às permissões concedidas na Meta.
             </div>
           </div>
         </div>
@@ -6167,8 +6167,8 @@ function PublicacoesIaPageContent() {
         Selecione um rascunho para revisar
       </div>
       <div className="mt-1 max-w-md text-sm">
-        Gere um novo conteudo com IA ou escolha um item da lista para editar
-        legenda, hashtags e publicacao.
+        Gere um novo conteúdo com IA ou escolha um item da lista para editar
+        legenda, hashtags e publicação.
       </div>
     </div>
   );
@@ -6230,7 +6230,7 @@ function PublicacoesIaPageContent() {
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
             <div className="font-semibold text-slate-900">
-              Conta conectada: {isMetaConnected ? "sim" : "nao"}
+              Conta conectada: {isMetaConnected ? "sim" : "não"}
             </div>
             <div className="mt-1">
               {me?.instagramHandle || "Conecte o Instagram profissional para publicar."}
@@ -6247,7 +6247,7 @@ function PublicacoesIaPageContent() {
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
             <div className="font-semibold text-slate-900">
-              Videos do plano
+              Vídeos do plano
             </div>
             <div className="mt-1">
               {totalAiVideoGenerations} / {aiPostsVideoGenerationLimit} utilizadas no
@@ -6282,7 +6282,7 @@ function PublicacoesIaPageContent() {
                   href="/dashboard/configuracoes"
                   className="font-bold text-amber-950 underline"
                 >
-                  Ir para configuracoes
+                  Ir para configurações
                 </Link>
               </div>
             </div>
@@ -6359,7 +6359,7 @@ function PublicacoesIaPageContent() {
                   type="button"
                   onClick={() => dismissToast(toast.id)}
                   className="text-slate-400 transition-colors hover:text-slate-600"
-                  aria-label="Fechar notificacao"
+                  aria-label="Fechar notificação"
                 >
                   ×
                 </button>
@@ -6372,8 +6372,8 @@ function PublicacoesIaPageContent() {
       {trackedAsyncGenerationJobs.length > 0 ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           {trackedAsyncGenerationJobs.length > 1
-            ? `${trackedAsyncGenerationJobs.length} geracoes estao em acompanhamento agora.`
-            : "1 geracao esta em acompanhamento agora."}{" "}
+            ? `${trackedAsyncGenerationJobs.length} gerações estão em acompanhamento agora.`
+            : "1 geração está em acompanhamento agora."}{" "}
           {asyncQueuedCount > 0 ? `${asyncQueuedCount} na fila.` : ""}
           {asyncProcessingCount > 0
             ? ` ${asyncProcessingCount} processando.`
@@ -6394,7 +6394,7 @@ function PublicacoesIaPageContent() {
           </div>
           <div>
             <h2 className="font-heading text-xl font-bold text-slate-900">
-              Gerar nova publicação
+              Nova publicação
             </h2>
             <p className="text-sm text-slate-500">
               Escolha se a IA deve criar um conteúdo editorial ou vinculado a uma
@@ -6486,7 +6486,7 @@ function PublicacoesIaPageContent() {
                 >
                   <span className="block font-bold text-slate-900">Gerar imagem</span>
                   Use quando quiser uma arte fixa para feed ou story, com leitura
-                  rapida e composicao estatica.
+                  rápida e composição estática.
                 </span>
               </label>
 
@@ -6551,7 +6551,7 @@ function PublicacoesIaPageContent() {
                 </div>
                 <p className="mt-1 text-sm text-slate-500">
                   Preencha o briefing em etapas. A linha do tempo organiza objetivo,
-                  midia, direcao visual e detalhes extras no mesmo fluxo.
+                  mídia, direção visual e detalhes extras no mesmo fluxo.
                 </p>
               </div>
               <button
@@ -6567,12 +6567,12 @@ function PublicacoesIaPageContent() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                {generateBriefingCompletedRequiredSteps}/{generateBriefingRequiredStepCount} etapas principais concluidas
+                {generateBriefingCompletedRequiredSteps}/{generateBriefingRequiredStepCount} etapas principais concluídas
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
                 {nextGenerateBriefingField
-                  ? `Proxima etapa: ${getAiBriefingFieldLabel(nextGenerateBriefingField)}`
-                  : "Briefing base concluido"}
+                  ? `Próxima etapa: ${getAiBriefingFieldLabel(nextGenerateBriefingField)}`
+                  : "Briefing base concluído"}
               </span>
             </div>
 
@@ -6687,8 +6687,8 @@ function PublicacoesIaPageContent() {
             </div>
 
             <p className="mt-4 text-xs text-slate-500">
-              Cada etapa guarda uma resposta final. Voce pode preencher em ordem,
-              revisar depois e manter a geracao organizada sem depender de conversa.
+              Cada etapa guarda uma resposta final. Você pode preencher em ordem,
+              revisar depois e manter a geração organizada sem depender de conversa.
             </p>
           </div>
 
@@ -6723,7 +6723,7 @@ function PublicacoesIaPageContent() {
                 </select>
                 <p className="mt-1 text-xs text-slate-500">
                   {isGenerateVideoReferenceMode
-                    ? "Video com imagem de referencia fica travado em 8 segundos no modelo atual."
+                    ? "Vídeo com imagem de referência fica travado em 8 segundos no modelo atual."
                     : "O backend aceita apenas 4, 6 ou 8 segundos."}
                 </p>
               </div>
@@ -6856,9 +6856,9 @@ function PublicacoesIaPageContent() {
 
           <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">
-              <div className="text-sm font-bold text-slate-900">Sequencia de publicacoes</div>
+              <div className="text-sm font-bold text-slate-900">Sequência de publicações</div>
               <div className="mt-1 text-xs text-slate-500">
-                Gere uma Peça única ou uma sequencia inteira de feed, story ou reels no mesmo fluxo.
+                Gere uma Peça única ou uma sequência inteira de feed, story ou reels no mesmo fluxo.
               </div>
             </div>
 
@@ -6894,7 +6894,7 @@ function PublicacoesIaPageContent() {
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                 <div className="font-semibold text-slate-900">Resultado na biblioteca</div>
                 <div className="mt-2">
-                  Cada item da sequencia vira um rascunho separado. Isso ja resolve stories em passos e series de reels; carrossel unico no feed ainda depende de suporte especifico do backend.
+                  Cada item da sequência vira um rascunho separado. Isso já resolve stories em passos e séries de reels; carrossel único no feed ainda depende de suporte específico do backend.
                 </div>
               </div>
 
@@ -6913,15 +6913,15 @@ function PublicacoesIaPageContent() {
                   }
                   placeholder={
                     generateForm.postType === "FEED"
-                      ? "card 1: chamar atencao para o problema\ncard 2: mostrar a solucao\ncard 3: fechar com CTA"
+                      ? "card 1: chamar atenção para o problema\ncard 2: mostrar a solução\ncard 3: fechar com CTA"
                       : generateForm.postType === "STORY"
-                        ? "story 1: contexto rapido\nstory 2: prova ou beneficio\nstory 3: CTA para responder"
+                        ? "story 1: contexto rápido\nstory 2: prova ou benefício\nstory 3: CTA para responder"
                         : "reel 1: gancho forte\nreel 2: bastidores\nreel 3: oferta final"
                   }
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
                 />
                 <p className="mt-2 text-xs text-slate-500">
-                  Use uma linha por item. Se preencher menos linhas que a quantidade, o restante sai como variacao complementar.
+                  Use uma linha por item. Se preencher menos linhas que a quantidade, o restante sai como variação complementar.
                 </p>
               </div>
             </div>
@@ -6963,7 +6963,7 @@ function PublicacoesIaPageContent() {
 
         {isGenerateBlockedByProtectedReferences ? (
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            A geracao foi bloqueada porque pelo menos uma referencia importada do PC ficou com preview local apenas. Remova essa imagem ou troque por uma URL publica antes de continuar.
+            A geração foi bloqueada porque pelo menos uma referência importada do PC ficou com preview local apenas. Remova essa imagem ou troque por uma URL pública antes de continuar.
           </div>
         ) : null}
 
@@ -6998,8 +6998,8 @@ function PublicacoesIaPageContent() {
         {generateMutation.isPending ? (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {batchGenerationProgress && batchGenerationProgress.total > 1
-              ? `Estamos enviando a sequencia para fila agora (${batchGenerationProgress.current}/${batchGenerationProgress.total}).`
-              : "Estamos enviando sua publicacao para fila agora."}
+              ? `Estamos enviando a sequência para fila agora (${batchGenerationProgress.current}/${batchGenerationProgress.total}).`
+              : "Estamos enviando sua publicação para fila agora."}
           </div>
         ) : null}
       </section>
@@ -7091,7 +7091,7 @@ function PublicacoesIaPageContent() {
         <div className="border-t border-slate-100 bg-slate-50/40 p-4 sm:p-6">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-500">
-              Clique em uma publicacao para abrir os detalhes em modal sem apertar a listagem.
+              Clique em uma publicação para abrir os detalhes em modal sem apertar a listagem.
             </p>
             {selectedPost ? (
               <button
@@ -7923,8 +7923,8 @@ function PublicacoesIaPageContent() {
             Boolean(selectedPost)
           }
           onClose={() => setIsPostDetailModalOpen(false)}
-          title="Revisar publicacao"
-          description="Ajuste legenda, hashtags, midia e agendamento antes de publicar."
+          title="Revisar publicação"
+          description="Ajuste legenda, hashtags, mídia e agendamento antes de publicar."
           maxWidthClassName="max-w-6xl"
         >
           <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">

@@ -7,7 +7,7 @@ export const aiPostsSections: Array<{
 }> = [
   {
     id: "generate",
-    label: "Gerar nova publicação",
+    label: "Nova publicação",
     description:
       "Configure briefing, formato, mídia e prompts para criar uma nova publicação com IA.",
   },
