@@ -189,7 +189,7 @@ export default function SponsoredRulesPage() {
                   <div>
                     <p className="font-semibold text-slate-900">Limite de exibicao por regiao</p>
                     <p className="text-sm text-slate-500">
-                      Evita saturacao comercial em uma unica cidade ou bairro.
+                      Evita saturacao comercial em uma única cidade ou bairro.
                     </p>
                   </div>
                   <input
