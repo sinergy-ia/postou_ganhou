@@ -2,6 +2,7 @@ export type ConfigSectionId =
   | "profile"
   | "address"
   | "social"
+  | "marketplace"
   | "team"
   | "hours"
   | "notifications"
@@ -29,6 +30,12 @@ export const dashboardConfigSections: Array<{
     id: "social",
     label: "Conectar Instagram",
     description: "Instagram e website do estabelecimento.",
+    available: true,
+  },
+  {
+    id: "marketplace",
+    label: "Marketplaces",
+    description: "Integracoes com Nuvemshop, Shopify e iFood.",
     available: true,
   },
   {

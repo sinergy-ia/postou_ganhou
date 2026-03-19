@@ -6,6 +6,12 @@ import PaginationControls from '@/components/dashboard/PaginationControls';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { downloadCsvFile } from '@/lib/csv';
 import { establishmentApi } from '@/services/establishment-api';
+import {
+  MARKETPLACE_PLATFORMS,
+  normalizeExternalSyncStatus,
+  normalizeMarketplacePlatform,
+  type MarketplacePlatform,
+} from '@/services/marketplace-api';
 import { Search, Filter, Download, Ticket, Ban, RefreshCw, Eye, Loader2, X } from 'lucide-react';
 
 interface CouponDetails {
@@ -28,9 +34,22 @@ interface CouponDetails {
     id?: string;
     userHandle?: string;
   } | null;
+  externalPlatform?: string;
+  externalCouponId?: string;
+  externalCouponCode?: string;
+  externalSyncStatus?: string;
+  externalSyncError?: string;
+  externalSyncedAt?: string | null;
 }
 
 const PAGE_SIZE = 20;
+const BULK_FETCH_LIMIT = 100;
+
+type ManualSyncResult = {
+  status: 'SUCCESS' | 'FAILED';
+  message: string;
+  at: string;
+};
 
 export default function CuponsPage() {
   const queryClient = useQueryClient();
@@ -39,6 +58,10 @@ export default function CuponsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedCoupon, setSelectedCoupon] = useState<CouponDetails | null>(null);
+  const [syncTargetByCoupon, setSyncTargetByCoupon] = useState<Record<string, MarketplacePlatform>>({});
+  const [bulkSyncPlatform, setBulkSyncPlatform] = useState<MarketplacePlatform>('NUVEMSHOP');
+  const [syncFeedback, setSyncFeedback] = useState('');
+  const [manualSyncResultByCoupon, setManualSyncResultByCoupon] = useState<Record<string, ManualSyncResult>>({});
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
     queryFn: establishmentApi.getMe,
@@ -53,6 +76,27 @@ export default function CuponsPage() {
 
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Nao informado' : date.toLocaleString('pt-BR');
+  };
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'response' in error &&
+      typeof (error as { response?: unknown }).response === 'object'
+    ) {
+      const response = (error as { response?: { data?: { message?: unknown } } }).response;
+      const message = response?.data?.message;
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return fallback;
   };
 
   const getParticipationIds = (coupon: CouponDetails) => {
@@ -70,6 +114,28 @@ export default function CuponsPage() {
       case 'Usados': return 'USED';
       case 'Expirados': return 'EXPIRED';
       default: return undefined;
+    }
+  };
+
+  const formatExternalSyncStatusLabel = (value?: string) => {
+    if (!value) {
+      return 'Nao informado';
+    }
+
+    const normalized = normalizeExternalSyncStatus(value);
+
+    switch (normalized) {
+      case 'SYNCED':
+        return 'Sincronizado';
+      case 'FAILED':
+        return 'Falhou';
+      case 'SKIPPED':
+        return 'Ignorado';
+      case 'UNSUPPORTED':
+        return 'Nao suportado';
+      case 'PENDING':
+      default:
+        return 'Pendente';
     }
   };
 
@@ -105,8 +171,136 @@ export default function CuponsPage() {
     }
   });
 
+  const syncExternalMutation = useMutation({
+    mutationFn: async (coupon: CouponDetails) => {
+      const targetPlatform =
+        syncTargetByCoupon[coupon.code] ||
+        (normalizeMarketplacePlatform(coupon.externalPlatform) as MarketplacePlatform) ||
+        'NUVEMSHOP';
+      await syncCouponNow(coupon, targetPlatform);
+      return {
+        code: coupon.code,
+        targetPlatform,
+      };
+    },
+    onSuccess: (result) => {
+      setSyncFeedback('Sincronizacao externa solicitada com sucesso.');
+      setManualSyncResultByCoupon((current) => ({
+        ...current,
+        [result.code]: {
+          status: 'SUCCESS',
+          message: `Sincronizado em ${result.targetPlatform}`,
+          at: new Date().toISOString(),
+        },
+      }));
+      queryClient.invalidateQueries({ queryKey: ['coupons'] });
+    },
+    onError: (error, coupon) => {
+      const message = getErrorMessage(error, 'Nao foi possivel sincronizar o cupom externamente.');
+      setSyncFeedback(message);
+      setManualSyncResultByCoupon((current) => ({
+        ...current,
+        [coupon.code]: {
+          status: 'FAILED',
+          message,
+          at: new Date().toISOString(),
+        },
+      }));
+    },
+  });
+
+  const syncCouponNow = async (
+    coupon: CouponDetails,
+    targetPlatform: MarketplacePlatform,
+  ) => {
+    const participationId = coupon.participationId || coupon.participation?.id;
+    try {
+      return await establishmentApi.syncCouponExternal(coupon.code, {
+        externalPlatform: targetPlatform,
+        participationId,
+      });
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 404 && participationId) {
+        return establishmentApi.approveParticipation(participationId, {
+          syncExternalCoupon: true,
+          externalPlatform: targetPlatform,
+        });
+      }
+      throw error;
+    }
+  };
+
+  const bulkSyncMutation = useMutation({
+    mutationFn: async () => {
+      const allFilteredCoupons: CouponDetails[] = [];
+      let fetchPage = 1;
+      let total = 0;
+
+      do {
+        const response = await establishmentApi.getCoupons({
+          page: fetchPage,
+          limit: BULK_FETCH_LIMIT,
+          status: getStatus(activeFilter),
+          search,
+        });
+        const pageItems = Array.isArray(response?.items)
+          ? (response.items as CouponDetails[])
+          : [];
+        total = Number(response?.total || 0);
+        allFilteredCoupons.push(...pageItems);
+        fetchPage += 1;
+      } while (allFilteredCoupons.length < total);
+
+      const eligibleCoupons = allFilteredCoupons.filter((coupon) => coupon.status === 'active');
+      if (eligibleCoupons.length === 0) {
+        throw new Error('Nao ha cupons ativos para sincronizar.');
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const results: Record<string, ManualSyncResult> = {};
+
+      for (const coupon of eligibleCoupons) {
+        try {
+          await syncCouponNow(coupon, bulkSyncPlatform);
+          successCount += 1;
+          results[coupon.code] = {
+            status: 'SUCCESS',
+            message: `Sincronizado em ${bulkSyncPlatform}`,
+            at: new Date().toISOString(),
+          };
+        } catch (error) {
+          errorCount += 1;
+          results[coupon.code] = {
+            status: 'FAILED',
+            message: getErrorMessage(error, 'Falha na sincronizacao'),
+            at: new Date().toISOString(),
+          };
+        }
+      }
+
+      return { successCount, errorCount, total: eligibleCoupons.length, results };
+    },
+    onSuccess: (result) => {
+      setSyncFeedback(
+        `Sincronizacao em lote concluida: ${result.successCount}/${result.total} com sucesso` +
+          (result.errorCount > 0 ? ` (${result.errorCount} falharam).` : '.'),
+      );
+      setManualSyncResultByCoupon((current) => ({
+        ...current,
+        ...result.results,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['coupons'] });
+    },
+    onError: (error) => {
+      setSyncFeedback(getErrorMessage(error, 'Nao foi possivel sincronizar os cupons em lote.'));
+    },
+  });
+
   const closeSelectedCouponModal = () => {
     setSelectedCoupon(null);
+    setSyncFeedback('');
   };
 
   useEffect(() => {
@@ -187,6 +381,12 @@ export default function CuponsPage() {
         </div>
       ) : null}
 
+      {syncFeedback ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+          {syncFeedback}
+        </div>
+      ) : null}
+
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -232,6 +432,35 @@ export default function CuponsPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            {canManageCoupons ? (
+              <>
+                <select
+                  value={bulkSyncPlatform}
+                  onChange={(event) => setBulkSyncPlatform(event.target.value as MarketplacePlatform)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {MARKETPLACE_PLATFORMS.map((platform) => (
+                    <option key={platform} value={platform}>
+                      {platform}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={bulkSyncMutation.isPending || coupons.length === 0}
+                  onClick={() => bulkSyncMutation.mutate()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Ativar sincronizacao para todos os cupons ativos da lista atual"
+                >
+                  {bulkSyncMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Ativar todos
+                </button>
+              </>
+            ) : null}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
@@ -262,19 +491,20 @@ export default function CuponsPage() {
                 <th className="px-6 py-4 font-semibold">Benefício</th>
                 <th className="px-6 py-4 font-semibold">Validade</th>
                 <th className="px-6 py-4 font-semibold text-center">Status</th>
+                <th className="px-6 py-4 font-semibold text-center">Ativação</th>
                 <th className="px-6 py-4 font-semibold text-right">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <Loader2 className="w-8 h-8 animate-spin text-primary-500 mx-auto" />
                   </td>
                 </tr>
               ) : coupons.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     Nenhum cupom encontrado.
                   </td>
                 </tr>
@@ -294,9 +524,19 @@ export default function CuponsPage() {
                   </td>
                   <td className="px-6 py-4 text-slate-900 font-medium">
                     <div>{coupon.benefit}</div>
+                    {coupon.externalPlatform ? (
+                      <div className="mt-1 text-xs text-slate-500">
+                        Marketplace: {normalizeMarketplacePlatform(coupon.externalPlatform) || coupon.externalPlatform}
+                      </div>
+                    ) : null}
                     {getParticipationIds(coupon).length > 1 ? (
                       <div className="mt-1 text-xs font-semibold text-primary-600">
                         {getParticipationIds(coupon).length} participacoes acumuladas
+                      </div>
+                    ) : null}
+                    {coupon.externalSyncStatus ? (
+                      <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                        Sync: {formatExternalSyncStatusLabel(coupon.externalSyncStatus)}
                       </div>
                     ) : null}
                   </td>
@@ -308,6 +548,21 @@ export default function CuponsPage() {
                     {coupon.status === 'used' && <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">Usado</span>}
                     {coupon.status === 'expired' && <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200">Expirado</span>}
                     {coupon.status === 'cancelled' && <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-red-50 text-red-700 border border-red-200">Cancelado</span>}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {manualSyncResultByCoupon[coupon.code]?.status === 'SUCCESS' ? (
+                      <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-green-50 text-green-700 border border-green-200">
+                        Sucesso
+                      </span>
+                    ) : null}
+                    {manualSyncResultByCoupon[coupon.code]?.status === 'FAILED' ? (
+                      <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-red-50 text-red-700 border border-red-200">
+                        Falha
+                      </span>
+                    ) : null}
+                    {!manualSyncResultByCoupon[coupon.code] ? (
+                      <span className="text-xs text-slate-400">-</span>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -332,6 +587,18 @@ export default function CuponsPage() {
                       
                       {coupon.status === 'expired' && (
                         <button className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="Reenviar/Renovar">
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {canManageCoupons && (
+                        <button
+                          type="button"
+                          disabled={syncExternalMutation.isPending}
+                          onClick={() => syncExternalMutation.mutate(coupon)}
+                          className="p-1.5 text-slate-400 hover:text-violet-700 hover:bg-violet-50 rounded transition-colors disabled:opacity-50"
+                          title="Sincronizar agora no marketplace"
+                        >
                           <RefreshCw className="w-4 h-4" />
                         </button>
                       )}
@@ -425,6 +692,42 @@ export default function CuponsPage() {
                   { label: 'Participacoes vinculadas', value: linkedParticipationIds.length > 0 ? linkedParticipationIds.join(', ') : 'Nao informado' },
                 { label: 'Cliente ID', value: selectedCoupon.client?.id || 'Nao informado' },
                 { label: 'Cupom ID', value: selectedCoupon.id || 'Nao informado' },
+                {
+                  label: 'Marketplace',
+                  value:
+                    normalizeMarketplacePlatform(selectedCoupon.externalPlatform) ||
+                    selectedCoupon.externalPlatform ||
+                    'Nao informado',
+                },
+                {
+                  label: 'Cupom externo ID',
+                  value: selectedCoupon.externalCouponId || 'Nao informado',
+                },
+                {
+                  label: 'Cupom externo codigo',
+                  value: selectedCoupon.externalCouponCode || 'Nao informado',
+                },
+                {
+                  label: 'Status sync externo',
+                  value: formatExternalSyncStatusLabel(selectedCoupon.externalSyncStatus),
+                },
+                {
+                  label: 'Ultima sync externa',
+                  value: formatDateTime(selectedCoupon.externalSyncedAt),
+                },
+                {
+                  label: 'Erro sync externo',
+                  value: selectedCoupon.externalSyncError || 'Nao informado',
+                },
+                {
+                  label: 'Resultado ativacao manual',
+                  value:
+                    manualSyncResultByCoupon[selectedCoupon.code]?.status === 'SUCCESS'
+                      ? `Sucesso em ${formatDateTime(manualSyncResultByCoupon[selectedCoupon.code]?.at)}`
+                      : manualSyncResultByCoupon[selectedCoupon.code]?.status === 'FAILED'
+                        ? `Falha: ${manualSyncResultByCoupon[selectedCoupon.code]?.message}`
+                        : 'Nao executado',
+                },
               ].map((item) => (
                 <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -436,6 +739,55 @@ export default function CuponsPage() {
                 </div>
               ))}
             </div>
+
+            {canManageCoupons ? (
+              <div className="border-t border-slate-100 px-6 py-4 space-y-3">
+                <div className="text-sm font-bold text-slate-900">Sincronizacao externa manual</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                  <label className="space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Plataforma
+                    </span>
+                    <select
+                      value={
+                        syncTargetByCoupon[selectedCoupon.code] ||
+                        (normalizeMarketplacePlatform(selectedCoupon.externalPlatform) as MarketplacePlatform) ||
+                        'NUVEMSHOP'
+                      }
+                      onChange={(event) =>
+                        setSyncTargetByCoupon((current) => ({
+                          ...current,
+                          [selectedCoupon.code]: event.target.value as MarketplacePlatform,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                    >
+                      {MARKETPLACE_PLATFORMS.map((platform) => (
+                        <option key={platform} value={platform}>
+                          {platform}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={syncExternalMutation.isPending}
+                    onClick={() => syncExternalMutation.mutate(selectedCoupon)}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {syncExternalMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Sincronizar agora
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Esta acao tenta reenviar a sincronizacao para o marketplace selecionado.
+                </p>
+              </div>
+            ) : null}
 
             <div className="flex justify-end border-t border-slate-100 px-6 py-4">
               <button

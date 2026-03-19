@@ -13,6 +13,7 @@ import DashboardDialog from "@/components/ui/DashboardDialog";
 import { publicApi } from "@/services/public-api";
 import PricingAdminSection from "@/components/dashboard/PricingAdminSection";
 import TeamManagementSection from "@/components/dashboard/TeamManagementSection";
+import MarketplaceIntegrationsSection from "@/components/dashboard/MarketplaceIntegrationsSection";
 import {
   dashboardConfigSections,
   isDashboardConfigSectionId,
@@ -796,6 +797,10 @@ function ConfiguracoesPageContent() {
                 </div>
               </div>
             </section>
+          ) : null}
+
+          {activeSection === "marketplace" ? (
+            <MarketplaceIntegrationsSection canEdit={canEditSettings} />
           ) : null}
 
           {activeSection === "team" ? <TeamManagementSection /> : null}

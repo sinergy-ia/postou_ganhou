@@ -24,6 +24,7 @@ type CampaignFormState = {
   reelsMaxReward: string;
   reelsMaxQuantity: string;
   autoApproveParticipations: boolean;
+  marketplaceAutoActivation: boolean;
   hashtagRequired: string;
   expiresAt: string;
   isActive: boolean;
@@ -54,6 +55,7 @@ const defaultFormData: CampaignFormState = {
   reelsMaxReward: '',
   reelsMaxQuantity: '',
   autoApproveParticipations: false,
+  marketplaceAutoActivation: false,
   hashtagRequired: '',
   expiresAt: '',
   isActive: true,
@@ -242,6 +244,11 @@ function buildInitialFormData(campaignToEdit?: Awaited<ReturnType<typeof establi
     reelsMaxReward: String(campaignToEdit.reelsMaxReward || ''),
     reelsMaxQuantity: String(campaignToEdit.reelsMaxQuantity || ''),
     autoApproveParticipations: Boolean(campaignToEdit.autoApproveParticipations),
+    marketplaceAutoActivation: Boolean(
+      campaignToEdit.marketplaceAutoActivation ??
+        campaignToEdit.autoMarketplaceActivation ??
+        campaignToEdit.autoSyncMarketplaceCoupon,
+    ),
     hashtagRequired: String(campaignToEdit.hashtagRequired || ''),
     expiresAt: campaignToEdit.expiresAt
       ? new Date(campaignToEdit.expiresAt).toISOString().split('T')[0]
@@ -697,6 +704,34 @@ function CampaignForm() {
                       {canUseAutoApproval
                         ? 'Quando essa opção estiver ativa, o backend aprova sozinho as participações elegíveis e já gera o cupom sem moderador humano.'
                         : 'O plano Free opera com validacao manual. Faça upgrade para liberar autoaprovacao.'}
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer relative">
+                  <input
+                    type="checkbox"
+                    name="marketplaceAutoActivation"
+                    checked={formData.marketplaceAutoActivation}
+                    onChange={(e) =>
+                      setDraftFormData((prev) => ({
+                        ...(prev ?? initialFormData),
+                        marketplaceAutoActivation: e.target.checked,
+                      }))
+                    }
+                    disabled={!canUseAutoApproval || !formData.autoApproveParticipations}
+                    className="mt-0.5 w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-700 select-none block">
+                      Ativacao automatica Marketplace
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {canUseAutoApproval
+                        ? formData.autoApproveParticipations
+                          ? 'Quando ativa, participacoes autoaprovadas tambem tentam sincronizar cupom no marketplace automaticamente.'
+                          : 'Ative primeiro a opcao de autoaprovacao para liberar a ativacao automatica no marketplace.'
+                        : 'Disponivel junto com autoaprovacao (planos com recurso habilitado).'}
                     </span>
                   </div>
                 </label>
