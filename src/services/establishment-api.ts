@@ -655,6 +655,17 @@ export const establishmentApi = {
     return data;
   },
 
+  syncCouponExternal: async (
+    code: string,
+    payload: {
+      externalPlatform: "NUVEMSHOP" | "SHOPIFY" | "IFOOD";
+      participationId?: string;
+    },
+  ) => {
+    const { data } = await api.post(`/api/coupons/${code}/sync-external`, payload);
+    return data;
+  },
+
   getAnalyticsRoi: async (params?: AnalyticsScopeParams) => {
     const { data } = await api.get("/api/analytics/roi", { params });
     return {

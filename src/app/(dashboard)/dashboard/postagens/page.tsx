@@ -6,6 +6,7 @@ import PaginationControls from '@/components/dashboard/PaginationControls';
 import DashboardDialog from '@/components/ui/DashboardDialog';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { establishmentApi } from '@/services/establishment-api';
+import { MARKETPLACE_PLATFORMS, type MarketplacePlatform } from '@/services/marketplace-api';
 import {
   formatCampaignQuantityLabel,
   getCampaignModalityConfig,
@@ -62,6 +63,27 @@ type FeedbackState = {
   title: string;
   description: string;
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: unknown }).response === 'object'
+  ) {
+    const response = (error as { response?: { data?: { message?: unknown } } }).response;
+    const message = response?.data?.message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 function normalizeSearchValue(value?: string | null) {
   return String(value || '')
@@ -170,6 +192,8 @@ export default function PostagensPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isPostDetailModalOpen, setIsPostDetailModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [syncExternalCoupon, setSyncExternalCoupon] = useState(false);
+  const [externalPlatform, setExternalPlatform] = useState<MarketplacePlatform>('NUVEMSHOP');
   const tabs = ['Todas', 'Pendentes', 'Aprovadas', 'Reprovadas'];
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
@@ -271,7 +295,19 @@ export default function PostagensPage() {
   );
 
   const approveMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) => establishmentApi.approveParticipation(id),
+    mutationFn: ({
+      id,
+      syncExternal,
+      platform,
+    }: {
+      id: string;
+      syncExternal: boolean;
+      platform: MarketplacePlatform;
+    }) =>
+      establishmentApi.approveParticipation(id, {
+        syncExternalCoupon: syncExternal,
+        externalPlatform: syncExternal ? platform : undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['participations'] });
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
@@ -282,10 +318,13 @@ export default function PostagensPage() {
         description: 'A participação foi aprovada e o cupom foi recalculado com sucesso.',
       });
     },
-    onError: () => {
+    onError: (mutationError) => {
       setFeedback({
         title: 'Nao foi possivel aprovar',
-        description: 'Tente novamente em instantes para concluir a aprovacao da postagem.',
+        description: getErrorMessage(
+          mutationError,
+          'Tente novamente em instantes para concluir a aprovacao da postagem.',
+        ),
       });
     },
   });
@@ -621,6 +660,39 @@ export default function PostagensPage() {
                     A aprovação continua manual, mas o backend recalcula o benefício usando
                     o total aprovado do cliente nesta campanha e nesta modalidade.
                   </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={syncExternalCoupon}
+                        onChange={(event) => setSyncExternalCoupon(event.target.checked)}
+                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      Sincronizar cupom externo no marketplace ao aprovar
+                    </label>
+
+                    {syncExternalCoupon ? (
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Plataforma externa
+                        </span>
+                        <select
+                          value={externalPlatform}
+                          onChange={(event) =>
+                            setExternalPlatform(event.target.value as MarketplacePlatform)
+                          }
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                        >
+                          {MARKETPLACE_PLATFORMS.map((platform) => (
+                            <option key={platform} value={platform}>
+                              {platform}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               )}
               
@@ -642,6 +714,8 @@ export default function PostagensPage() {
                     onClick={() =>
                       approveMutation.mutate({
                         id: selectedPost.id,
+                        syncExternal: syncExternalCoupon,
+                        platform: externalPlatform,
                       })
                     }
                     className="flex items-center justify-center gap-2 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-colors shadow-md shadow-green-200 disabled:opacity-50"
@@ -816,6 +890,36 @@ export default function PostagensPage() {
               </div>
             ) : null}
 
+            {selectedPost.status === 'pending' ? (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={syncExternalCoupon}
+                    onChange={(event) => setSyncExternalCoupon(event.target.checked)}
+                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  Sincronizar cupom externo no marketplace
+                </label>
+
+                {syncExternalCoupon ? (
+                  <select
+                    value={externalPlatform}
+                    onChange={(event) =>
+                      setExternalPlatform(event.target.value as MarketplacePlatform)
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                  >
+                    {MARKETPLACE_PLATFORMS.map((platform) => (
+                      <option key={platform} value={platform}>
+                        {platform}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            ) : null}
+
             {selectedPost.status === 'pending' && hasReachedMonthlyParticipationLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 O plano atual ja consumiu o limite mensal de participacoes. Novas
@@ -843,6 +947,8 @@ export default function PostagensPage() {
                   onClick={() =>
                     approveMutation.mutate({
                       id: selectedPost.id,
+                      syncExternal: syncExternalCoupon,
+                      platform: externalPlatform,
                     })
                   }
                   className="flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 font-bold text-white transition-colors hover:bg-green-600 shadow-md shadow-green-200 disabled:opacity-50"
