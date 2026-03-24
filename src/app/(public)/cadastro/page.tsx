@@ -4,8 +4,33 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
-import { establishmentApi } from '@/services/establishment-api';
+import {
+  clearEstablishmentSelectionContext,
+  establishmentApi,
+} from '@/services/establishment-api';
 import { Loader2, Store, User, Mail, Lock } from 'lucide-react';
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: unknown }).response === 'object'
+  ) {
+    const response = (error as { response?: { data?: { message?: unknown } } }).response;
+    const message = response?.data?.message;
+
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -23,13 +48,19 @@ export default function CadastroPage() {
   const registerMutation = useMutation({
     mutationFn: establishmentApi.register,
     onSuccess: () => {
+      clearEstablishmentSelectionContext();
       setSuccess(true);
       setTimeout(() => {
         router.push('/dashboard'); // Direct to dashboard upon token reception
       }, 1500);
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || 'Erro ao criar conta. Verifique os dados e tente novamente.');
+    onError: (error) => {
+      setError(
+        getErrorMessage(
+          error,
+          'Erro ao criar conta. Verifique os dados e tente novamente.',
+        ),
+      );
     }
   });
 

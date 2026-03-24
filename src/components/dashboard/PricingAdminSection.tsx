@@ -52,6 +52,63 @@ function formatPercentageValue(value?: number | null) {
   return `${Number(value || 0)}%`;
 }
 
+function formatUsageValue(
+  value: number,
+  limit?: number | null,
+  options?: {
+    unlimitedLabel?: string;
+  },
+) {
+  if (limit === null || limit === undefined) {
+    return `${value} / ${options?.unlimitedLabel || "Ilimitado"}`;
+  }
+
+  return `${value} / ${limit}`;
+}
+
+function getUsagePercentage(value: number, limit?: number | null) {
+  if (limit === null || limit === undefined || limit <= 0) {
+    return 0;
+  }
+
+  return Math.min((value / limit) * 100, 100);
+}
+
+function getUsageBarTone(percentage: number) {
+  if (percentage >= 100) {
+    return "bg-rose-500";
+  }
+
+  if (percentage >= 80) {
+    return "bg-amber-500";
+  }
+
+  return "bg-emerald-500";
+}
+
+function getUsageSummary(
+  value: number,
+  limit?: number | null,
+  options?: {
+    limitLabel?: string;
+    unlimitedLabel?: string;
+  },
+) {
+  if (limit === null || limit === undefined) {
+    return options?.unlimitedLabel || "Sem limite configurado no plano.";
+  }
+
+  if (value > limit) {
+    return `${value - limit} acima do ${options?.limitLabel || "limite configurado"}.`;
+  }
+
+  if (value === limit) {
+    return `No limite do ${options?.limitLabel || "plano"}.`;
+  }
+
+  return `${limit - value} disponiveis ate o ${options?.limitLabel || "limite do plano"}.`;
+}
+
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -579,6 +636,21 @@ export default function PricingAdminSection() {
   const estimatedRedemptionCharge =
     Number(analyticsMetrics?.couponsRedeemed || 0) *
     Number(selectedPricingPlan?.redemptionFee || 0);
+  const selectedPlanLimits = selectedAnalyticsEstablishment?.planAccess?.limits || null;
+  const activeCampaignUsage = Number(analyticsMetrics?.activeCampaigns || 0);
+  const participationUsage = Number(analyticsMetrics?.totalPosts || 0);
+  const activeCampaignUsagePercentage = getUsagePercentage(
+    activeCampaignUsage,
+    selectedPlanLimits?.maxActiveCampaigns,
+  );
+  const participationUsagePercentage = getUsagePercentage(
+    participationUsage,
+    selectedPlanLimits?.maxMonthlyParticipations,
+  );
+  const redemptionUsagePercentage = Math.min(
+    Number(analyticsConversion?.redemptionRate || 0),
+    100,
+  );
   const isLoadingAnalyticsPanel =
     isLoadingAnalyticsMetrics ||
     isLoadingAnalyticsCharts ||
@@ -755,11 +827,12 @@ export default function PricingAdminSection() {
               Visão por estabelecimento
             </div>
             <h2 className="mt-4 font-heading font-bold text-2xl text-slate-900">
-              Cobrança e performance
+              Consumo, cobrança e performance
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Selecione um estabelecimento e um período para acompanhar resgates,
-              cupons emitidos, conversão e estimativa de cobrança individual.
+              Selecione um estabelecimento e um período para acompanhar o consumo
+              individual do parceiro, os resgates, a conversão e a estimativa de
+              cobrança da loja escolhida.
             </p>
           </div>
 
@@ -901,6 +974,130 @@ export default function PricingAdminSection() {
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Consumo de campanhas
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900">
+                      {formatUsageValue(
+                        activeCampaignUsage,
+                        selectedPlanLimits?.maxActiveCampaigns,
+                      )}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                    {selectedPlanLimits?.maxActiveCampaigns === null ||
+                    selectedPlanLimits?.maxActiveCampaigns === undefined
+                      ? "Livre"
+                      : formatPercentageValue(activeCampaignUsagePercentage)}
+                  </span>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${getUsageBarTone(
+                      activeCampaignUsagePercentage,
+                    )}`}
+                    style={{
+                      width:
+                        selectedPlanLimits?.maxActiveCampaigns === null ||
+                        selectedPlanLimits?.maxActiveCampaigns === undefined
+                          ? "28%"
+                          : `${Math.max(activeCampaignUsagePercentage, 6)}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  {getUsageSummary(activeCampaignUsage, selectedPlanLimits?.maxActiveCampaigns, {
+                    limitLabel: "limite de campanhas do plano",
+                    unlimitedLabel:
+                      "Plano sem teto configurado para campanhas ativas.",
+                  })}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Consumo de participações
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900">
+                      {formatUsageValue(
+                        participationUsage,
+                        selectedPlanLimits?.maxMonthlyParticipations,
+                      )}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                    {selectedPlanLimits?.maxMonthlyParticipations === null ||
+                    selectedPlanLimits?.maxMonthlyParticipations === undefined
+                      ? "Livre"
+                      : formatPercentageValue(participationUsagePercentage)}
+                  </span>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${getUsageBarTone(
+                      participationUsagePercentage,
+                    )}`}
+                    style={{
+                      width:
+                        selectedPlanLimits?.maxMonthlyParticipations === null ||
+                        selectedPlanLimits?.maxMonthlyParticipations === undefined
+                          ? "34%"
+                          : `${Math.max(participationUsagePercentage, 6)}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  {getUsageSummary(
+                    participationUsage,
+                    selectedPlanLimits?.maxMonthlyParticipations,
+                    {
+                      limitLabel: "limite mensal de participações",
+                      unlimitedLabel:
+                        "Plano sem limite mensal configurado para participações.",
+                    },
+                  )}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Referência do plano comparada ao período filtrado acima.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Aproveitamento de cupons
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900">
+                      {analyticsMetrics?.couponsRedeemed || 0} / {analyticsMetrics?.couponsIssued || 0}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                    {analyticsConversion?.rate || "0%"}
+                  </span>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${getUsageBarTone(
+                      redemptionUsagePercentage,
+                    )}`}
+                    style={{ width: `${Math.max(redemptionUsagePercentage, 6)}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  {Number(analyticsMetrics?.couponsIssued || 0) > 0
+                    ? "Mostra quanto do volume emitido virou uso real na loja."
+                    : "Ainda não houve emissão de cupons no período filtrado."}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                   Estabelecimento selecionado
                 </div>
@@ -924,6 +1121,13 @@ export default function PricingAdminSection() {
                   {selectedAnalyticsEstablishment.pricingBillingCycle === "annual"
                     ? "Anual"
                     : "Mensal"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Limites:{" "}
+                  {selectedPlanLimits?.maxActiveCampaigns ?? "campanhas ilimitadas"} campanhas
+                  {" • "}
+                  {selectedPlanLimits?.maxMonthlyParticipations ??
+                    "participações ilimitadas"}
                 </p>
               </div>
 

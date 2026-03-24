@@ -39,6 +39,11 @@ export interface EstablishmentLoginResponse {
   memberships?: EstablishmentLoginMembership[];
 }
 
+export interface EstablishmentSelectionContext {
+  selectionToken: string;
+  memberships: EstablishmentLoginMembership[];
+}
+
 export interface PlanAccess {
   planType: "free" | "start" | "pro" | "scale";
   planName: string;
@@ -106,6 +111,211 @@ export interface EstablishmentTeamUser {
   lastLoginAt?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+function normalizePricingPlanType(
+  value: unknown,
+): PricingEstablishmentAssignment["pricingPlanType"] {
+  switch (value) {
+    case "start":
+    case "pro":
+    case "scale":
+    case "free":
+      return value;
+    default:
+      return "free";
+  }
+}
+
+function normalizePricingBillingCycle(
+  value: unknown,
+): PricingEstablishmentAssignment["pricingBillingCycle"] {
+  return value === "annual" ? "annual" : "monthly";
+}
+
+function buildFallbackPlanAccess(
+  planType: PricingEstablishmentAssignment["pricingPlanType"],
+  planName: string,
+  billingCycle: PricingEstablishmentAssignment["pricingBillingCycle"],
+): PlanAccess {
+  return {
+    planType,
+    planName,
+    billingCycle,
+    limits: {
+      maxActiveCampaigns: null,
+      maxMonthlyParticipations: null,
+      maxUsers: null,
+    },
+    features: {
+      autoApproval: false,
+      progressiveRewards: false,
+      advancedAnalytics: false,
+      clientRanking: false,
+      sponsoredHighlights: false,
+      whiteLabel: false,
+      multiUnit: false,
+      advancedExports: false,
+      multipleUsers: false,
+    },
+  };
+}
+
+function normalizePricingEstablishmentAssignment(
+  record: Record<string, any> | null | undefined,
+): PricingEstablishmentAssignment | null {
+  const normalized = normalizeEstablishment(record);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const pricingPlanType = normalizePricingPlanType(
+    normalized.pricingPlanType ?? record?.pricingPlanType,
+  );
+  const pricingBillingCycle = normalizePricingBillingCycle(
+    normalized.pricingBillingCycle ?? record?.pricingBillingCycle,
+  );
+  const plan = String(normalized.plan ?? record?.plan ?? "Free").trim() || "Free";
+
+  return {
+    ...normalized,
+    id: String(normalized.id || record?._id || record?.id || "").trim(),
+    name: String(normalized.name || record?.name || "Estabelecimento").trim(),
+    email: String(normalized.email || record?.email || "").trim(),
+    category: String(normalized.category || record?.category || "Sem categoria").trim(),
+    pricingPlanType,
+    pricingBillingCycle,
+    plan,
+    superAdmin: Boolean(record?.superAdmin ?? normalized.superAdmin),
+    planAccess:
+      normalized.planAccess && typeof normalized.planAccess === "object"
+        ? (normalized.planAccess as PlanAccess)
+        : buildFallbackPlanAccess(pricingPlanType, plan, pricingBillingCycle),
+  };
+}
+
+const ESTABLISHMENT_SELECTION_CONTEXT_KEY =
+  "marque_e_ganhe_establishment_selection_context";
+
+function normalizeMembershipRole(
+  value: unknown,
+): EstablishmentLoginMembership["role"] {
+  switch (value) {
+    case "owner":
+    case "manager":
+    case "viewer":
+      return value;
+    default:
+      return "viewer";
+  }
+}
+
+function normalizeMembership(
+  value: unknown,
+): EstablishmentLoginMembership | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const teamUserId = String(record.teamUserId || "").trim();
+  const establishmentId = String(record.establishmentId || "").trim();
+
+  if (!teamUserId || !establishmentId) {
+    return null;
+  }
+
+  return {
+    teamUserId,
+    establishmentId,
+    establishmentName:
+      String(record.establishmentName || "").trim() || "Estabelecimento",
+    role: normalizeMembershipRole(record.role),
+    superAdmin: Boolean(record.superAdmin),
+    plan: String(record.plan || "").trim() || "Free",
+  };
+}
+
+function normalizeSelectionContext(
+  value: unknown,
+): EstablishmentSelectionContext {
+  if (!value || typeof value !== "object") {
+    return {
+      selectionToken: "",
+      memberships: [],
+    };
+  }
+
+  const record = value as Record<string, unknown>;
+  const selectionToken = String(record.selectionToken || "").trim();
+  const memberships = Array.isArray(record.memberships)
+    ? record.memberships
+        .map((item) => normalizeMembership(item))
+        .filter((item): item is EstablishmentLoginMembership => Boolean(item))
+    : [];
+
+  return {
+    selectionToken,
+    memberships,
+  };
+}
+
+export function readEstablishmentSelectionContext(): EstablishmentSelectionContext {
+  if (typeof window === "undefined") {
+    return {
+      selectionToken: "",
+      memberships: [],
+    };
+  }
+
+  const rawValue = window.localStorage.getItem(
+    ESTABLISHMENT_SELECTION_CONTEXT_KEY,
+  );
+
+  if (!rawValue) {
+    return {
+      selectionToken: "",
+      memberships: [],
+    };
+  }
+
+  try {
+    return normalizeSelectionContext(JSON.parse(rawValue));
+  } catch {
+    return {
+      selectionToken: "",
+      memberships: [],
+    };
+  }
+}
+
+export function clearEstablishmentSelectionContext() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(ESTABLISHMENT_SELECTION_CONTEXT_KEY);
+}
+
+export function persistEstablishmentSelectionContext(
+  value: EstablishmentSelectionContext,
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalized = normalizeSelectionContext(value);
+
+  if (!normalized.selectionToken || normalized.memberships.length < 2) {
+    clearEstablishmentSelectionContext();
+    return;
+  }
+
+  window.localStorage.setItem(
+    ESTABLISHMENT_SELECTION_CONTEXT_KEY,
+    JSON.stringify(normalized),
+  );
 }
 
 type AnalyticsScopeParams = {
@@ -885,7 +1095,11 @@ export const establishmentApi = {
     const { data } = await api.get<PricingEstablishmentAssignment[]>(
       "/api/pricing/establishments",
     );
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data)
+      ? data
+          .map((item) => normalizePricingEstablishmentAssignment(item))
+          .filter((item): item is PricingEstablishmentAssignment => Boolean(item))
+      : [];
   },
 
   assignPricingPlan: async (
@@ -899,7 +1113,7 @@ export const establishmentApi = {
       `/api/pricing/establishments/${establishmentId}/plan`,
       payload,
     );
-    return data;
+    return normalizePricingEstablishmentAssignment(data) || data;
   },
 
   updatePricingSuperAdmin: async (
@@ -910,7 +1124,7 @@ export const establishmentApi = {
       `/api/pricing/establishments/${establishmentId}/super-admin`,
       payload,
     );
-    return data;
+    return normalizePricingEstablishmentAssignment(data) || data;
   },
 
   createPricingAdmin: async (payload: {
@@ -926,7 +1140,7 @@ export const establishmentApi = {
       "/api/pricing/establishments/admin",
       payload,
     );
-    return data;
+    return normalizePricingEstablishmentAssignment(data) || data;
   },
 
   getTeamUsers: async () => {
