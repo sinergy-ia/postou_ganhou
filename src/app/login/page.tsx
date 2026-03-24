@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  clearEstablishmentSelectionContext,
   establishmentApi,
+  persistEstablishmentSelectionContext,
   type EstablishmentLoginMembership,
 } from '@/services/establishment-api';
 import { Loader2 } from 'lucide-react';
@@ -46,11 +48,19 @@ export default function LoginPage() {
       queryClient.clear();
 
       if (result.requiresEstablishmentSelection) {
-        setSelectionToken(result.selectionToken || '');
-        setMemberships(result.memberships || []);
+        const nextSelectionToken = result.selectionToken || '';
+        const nextMemberships = result.memberships || [];
+
+        setSelectionToken(nextSelectionToken);
+        setMemberships(nextMemberships);
+        persistEstablishmentSelectionContext({
+          selectionToken: nextSelectionToken,
+          memberships: nextMemberships,
+        });
         return;
       }
 
+      clearEstablishmentSelectionContext();
       router.push('/dashboard');
     },
     onError: (error) => {
@@ -61,6 +71,10 @@ export default function LoginPage() {
   const selectMembershipMutation = useMutation({
     mutationFn: establishmentApi.selectMembership,
     onSuccess: () => {
+      persistEstablishmentSelectionContext({
+        selectionToken,
+        memberships,
+      });
       queryClient.clear();
       router.push('/dashboard');
     },
@@ -120,6 +134,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
+              clearEstablishmentSelectionContext();
               setMemberships([]);
               setSelectionToken('');
             }}

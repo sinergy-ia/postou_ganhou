@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   clearDashboardRuntimeNotifications,
   getDashboardRuntimeNotifications,
@@ -10,13 +10,21 @@ import {
   subscribeDashboardRuntimeNotifications,
   type DashboardRuntimeNotification,
 } from "@/lib/dashboard-runtime-notifications";
-import { establishmentApi } from "@/services/establishment-api";
+import {
+  clearEstablishmentSelectionContext,
+  establishmentApi,
+  readEstablishmentSelectionContext,
+  type EstablishmentLoginMembership,
+  type EstablishmentSelectionContext,
+} from "@/services/establishment-api";
 import {
   Bell,
   ChevronDown,
   CreditCard,
+  Loader2,
   LogOut,
   Menu,
+  Store,
   Users,
 } from "lucide-react";
 
@@ -33,6 +41,29 @@ function roleLabel(role?: string) {
   }
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: unknown }).response === "object"
+  ) {
+    const response = (error as { response?: { data?: { message?: unknown } } })
+      .response;
+    const message = response?.data?.message;
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 type DashboardHeaderProps = {
   onOpenSidebar?: () => void;
 };
@@ -45,21 +76,54 @@ export default function DashboardHeader({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<DashboardRuntimeNotification[]>([]);
+  const [switchContext, setSwitchContext] = useState<EstablishmentSelectionContext>({
+    selectionToken: "",
+    memberships: [],
+  });
+  const [switchError, setSwitchError] = useState("");
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const { data: user } = useQuery({
     queryKey: ["establishment-me"],
     queryFn: establishmentApi.getMe,
   });
+  const switchMembershipMutation = useMutation({
+    mutationFn: establishmentApi.selectMembership,
+    onMutate: () => {
+      setSwitchError("");
+    },
+    onSuccess: () => {
+      setIsUserMenuOpen(false);
+      queryClient.clear();
+      router.replace("/dashboard");
+      router.refresh();
+    },
+    onError: (error) => {
+      setSwitchError(
+        getErrorMessage(
+          error,
+          "Nao foi possivel trocar de estabelecimento. Faca login novamente para atualizar seus acessos.",
+        ),
+      );
+    },
+  });
 
   const userName = user?.currentUser?.name || user?.name || "Usuario";
   const currentRole = roleLabel(user?.currentUser?.role);
   const initial = userName.charAt(0).toUpperCase();
   const unreadNotificationsCount = notifications.filter((notification) => !notification.read).length;
+  const currentEstablishmentId = String(user?.id || user?._id || "").trim();
+  const currentTeamUserId = String(user?.currentUser?.id || "").trim();
+  const canSwitchEstablishments =
+    Boolean(switchContext.selectionToken) && switchContext.memberships.length > 1;
 
   useEffect(() => {
     setNotifications(getDashboardRuntimeNotifications());
     return subscribeDashboardRuntimeNotifications(setNotifications);
+  }, []);
+
+  useEffect(() => {
+    setSwitchContext(readEstablishmentSelectionContext());
   }, []);
 
   useEffect(() => {
@@ -81,6 +145,7 @@ export default function DashboardHeader({
   }, []);
 
   const handleLogout = () => {
+    clearEstablishmentSelectionContext();
     import("@/services/api").then(({ setAuthToken }) => {
       setAuthToken(undefined, "establishment");
       queryClient.clear();
@@ -117,6 +182,22 @@ export default function DashboardHeader({
     if (href) {
       router.push(href);
     }
+  };
+
+  const handleSwitchMembership = (membership: EstablishmentLoginMembership) => {
+    const isCurrentMembership =
+      (currentTeamUserId && membership.teamUserId === currentTeamUserId) ||
+      (currentEstablishmentId &&
+        membership.establishmentId === currentEstablishmentId);
+
+    if (!switchContext.selectionToken || isCurrentMembership) {
+      return;
+    }
+
+    switchMembershipMutation.mutate({
+      selectionToken: switchContext.selectionToken,
+      teamUserId: membership.teamUserId,
+    });
   };
 
   return (
@@ -253,7 +334,11 @@ export default function DashboardHeader({
             </button>
 
             {isUserMenuOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-2 w-52 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+              <div
+                className={`absolute right-0 top-full z-50 mt-2 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl ${
+                  canSwitchEstablishments ? "w-80" : "w-52"
+                }`}
+              >
                 <div className="rounded-xl px-3 py-2 sm:hidden">
                   <div className="truncate text-sm font-semibold text-slate-900">
                     {userName}
@@ -268,6 +353,71 @@ export default function DashboardHeader({
                   <Users className="h-4 w-4" />
                   Equipe
                 </button>
+                {canSwitchEstablishments ? (
+                  <div className="mb-1 border-t border-slate-100 px-1 pt-2">
+                    <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Trocar estabelecimento
+                    </div>
+                    <div className="space-y-1">
+                      {switchContext.memberships.map((membership) => {
+                        const isCurrentMembership =
+                          (currentTeamUserId &&
+                            membership.teamUserId === currentTeamUserId) ||
+                          (currentEstablishmentId &&
+                            membership.establishmentId === currentEstablishmentId);
+                        const isSwitchingThisMembership =
+                          switchMembershipMutation.isPending &&
+                          switchMembershipMutation.variables?.teamUserId ===
+                            membership.teamUserId;
+
+                        return (
+                          <button
+                            key={membership.teamUserId}
+                            type="button"
+                            onClick={() => handleSwitchMembership(membership)}
+                            disabled={
+                              isCurrentMembership ||
+                              switchMembershipMutation.isPending
+                            }
+                            className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                              isCurrentMembership
+                                ? "bg-slate-50 text-slate-500"
+                                : "text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                              {isSwitchingThisMembership ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Store className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-semibold text-slate-900">
+                                  {membership.establishmentName}
+                                </span>
+                                {isCurrentMembership ? (
+                                  <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                                    Atual
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {roleLabel(membership.role)} • Plano {membership.plan}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {switchError ? (
+                      <div className="px-2 pt-2 text-xs text-red-600">
+                        {switchError}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleLogout}

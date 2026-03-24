@@ -3497,6 +3497,7 @@ function PublicacoesIaPageContent() {
 
   const planType = me?.planAccess?.planType || "free";
   const isAiPostsPlanEligible = canUseAiPostsPlan(planType);
+  const isAdminAiPostsAccess = Boolean(me?.superAdmin || me?.currentUser?.superAdmin);
   const aiPostsGenerationLimit = getAiPostsGenerationLimit(planType);
   const canEditAiPosts = isAiPostsPlanEligible && (me?.currentUser?.role || "owner") !== "viewer";
 
@@ -6177,6 +6178,37 @@ function PublicacoesIaPageContent() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
+
+  if (!isAdminAiPostsAccess) {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-bold text-slate-900">
+              Publicações IA
+            </h1>
+            <p className="mt-1 text-slate-500">
+              Este módulo ficará disponível em breve para os estabelecimentos.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">Status do módulo</div>
+            <div className="mt-1">
+              Em breve. Acesso liberado apenas para admin por enquanto.
+            </div>
+          </div>
+        </div>
+
+        <FeatureUpgradeNotice
+          badge="Em breve"
+          title="Publicações IA ainda não estão liberadas para a operação"
+          description="Por enquanto este módulo está restrito ao admin para testes e preparação da release. Assim que abrirmos para os estabelecimentos, esta área será habilitada no painel."
+          ctaLabel="Voltar ao dashboard"
+          ctaHref="/dashboard"
+        />
       </div>
     );
   }
