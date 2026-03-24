@@ -106,6 +106,7 @@ export default function Sidebar({
   const planName = user?.plan || "Free";
   const planType = user?.planAccess?.planType || "free";
   const hasAiPostsPlan = canUseAiPosts(planType);
+  const canAccessAiPosts = isSuperAdmin;
   const visibleNavigation = navigation.filter((item) => {
     if (item.superAdminOnly) {
       return isSuperAdmin;
@@ -154,7 +155,11 @@ export default function Sidebar({
               item.href === "/dashboard"
                 ? pathname === item.href
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPlanLocked = Boolean(item.proScaleOnly && !hasAiPostsPlan);
+            const isAiPostsComingSoon =
+              item.href === "/dashboard/publicacoes-ia" && !canAccessAiPosts;
+            const isPlanLocked = Boolean(
+              item.proScaleOnly && !hasAiPostsPlan && !canAccessAiPosts,
+            );
             const shouldShowConfigSubmenu =
               item.href === "/dashboard/configuracoes" && isConfigMenuOpen;
 
@@ -236,13 +241,19 @@ export default function Sidebar({
             }
 
             if (item.href === "/dashboard/publicacoes-ia") {
-              const shouldShowAiPostsSubmenu = isAiPostsMenuOpen;
+              const shouldShowAiPostsSubmenu = canAccessAiPosts && isAiPostsMenuOpen;
 
               return (
                 <div key={item.name}>
                   <Link
                     href={aiPostsHref}
                     onClick={(event) => {
+                      if (!canAccessAiPosts) {
+                        event.preventDefault();
+                        onClose?.();
+                        return;
+                      }
+
                       if (isAiPostsRoute) {
                         event.preventDefault();
                         setIsAiPostsMenuOpen((currentState) => !currentState);
@@ -272,6 +283,16 @@ export default function Sidebar({
                       <span className="truncate">{item.name}</span>
                     </span>
                     <div className="flex items-center gap-2">
+                      {isAiPostsComingSoon ? (
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                            isActive ? "bg-white/15 text-white" : "bg-slate-800 text-slate-400",
+                          )}
+                        >
+                          Em breve
+                        </span>
+                      ) : null}
                       {isPlanLocked ? (
                         <span
                           className={cn(
