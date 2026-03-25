@@ -62,9 +62,7 @@ const navigation = [
   { name: "Configuracoes", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
-const sidebarConfigSections = dashboardConfigSections.filter(
-  (section) => section.id !== "team" && section.id !== "billing",
-);
+const sidebarConfigSections = dashboardConfigSections;
 
 type SidebarProps = {
   isMobileOpen?: boolean;

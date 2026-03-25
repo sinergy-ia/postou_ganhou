@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PaginationControls from '@/components/dashboard/PaginationControls';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
+import DashboardDialog from '@/components/ui/DashboardDialog';
 import { downloadCsvFile } from '@/lib/csv';
 import { establishmentApi } from '@/services/establishment-api';
 import {
-  MARKETPLACE_PLATFORMS,
+  getConfiguredMarketplacePlatforms,
+  marketplaceApi,
   normalizeExternalSyncStatus,
   normalizeMarketplacePlatform,
   type MarketplacePlatform,
@@ -51,6 +53,13 @@ type ManualSyncResult = {
   at: string;
 };
 
+type SyncFeedbackDialogState = {
+  tone: 'success' | 'warning' | 'error';
+  title: string;
+  description: string;
+  details?: string[];
+};
+
 export default function CuponsPage() {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('Todos');
@@ -60,14 +69,20 @@ export default function CuponsPage() {
   const [selectedCoupon, setSelectedCoupon] = useState<CouponDetails | null>(null);
   const [syncTargetByCoupon, setSyncTargetByCoupon] = useState<Record<string, MarketplacePlatform>>({});
   const [bulkSyncPlatform, setBulkSyncPlatform] = useState<MarketplacePlatform>('NUVEMSHOP');
-  const [syncFeedback, setSyncFeedback] = useState('');
   const [manualSyncResultByCoupon, setManualSyncResultByCoupon] = useState<Record<string, ManualSyncResult>>({});
+  const [syncFeedbackDialog, setSyncFeedbackDialog] = useState<SyncFeedbackDialogState | null>(null);
   const { data: me, isLoading: isLoadingMe } = useQuery({
     queryKey: ['establishment-me'],
     queryFn: establishmentApi.getMe,
   });
   const canManageCoupons = (me?.currentUser?.role || 'owner') !== 'viewer';
   const canExportAdvanced = Boolean(me?.planAccess?.features?.advancedExports);
+  const { data: marketplaceIntegrationsData } = useQuery({
+    queryKey: ['marketplace-integrations'],
+    queryFn: marketplaceApi.getIntegrations,
+    enabled: canManageCoupons,
+    retry: false,
+  });
 
   const formatDateTime = (value?: string | null) => {
     if (!value) {
@@ -107,6 +122,36 @@ export default function CuponsPage() {
     const fallbackId = coupon.participationId || coupon.participation?.id;
     return fallbackId ? [fallbackId] : [];
   };
+
+  const configuredMarketplacePlatforms = useMemo(
+    () => getConfiguredMarketplacePlatforms(marketplaceIntegrationsData?.integrations),
+    [marketplaceIntegrationsData?.integrations],
+  );
+  const configuredMarketplacePlatformSet = useMemo(
+    () => new Set(configuredMarketplacePlatforms),
+    [configuredMarketplacePlatforms],
+  );
+  const hasConfiguredMarketplaces = configuredMarketplacePlatforms.length > 0;
+  const showSyncControls = canManageCoupons && hasConfiguredMarketplaces;
+  const defaultMarketplacePlatform = configuredMarketplacePlatforms[0] || 'NUVEMSHOP';
+  const resolvedBulkSyncPlatform = configuredMarketplacePlatformSet.has(bulkSyncPlatform)
+    ? bulkSyncPlatform
+    : defaultMarketplacePlatform;
+
+  const resolveCouponTargetPlatform = (coupon: CouponDetails): MarketplacePlatform =>
+    (() => {
+      const manuallySelectedPlatform = syncTargetByCoupon[coupon.code];
+      if (manuallySelectedPlatform && configuredMarketplacePlatformSet.has(manuallySelectedPlatform)) {
+        return manuallySelectedPlatform;
+      }
+
+      const couponPlatform = normalizeMarketplacePlatform(coupon.externalPlatform);
+      if (couponPlatform && configuredMarketplacePlatformSet.has(couponPlatform)) {
+        return couponPlatform;
+      }
+
+      return defaultMarketplacePlatform;
+    })();
 
   const getStatus = (filter: string) => {
     switch (filter) {
@@ -172,11 +217,15 @@ export default function CuponsPage() {
   });
 
   const syncExternalMutation = useMutation({
+    onMutate: (coupon) => ({
+      targetPlatform: resolveCouponTargetPlatform(coupon),
+    }),
     mutationFn: async (coupon: CouponDetails) => {
-      const targetPlatform =
-        syncTargetByCoupon[coupon.code] ||
-        (normalizeMarketplacePlatform(coupon.externalPlatform) as MarketplacePlatform) ||
-        'NUVEMSHOP';
+      if (!hasConfiguredMarketplaces) {
+        throw new Error('Nenhum marketplace esta configurado para sincronizar cupons.');
+      }
+
+      const targetPlatform = resolveCouponTargetPlatform(coupon);
       await syncCouponNow(coupon, targetPlatform);
       return {
         code: coupon.code,
@@ -184,7 +233,11 @@ export default function CuponsPage() {
       };
     },
     onSuccess: (result) => {
-      setSyncFeedback('Sincronizacao externa solicitada com sucesso.');
+      setSyncFeedbackDialog({
+        tone: 'success',
+        title: 'Cupom sincronizado no marketplace',
+        description: `O cupom ${result.code} foi sincronizado com sucesso em ${result.targetPlatform}.`,
+      });
       setManualSyncResultByCoupon((current) => ({
         ...current,
         [result.code]: {
@@ -195,9 +248,14 @@ export default function CuponsPage() {
       }));
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
     },
-    onError: (error, coupon) => {
+    onError: (error, coupon, context) => {
       const message = getErrorMessage(error, 'Nao foi possivel sincronizar o cupom externamente.');
-      setSyncFeedback(message);
+      setSyncFeedbackDialog({
+        tone: 'error',
+        title: 'Falha ao sincronizar cupom',
+        description: `O cupom ${coupon.code} nao foi sincronizado em ${context?.targetPlatform || resolveCouponTargetPlatform(coupon)}.`,
+        details: [message],
+      });
       setManualSyncResultByCoupon((current) => ({
         ...current,
         [coupon.code]: {
@@ -233,6 +291,11 @@ export default function CuponsPage() {
 
   const bulkSyncMutation = useMutation({
     mutationFn: async () => {
+      if (!hasConfiguredMarketplaces) {
+        throw new Error('Nenhum marketplace esta configurado para sincronizacao em lote.');
+      }
+
+      const targetPlatform = resolvedBulkSyncPlatform;
       const allFilteredCoupons: CouponDetails[] = [];
       let fetchPage = 1;
       let total = 0;
@@ -263,11 +326,11 @@ export default function CuponsPage() {
 
       for (const coupon of eligibleCoupons) {
         try {
-          await syncCouponNow(coupon, bulkSyncPlatform);
+          await syncCouponNow(coupon, targetPlatform);
           successCount += 1;
           results[coupon.code] = {
             status: 'SUCCESS',
-            message: `Sincronizado em ${bulkSyncPlatform}`,
+            message: `Sincronizado em ${targetPlatform}`,
             at: new Date().toISOString(),
           };
         } catch (error) {
@@ -280,13 +343,40 @@ export default function CuponsPage() {
         }
       }
 
-      return { successCount, errorCount, total: eligibleCoupons.length, results };
+      return { successCount, errorCount, total: eligibleCoupons.length, results, targetPlatform };
     },
     onSuccess: (result) => {
-      setSyncFeedback(
-        `Sincronizacao em lote concluida: ${result.successCount}/${result.total} com sucesso` +
-          (result.errorCount > 0 ? ` (${result.errorCount} falharam).` : '.'),
-      );
+      const failedItems = Object.entries(result.results)
+        .filter(([, syncResult]) => syncResult.status === 'FAILED')
+        .slice(0, 5)
+        .map(([code, syncResult]) => `${code}: ${syncResult.message}`);
+
+      const tone =
+        result.errorCount === 0 ? 'success' : result.successCount === 0 ? 'error' : 'warning';
+      const title =
+        tone === 'success'
+          ? 'Sincronizacao em lote concluida'
+          : tone === 'warning'
+            ? 'Sincronizacao em lote concluida com alertas'
+            : 'Falha na sincronizacao em lote';
+
+      setSyncFeedbackDialog({
+        tone,
+        title,
+        description:
+          `Processamos ${result.total} cupons ativos em ${result.targetPlatform}. ` +
+          `${result.successCount} sincronizados com sucesso` +
+          (result.errorCount > 0 ? ` e ${result.errorCount} com falha.` : '.'),
+        details:
+          failedItems.length > 0
+            ? [
+                ...failedItems,
+                ...(result.errorCount > failedItems.length
+                  ? [`Mais ${result.errorCount - failedItems.length} falha(s) nao exibidas nesta lista.`]
+                  : []),
+              ]
+            : undefined,
+      });
       setManualSyncResultByCoupon((current) => ({
         ...current,
         ...result.results,
@@ -294,13 +384,17 @@ export default function CuponsPage() {
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
     },
     onError: (error) => {
-      setSyncFeedback(getErrorMessage(error, 'Nao foi possivel sincronizar os cupons em lote.'));
+      setSyncFeedbackDialog({
+        tone: 'error',
+        title: 'Nao foi possivel sincronizar em lote',
+        description: 'A sincronizacao em lote nao foi concluida.',
+        details: [getErrorMessage(error, 'Nao foi possivel sincronizar os cupons em lote.')],
+      });
     },
   });
 
   const closeSelectedCouponModal = () => {
     setSelectedCoupon(null);
-    setSyncFeedback('');
   };
 
   useEffect(() => {
@@ -381,12 +475,6 @@ export default function CuponsPage() {
         </div>
       ) : null}
 
-      {syncFeedback ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
-          {syncFeedback}
-        </div>
-      ) : null}
-
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -432,14 +520,14 @@ export default function CuponsPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            {canManageCoupons ? (
+            {showSyncControls ? (
               <>
                 <select
-                  value={bulkSyncPlatform}
+                  value={resolvedBulkSyncPlatform}
                   onChange={(event) => setBulkSyncPlatform(event.target.value as MarketplacePlatform)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  {MARKETPLACE_PLATFORMS.map((platform) => (
+                  {configuredMarketplacePlatforms.map((platform) => (
                     <option key={platform} value={platform}>
                       {platform}
                     </option>
@@ -480,9 +568,12 @@ export default function CuponsPage() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
+          <table
+            className={`w-full text-left text-sm whitespace-nowrap ${
+              showSyncControls ? '' : '[&_th:nth-child(7)]:hidden [&_td:nth-child(7)]:hidden'
+            }`}
+          >
             <thead className="text-xs text-slate-500 bg-slate-50/50 uppercase">
               <tr>
                 <th className="px-6 py-4 font-semibold">Código</th>
@@ -591,7 +682,7 @@ export default function CuponsPage() {
                         </button>
                       )}
 
-                      {canManageCoupons && (
+                      {showSyncControls ? (
                         <button
                           type="button"
                           disabled={syncExternalMutation.isPending}
@@ -601,7 +692,7 @@ export default function CuponsPage() {
                         >
                           <RefreshCw className="w-4 h-4" />
                         </button>
-                      )}
+                      ) : null}
 
                       <button
                         type="button"
@@ -740,7 +831,7 @@ export default function CuponsPage() {
               ))}
             </div>
 
-            {canManageCoupons ? (
+            {showSyncControls ? (
               <div className="border-t border-slate-100 px-6 py-4 space-y-3">
                 <div className="text-sm font-bold text-slate-900">Sincronizacao externa manual</div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -749,11 +840,7 @@ export default function CuponsPage() {
                       Plataforma
                     </span>
                     <select
-                      value={
-                        syncTargetByCoupon[selectedCoupon.code] ||
-                        (normalizeMarketplacePlatform(selectedCoupon.externalPlatform) as MarketplacePlatform) ||
-                        'NUVEMSHOP'
-                      }
+                      value={resolveCouponTargetPlatform(selectedCoupon)}
                       onChange={(event) =>
                         setSyncTargetByCoupon((current) => ({
                           ...current,
@@ -762,7 +849,7 @@ export default function CuponsPage() {
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
                     >
-                      {MARKETPLACE_PLATFORMS.map((platform) => (
+                      {configuredMarketplacePlatforms.map((platform) => (
                         <option key={platform} value={platform}>
                           {platform}
                         </option>
@@ -804,6 +891,57 @@ export default function CuponsPage() {
           </div>
         </div>
       ) : null}
+
+      <DashboardDialog
+        open={Boolean(syncFeedbackDialog)}
+        onClose={() => setSyncFeedbackDialog(null)}
+        title={syncFeedbackDialog?.title || ''}
+        description={syncFeedbackDialog?.description}
+        footer={
+          <button
+            type="button"
+            onClick={() => setSyncFeedbackDialog(null)}
+            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Fechar
+          </button>
+        }
+      >
+        {syncFeedbackDialog ? (
+          <div className="space-y-4">
+            <div
+              className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                syncFeedbackDialog.tone === 'success'
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : syncFeedbackDialog.tone === 'warning'
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : 'border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {syncFeedbackDialog.tone === 'success'
+                ? 'Sucesso'
+                : syncFeedbackDialog.tone === 'warning'
+                  ? 'Atencao'
+                  : 'Erro'}
+            </div>
+
+            {syncFeedbackDialog.details && syncFeedbackDialog.details.length > 0 ? (
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Detalhes
+                </div>
+                <div className="space-y-2">
+                  {syncFeedbackDialog.details.map((detail) => (
+                    <p key={detail} className="text-sm text-slate-700">
+                      {detail}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </DashboardDialog>
 
     </div>
   );
