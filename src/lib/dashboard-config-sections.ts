@@ -40,7 +40,7 @@ export const dashboardConfigSections: Array<{
   },
   {
     id: "team",
-    label: "Equipe",
+    label: "Time",
     description: "Usuarios da mesma conta com perfis owner, manager e viewer.",
     available: true,
   },

@@ -179,6 +179,35 @@ export type MarketplaceIntegrationsResponse = {
   integrations: MarketplaceIntegrationRecord[];
 };
 
+export function isMarketplaceIntegrationReadyForCouponSync(
+  integration?: MarketplaceIntegrationRecord | null,
+): boolean {
+  return Boolean(
+    integration?.enabled &&
+      integration?.connected &&
+      integration?.hasCredentials &&
+      integration?.capabilities?.createCoupon,
+  );
+}
+
+export function getConfiguredMarketplacePlatforms(
+  integrations?: MarketplaceIntegrationRecord[] | null,
+): MarketplacePlatform[] {
+  if (!Array.isArray(integrations) || integrations.length === 0) {
+    return [];
+  }
+
+  const configuredPlatforms = new Set<MarketplacePlatform>();
+
+  for (const integration of integrations) {
+    if (isMarketplaceIntegrationReadyForCouponSync(integration)) {
+      configuredPlatforms.add(integration.platform);
+    }
+  }
+
+  return MARKETPLACE_PLATFORMS.filter((platform) => configuredPlatforms.has(platform));
+}
+
 export type UpsertMarketplaceIntegrationPayload = {
   platform?: MarketplacePlatform;
   enabled?: boolean;

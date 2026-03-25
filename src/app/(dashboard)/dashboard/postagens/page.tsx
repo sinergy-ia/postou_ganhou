@@ -1,12 +1,17 @@
 "use client";
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PaginationControls from '@/components/dashboard/PaginationControls';
 import DashboardDialog from '@/components/ui/DashboardDialog';
 import FeatureUpgradeNotice from '@/components/dashboard/FeatureUpgradeNotice';
 import { establishmentApi } from '@/services/establishment-api';
-import { MARKETPLACE_PLATFORMS, type MarketplacePlatform } from '@/services/marketplace-api';
+import {
+  getConfiguredMarketplacePlatforms,
+  marketplaceApi,
+  type MarketplacePlatform,
+} from '@/services/marketplace-api';
 import {
   formatCampaignQuantityLabel,
   getCampaignModalityConfig,
@@ -200,8 +205,25 @@ export default function PostagensPage() {
     queryFn: establishmentApi.getMe,
   });
   const canModeratePosts = (me?.currentUser?.role || 'owner') !== 'viewer';
+  const { data: marketplaceIntegrationsData } = useQuery({
+    queryKey: ['marketplace-integrations'],
+    queryFn: marketplaceApi.getIntegrations,
+    enabled: canModeratePosts,
+    retry: false,
+  });
   const monthlyParticipationLimit = me?.planAccess?.limits?.maxMonthlyParticipations ?? null;
   const hasMonthlyParticipationLimit = typeof monthlyParticipationLimit === 'number';
+  const configuredMarketplacePlatforms = useMemo(
+    () => getConfiguredMarketplacePlatforms(marketplaceIntegrationsData?.integrations),
+    [marketplaceIntegrationsData?.integrations],
+  );
+  const hasConfiguredMarketplaces = configuredMarketplacePlatforms.length > 0;
+  const defaultMarketplacePlatform = configuredMarketplacePlatforms[0] || 'NUVEMSHOP';
+  const effectiveExternalPlatform = configuredMarketplacePlatforms.includes(externalPlatform)
+    ? externalPlatform
+    : defaultMarketplacePlatform;
+  const isExternalSyncEnabled = hasConfiguredMarketplaces && syncExternalCoupon;
+  const marketplaceConfigHref = '/dashboard/configuracoes?section=marketplace';
 
   const getStatus = (tab: string) => {
     switch (tab) {
@@ -304,10 +326,20 @@ export default function PostagensPage() {
       syncExternal: boolean;
       platform: MarketplacePlatform;
     }) =>
-      establishmentApi.approveParticipation(id, {
-        syncExternalCoupon: syncExternal,
-        externalPlatform: syncExternal ? platform : undefined,
-      }),
+      {
+        if (syncExternal && !hasConfiguredMarketplaces) {
+          throw new Error('Configure um marketplace antes de habilitar a sincronizacao externa.');
+        }
+
+        if (syncExternal && !configuredMarketplacePlatforms.includes(platform)) {
+          throw new Error('Selecione um marketplace configurado antes de aprovar.');
+        }
+
+        return establishmentApi.approveParticipation(id, {
+          syncExternalCoupon: syncExternal,
+          externalPlatform: syncExternal ? platform : undefined,
+        });
+      },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['participations'] });
       queryClient.invalidateQueries({ queryKey: ['coupons'] });
@@ -662,36 +694,57 @@ export default function PostagensPage() {
                   </div>
 
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
-                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <label
+                      className={`inline-flex items-center gap-2 text-sm font-medium ${
+                        hasConfiguredMarketplaces ? 'text-slate-700' : 'text-slate-400'
+                      }`}
+                    >
                       <input
                         type="checkbox"
-                        checked={syncExternalCoupon}
+                        disabled={!hasConfiguredMarketplaces}
+                        checked={isExternalSyncEnabled}
                         onChange={(event) => setSyncExternalCoupon(event.target.checked)}
                         className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                       />
                       Sincronizar cupom externo no marketplace ao aprovar
                     </label>
 
-                    {syncExternalCoupon ? (
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Plataforma externa
-                        </span>
-                        <select
-                          value={externalPlatform}
-                          onChange={(event) =>
-                            setExternalPlatform(event.target.value as MarketplacePlatform)
-                          }
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                    {hasConfiguredMarketplaces ? (
+                      isExternalSyncEnabled ? (
+                        <div className="space-y-1">
+                          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Plataforma externa
+                          </span>
+                          <select
+                            value={effectiveExternalPlatform}
+                            onChange={(event) =>
+                              setExternalPlatform(event.target.value as MarketplacePlatform)
+                            }
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                          >
+                            {configuredMarketplacePlatforms.map((platform) => (
+                              <option key={platform} value={platform}>
+                                {platform}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Apenas marketplaces configurados aparecem para sincronizacao.
+                        </p>
+                      )
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        Nenhum marketplace esta configurado para enviar o cupom automaticamente.
+                        <Link
+                          href={marketplaceConfigHref}
+                          className="mt-3 inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800"
                         >
-                          {MARKETPLACE_PLATFORMS.map((platform) => (
-                            <option key={platform} value={platform}>
-                              {platform}
-                            </option>
-                          ))}
-                        </select>
+                          Configurar marketplace
+                        </Link>
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               )}
@@ -714,8 +767,8 @@ export default function PostagensPage() {
                     onClick={() =>
                       approveMutation.mutate({
                         id: selectedPost.id,
-                        syncExternal: syncExternalCoupon,
-                        platform: externalPlatform,
+                        syncExternal: isExternalSyncEnabled,
+                        platform: effectiveExternalPlatform,
                       })
                     }
                     className="flex items-center justify-center gap-2 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-colors shadow-md shadow-green-200 disabled:opacity-50"
@@ -892,31 +945,52 @@ export default function PostagensPage() {
 
             {selectedPost.status === 'pending' ? (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <label
+                  className={`inline-flex items-center gap-2 text-sm font-medium ${
+                    hasConfiguredMarketplaces ? 'text-slate-700' : 'text-slate-400'
+                  }`}
+                >
                   <input
                     type="checkbox"
-                    checked={syncExternalCoupon}
+                    disabled={!hasConfiguredMarketplaces}
+                    checked={isExternalSyncEnabled}
                     onChange={(event) => setSyncExternalCoupon(event.target.checked)}
                     className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                   />
                   Sincronizar cupom externo no marketplace
                 </label>
 
-                {syncExternalCoupon ? (
-                  <select
-                    value={externalPlatform}
-                    onChange={(event) =>
-                      setExternalPlatform(event.target.value as MarketplacePlatform)
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
-                  >
-                    {MARKETPLACE_PLATFORMS.map((platform) => (
-                      <option key={platform} value={platform}>
-                        {platform}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
+                {hasConfiguredMarketplaces ? (
+                  isExternalSyncEnabled ? (
+                    <select
+                      value={effectiveExternalPlatform}
+                      onChange={(event) =>
+                        setExternalPlatform(event.target.value as MarketplacePlatform)
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-primary-500"
+                    >
+                      {configuredMarketplacePlatforms.map((platform) => (
+                        <option key={platform} value={platform}>
+                          {platform}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Apenas marketplaces configurados aparecem para sincronizacao.
+                    </p>
+                  )
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Nenhum marketplace esta configurado para sincronizar cupons.
+                    <Link
+                      href={marketplaceConfigHref}
+                      className="mt-3 inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800"
+                    >
+                      Configurar marketplace
+                    </Link>
+                  </div>
+                )}
               </div>
             ) : null}
 
@@ -947,8 +1021,8 @@ export default function PostagensPage() {
                   onClick={() =>
                     approveMutation.mutate({
                       id: selectedPost.id,
-                      syncExternal: syncExternalCoupon,
-                      platform: externalPlatform,
+                      syncExternal: isExternalSyncEnabled,
+                      platform: effectiveExternalPlatform,
                     })
                   }
                   className="flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 font-bold text-white transition-colors hover:bg-green-600 shadow-md shadow-green-200 disabled:opacity-50"
