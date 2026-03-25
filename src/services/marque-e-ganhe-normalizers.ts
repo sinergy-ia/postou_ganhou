@@ -602,7 +602,18 @@ export function normalizeParticipation(
     record.userAvatar,
     client?.avatarUrl || buildAvatarFallback(userName),
   );
-  const imageUrl = ensureText(record.imageUrl ?? record.mediaUrl);
+  const mediaUrl = ensureText(record.videoUrl ?? record.mediaUrl ?? record.imageUrl);
+  const imageUrl = ensureText(
+    record.imageUrl ??
+      record.thumbnailUrl ??
+      record.posterUrl ??
+      record.previewImageUrl ??
+      record.mediaUrl,
+  );
+  const videoUrl = ensureText(record.videoUrl);
+  const thumbnailUrl = ensureText(
+    record.thumbnailUrl ?? record.posterUrl ?? record.previewImageUrl ?? record.imageUrl,
+  );
 
   return {
     ...record,
@@ -612,7 +623,9 @@ export function normalizeParticipation(
     userHandle,
     userAvatar,
     imageUrl,
-    mediaUrl: imageUrl,
+    mediaUrl,
+    videoUrl,
+    thumbnailUrl,
     discountEarned: ensureText(record.discountEarned),
     type: normalizeParticipationType(record.type),
     status: normalizeParticipationStatus(record.status),

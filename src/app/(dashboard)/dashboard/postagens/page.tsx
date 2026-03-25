@@ -51,6 +51,13 @@ interface PostCampaign {
 interface PostItem {
   id: string;
   imageUrl?: string;
+  mediaUrl?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  posterUrl?: string;
+  previewImageUrl?: string;
+  mediaType?: string;
+  mimeType?: string;
   userHandle?: string;
   userAvatar?: string;
   userName?: string;
@@ -115,30 +122,130 @@ function formatDateTime(value?: string | null) {
   });
 }
 
-function PostImageFallback({
+function isVideoMediaSource({
   src,
+  mediaType,
+  mimeType,
+}: {
+  src?: string;
+  mediaType?: string;
+  mimeType?: string;
+}) {
+  const normalizedUrl = String(src || '').toLowerCase();
+  const normalizedMediaType = String(mediaType || '').toUpperCase();
+  const normalizedMimeType = String(mimeType || '').toLowerCase();
+
+  return (
+    normalizedMediaType.includes('VIDEO') ||
+    normalizedMimeType.startsWith('video/') ||
+    normalizedUrl.endsWith('.mp4') ||
+    normalizedUrl.endsWith('.mov') ||
+    normalizedUrl.endsWith('.webm') ||
+    normalizedUrl.endsWith('.m4v')
+  );
+}
+
+function getPostMediaUrl(post?: PostItem | null) {
+  return String(post?.videoUrl || post?.mediaUrl || post?.imageUrl || '').trim();
+}
+
+function getPostPosterUrl(post?: PostItem | null) {
+  return String(
+    post?.thumbnailUrl || post?.posterUrl || post?.previewImageUrl || post?.imageUrl || '',
+  ).trim();
+}
+
+function getPostMediaKey(post?: PostItem | null) {
+  return [
+    getPostMediaUrl(post),
+    getPostPosterUrl(post),
+    String(post?.mediaType || '').trim(),
+    String(post?.mimeType || '').trim(),
+    String(post?.id || '').trim(),
+  ].join('|');
+}
+
+function getStoryUnavailableLabel(post?: Pick<PostItem, 'type'> | null) {
+  return post?.type === 'story' ? 'Story expirado' : '';
+}
+
+function PostMediaPreview({
+  src,
+  posterSrc,
   alt,
   className,
   fallbackClassName,
   iconClassName,
+  mediaType,
+  mimeType,
+  fallbackLabel,
+  fallbackLabelClassName,
+  videoControls = false,
+  videoAutoPlay = true,
+  videoLoop = true,
 }: {
   src?: string;
+  posterSrc?: string;
   alt: string;
   className: string;
   fallbackClassName: string;
   iconClassName: string;
+  mediaType?: string;
+  mimeType?: string;
+  fallbackLabel?: string;
+  fallbackLabelClassName?: string;
+  videoControls?: boolean;
+  videoAutoPlay?: boolean;
+  videoLoop?: boolean;
 }) {
-  const [hasError, setHasError] = useState(false);
+  const resolvedSrc = String(src || '').trim();
+  const isVideoMedia = isVideoMediaSource({
+    src: resolvedSrc,
+    mediaType,
+    mimeType,
+  });
+  const mediaCandidates = (isVideoMedia ? ['video', 'image'] : ['image', 'video']) as const;
+  const [attemptIndex, setAttemptIndex] = useState(0);
+  const currentMediaMode = mediaCandidates[attemptIndex];
 
-  if (!src || hasError) {
+  if (!resolvedSrc || !currentMediaMode) {
     return (
       <div className={fallbackClassName}>
         <ImageOff className={iconClassName} />
+        {fallbackLabel ? (
+          <span className={fallbackLabelClassName || 'text-sm font-semibold text-slate-500'}>
+            {fallbackLabel}
+          </span>
+        ) : null}
       </div>
     );
   }
 
-  return <img src={src} className={className} alt={alt} onError={() => setHasError(true)} />;
+  if (currentMediaMode === 'video') {
+    return (
+      <video
+        src={resolvedSrc}
+        poster={posterSrc || undefined}
+        className={className}
+        controls={videoControls}
+        autoPlay={videoAutoPlay}
+        loop={videoLoop}
+        muted
+        playsInline
+        preload="metadata"
+        onError={() => setAttemptIndex((current) => current + 1)}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={resolvedSrc}
+      className={className}
+      alt={alt}
+      onError={() => setAttemptIndex((current) => current + 1)}
+    />
+  );
 }
 
 function isCurrentMonth(value?: string | null) {
@@ -524,12 +631,18 @@ export default function PostagensPage() {
                   className={`w-full text-left p-4 border-b border-slate-50 transition-colors flex gap-3 group outline-none ${selectedPost?.id === post.id ? 'bg-primary-50 border-l-4 border-l-primary-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
                 >
                   <div className="w-12 h-12 rounded-lg bg-slate-200 overflow-hidden shrink-0 relative">
-                    <PostImageFallback
-                      src={post.imageUrl}
+                    <PostMediaPreview
+                      key={getPostMediaKey(post)}
+                      src={getPostMediaUrl(post)}
+                      posterSrc={getPostPosterUrl(post)}
                       alt={post.userName || post.userHandle || 'Postagem'}
                       className="w-full h-full object-cover"
-                      fallbackClassName="flex h-full w-full items-center justify-center bg-slate-100"
+                      fallbackClassName="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-100 px-1"
                       iconClassName="w-5 h-5 text-slate-400"
+                      mediaType={post.mediaType}
+                      mimeType={post.mimeType}
+                      fallbackLabel={getStoryUnavailableLabel(post)}
+                      fallbackLabelClassName="text-center text-[9px] font-semibold leading-tight text-slate-500"
                     />
                     {post.status === 'pending' && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white"></div>}
                   </div>
@@ -604,12 +717,18 @@ export default function PostagensPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 {/* Image Preview */}
                 <div className="bg-slate-200 rounded-2xl aspect-[4/5] relative overflow-hidden shadow-inner flex items-center justify-center">
-                  <PostImageFallback
-                    src={selectedPost.imageUrl}
+                  <PostMediaPreview
+                    key={getPostMediaKey(selectedPost)}
+                    src={getPostMediaUrl(selectedPost)}
+                    posterSrc={getPostPosterUrl(selectedPost)}
                     alt={selectedPost.userName || selectedPost.userHandle || 'Postagem'}
                     className="w-full h-full object-cover"
                     fallbackClassName="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-100 text-slate-500"
                     iconClassName="w-12 h-12 text-slate-300"
+                    mediaType={selectedPost.mediaType}
+                    mimeType={selectedPost.mimeType}
+                    fallbackLabel={getStoryUnavailableLabel(selectedPost)}
+                    videoControls
                   />
                 </div>
             
@@ -872,12 +991,18 @@ export default function PostagensPage() {
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-slate-200 shadow-inner">
-                <PostImageFallback
-                  src={selectedPost.imageUrl}
+                <PostMediaPreview
+                  key={getPostMediaKey(selectedPost)}
+                  src={getPostMediaUrl(selectedPost)}
+                  posterSrc={getPostPosterUrl(selectedPost)}
                   alt={selectedPost.userName || selectedPost.userHandle || 'Postagem'}
                   className="h-full w-full object-cover"
                   fallbackClassName="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-100 text-slate-500"
                   iconClassName="w-12 h-12 text-slate-300"
+                  mediaType={selectedPost.mediaType}
+                  mimeType={selectedPost.mimeType}
+                  fallbackLabel={getStoryUnavailableLabel(selectedPost)}
+                  videoControls
                 />
               </div>
 
