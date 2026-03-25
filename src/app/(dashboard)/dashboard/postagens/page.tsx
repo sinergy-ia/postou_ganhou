@@ -169,6 +169,8 @@ function getStoryUnavailableLabel(post?: Pick<PostItem, 'type'> | null) {
   return post?.type === 'story' ? 'Story expirado' : '';
 }
 
+type PostMediaMode = 'image' | 'video';
+
 function PostMediaPreview({
   src,
   posterSrc,
@@ -204,7 +206,9 @@ function PostMediaPreview({
     mediaType,
     mimeType,
   });
-  const mediaCandidates = (isVideoMedia ? ['video', 'image'] : ['image', 'video']) as const;
+  const mediaCandidates: readonly PostMediaMode[] = isVideoMedia
+    ? ['video', 'image']
+    : ['image', 'video'];
   const [attemptIndex, setAttemptIndex] = useState(0);
   const currentMediaMode = mediaCandidates[attemptIndex];
 
