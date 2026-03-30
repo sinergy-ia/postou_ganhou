@@ -16,6 +16,13 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "Marque & Ganhe - Plataforma de Recompensas",
   description: "Poste, ganhe descontos e descubra lugares incríveis na plataforma de recompensas sociais.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
