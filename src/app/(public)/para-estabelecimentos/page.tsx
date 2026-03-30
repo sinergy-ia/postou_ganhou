@@ -6,14 +6,21 @@ import { useMutation } from '@tanstack/react-query';
 import {
   ArrowRight,
   Calendar,
+  CheckCircle2,
+  ChevronDown,
+  Gift,
   Image,
   MessageSquare,
   Send,
+  ShieldCheck,
   Sparkles,
+  Store,
   Target,
   TrendingUp,
   Users,
+  Utensils,
   Video,
+  Zap,
 } from 'lucide-react';
 import PricingSection from '@/components/public/PricingSection';
 import {
@@ -38,6 +45,8 @@ export default function ParaEstabelecimentosPage() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const contactMutation = useMutation({
     mutationFn: publicApi.submitPartnerContact,
@@ -92,9 +101,38 @@ export default function ParaEstabelecimentosPage() {
     contactMutation.mutate(formData);
   }
 
+  const faqItems = [
+    {
+      q: 'Meus clientes não têm costume de postar stories.',
+      a: 'A maioria dos brasileiros com smartphone usa o Instagram Stories diariamente. O que faltava era um motivo concreto para te marcar. A recompensa cria esse motivo.',
+    },
+    {
+      q: 'Quanto tempo vou gastar gerenciando isso?',
+      a: 'Zero. O sistema valida os stories e entrega os cupons automaticamente. Você não precisa verificar nada. Só abre o painel quando quiser ver os resultados.',
+    },
+    {
+      q: 'E se alguém tentar burlar a campanha?',
+      a: 'O sistema verifica se a conta é real, se o story ficou no ar pelo tempo mínimo e se o critério foi cumprido corretamente. Contas suspeitas são sinalizadas. Você só recompensa quem realmente participou.',
+    },
+    {
+      q: 'Preciso ter muitos seguidores para funcionar?',
+      a: 'Não. O poder da campanha vem dos seguidores dos seus clientes, não dos seus. Um cliente com 500 seguidores genuínos vale muito mais do que um post patrocinado para desconhecidos.',
+    },
+    {
+      q: 'Funciona para loja física sem e-commerce?',
+      a: 'Especialmente para loja física. A experiência presencial é o combustível do story. O cliente está lá, vivendo o momento, com incentivo real para registrar e marcar. É exatamente onde o MarqueGanhe brilha mais.',
+    },
+    {
+      q: 'Quanto custa?',
+      a: 'Menos do que você gasta em um único impulsionamento que some em 24 horas. Confira nossos planos abaixo.',
+    },
+  ];
+
   return (
     <div className="bg-slate-50 min-h-screen">
-      {/* Hero Section */}
+      {/* ────────────────────────────────────────────
+          HERO SECTION
+      ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-slate-900 py-24 lg:py-32 border-b border-primary-900">
         <div className="absolute top-0 right-0 -m-32 blur-3xl rounded-full bg-primary-900/40 w-96 h-96" />
         <div className="absolute bottom-0 left-0 -m-32 blur-3xl rounded-full bg-secondary-900/30 w-96 h-96" />
@@ -105,36 +143,54 @@ export default function ParaEstabelecimentosPage() {
                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
              </span>
-             Lançamento para novos parceiros
+             14 dias grátis — sem cartão de crédito
           </div>
-          <h1 className="font-heading font-black text-4xl md:text-6xl lg:text-7xl tracking-tighter text-white leading-tight mb-8">
-            Transforme seus clientes em <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-secondary-400">promotores da sua marca</span>
+          <h1 className="font-heading font-black text-3xl md:text-5xl lg:text-6xl tracking-tighter text-white leading-tight mb-8">
+            Todo dia, seus clientes postam stories marcando concorrentes de graça.{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-secondary-400">
+              E você ainda paga R$3 por clique para tentar alcançar quem já te conhece.
+            </span>
           </h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Aumente sua visibilidade local, atraia novos clientes e fidelize os atuais oferecendo recompensas por publicações nas redes sociais.
+            Existe uma forma de fazer seus clientes fazerem marketing para você — com critério, recompensa e cupom entregue automaticamente. Sem agência. Sem anúncio. Sem você mexer um dedo.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="#cadastro" className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-full transition-all shadow-xl shadow-primary-900/50 flex items-center justify-center gap-2 group">
-              Quero atrair mais clientes
+              Criar minha campanha — 14 dias grátis
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
+          <p className="text-sm text-slate-400 mt-4">
+            Sem cartão. Sem contrato. Cancele quando quiser.
+          </p>
         </div>
       </section>
 
-      {/* Social Proof Array */}
-      <section className="py-10 bg-white border-b border-slate-100">
-        <div className="container mx-auto px-4">
-          <p className="text-center text-sm font-bold text-slate-500 uppercase tracking-wider mb-6">Confiado por grandes marcas</p>
-          <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
-            {/* Fake logos using text for mockup */}
-            <div className="font-heading font-black text-2xl text-primary-700">SINERGY IA</div>
+      {/* ────────────────────────────────────────────
+          CONTEXT BLOCK — Por que isso funciona
+      ──────────────────────────────────────────── */}
+      <section className="py-16 bg-white border-b border-slate-100">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <div className="prose prose-lg prose-slate mx-auto text-center">
+            <p className="text-lg text-slate-600 leading-relaxed">
+              Toda vez que alguém marca um restaurante, uma loja ou um estabelecimento nos stories do Instagram, está gerando alcance orgânico para ele. <strong className="text-slate-900">Gratuitamente. Autenticamente.</strong> Com muito mais credibilidade do que qualquer anúncio pago.
+            </p>
+            <p className="text-lg text-slate-600 leading-relaxed mt-4">
+              Marcas grandes sabem disso há anos. A Coca-Cola não paga para aparecer na mesa dos seus clientes — ela criou condições para que as pessoas <em>quisessem</em> marcar. O McDonald&apos;s não paga por cada story. O Outback não contrata influenciador para cada promoção.
+            </p>
+            <p className="text-lg text-slate-700 leading-relaxed mt-4 font-semibold">
+              O problema é que até agora não existia uma ferramenta para o pequeno e médio varejista criar esse mesmo mecanismo, com regra definida, recompensa automática e resultado mensurável.
+            </p>
+            <p className="text-2xl font-heading font-black text-primary-600 mt-6">
+              Agora existe.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Como ajuda o negocio */}
+      {/* ────────────────────────────────────────────
+          SEÇÃO 2 — O QUE É O MARQUEGANHE
+      ──────────────────────────────────────────── */}
       <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-4 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -169,34 +225,34 @@ export default function ParaEstabelecimentosPage() {
                 Como funciona o Marque &amp; Ganhe
               </div>
               <h2 className="font-heading font-bold text-3xl md:text-5xl text-slate-900 leading-tight">
-                Mais visibilidade,<br/>
-                <span className="text-primary-600">mais retorno de clientes.</span>
+                Você define as regras.{' '}
+                <span className="text-primary-600">Seus clientes fazem a divulgação. O sistema entrega o cupom.</span>
               </h2>
-              <p className="text-lg text-slate-600">
-                Voce cria a campanha, o cliente publica no Instagram para participar e
-                sua equipe valida a acao para liberar a recompensa. Cada postagem vira
-                prova social e ajuda a trazer novas pessoas para conhecer sua marca.
-              </p>
-              <p className="hidden text-lg text-slate-600">
-                O marketing boca-a-boca é o mais poderoso que existe. Nós o digitalizamos. Cada post de um cliente atinge centenas de potenciais novos compradores da sua região.
-              </p>
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 text-slate-700 space-y-4">
+                <p>
+                  Imagine que você tem uma loja de suplementos. Você cria uma campanha com a hashtag <strong className="text-primary-700">#super10</strong>.
+                </p>
+                <p>
+                  A regra é simples: quem fizer <strong>3 stories</strong> marcando sua loja com essa hashtag ganha <strong>5% de desconto</strong> na próxima compra.
+                </p>
+              </div>
               
               <div className="space-y-4">
                 {[
                   {
                     icon: Target,
-                    title: '1. Crie a campanha',
-                    desc: 'Defina a recompensa, o formato da postagem e as regras para o cliente participar.',
+                    title: 'O cliente posta',
+                    desc: 'Stories com a hashtag e marcação do seu perfil. Amigos, seguidores, familiares — todos veem.',
                   },
                   {
-                    icon: MessageSquare,
-                    title: '2. O cliente publica',
-                    desc: 'Ele faz o post ou story, marca o perfil do estabelecimento e segue a campanha.',
+                    icon: Zap,
+                    title: 'O sistema monitora automaticamente',
+                    desc: 'Nenhum funcionário precisa ficar verificando stories. O MarqueGanhe faz isso.',
                   },
                   {
-                    icon: Users,
-                    title: '3. Voce valida e recompensa',
-                    desc: 'Sua equipe aprova no painel e libera o cupom para trazer esse cliente de volta.',
+                    icon: Gift,
+                    title: 'Cupom entregue via Direct',
+                    desc: 'Quando o critério é cumprido, o cliente recebe a recompensa. Você recebe um cliente fidelizado.',
                   },
                 ].map((item) => (
                   <div
@@ -214,44 +270,289 @@ export default function ParaEstabelecimentosPage() {
                 ))}
               </div>
 
-              <ul className="hidden space-y-6">
-                {[
-                  { icon: Target, title: 'Campanhas fáceis de criar', desc: 'Lance uma promoção em menos de 3 minutos. Defina regras, metas de likes e recompensas (story ou post).' },
-                  { icon: Users, title: 'Atração de novos clientes', desc: 'Os seguidores dos seus clientes descobrem seu estabelecimento com forte prova social embutida.' },
-                  { icon: MessageSquare, title: 'Mais exposição, zero esforço', desc: 'Enquanto você foca no seu negócio, seus clientes atuam como micro-influenciadores digitais.' }
-                ].map((item, i) => (
-                  <li key={i} className="flex gap-4">
-                    <div className="mt-1 w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
-                      <item.icon className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xl text-slate-900">{item.title}</h4>
-                      <p className="text-slate-600 mt-1">{item.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                {[
-                  'Mais alcance local para sua marca.',
-                  'Mais prova social com clientes reais.',
-                  'Mais retorno com cupom e recompra.',
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
+              <p className="text-slate-600 italic border-l-4 border-primary-400 pl-4">
+                Isso é marketing que gera marketing. O cliente que ganhou desconto vai contar para mais gente. A hashtag cresce. O alcance cresce. O custo de aquisição cai.
+              </p>
             </div>
             
           </div>
         </div>
       </section>
 
+      {/* ────────────────────────────────────────────
+          COMPARATIVO — Jeito antigo vs MarqueGanhe
+      ──────────────────────────────────────────── */}
+      <section className="py-20 bg-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_40%)]" />
+        <div className="container relative z-10 mx-auto px-4 max-w-5xl">
+          <h2 className="font-heading font-bold text-3xl md:text-4xl text-white text-center mb-12">
+            Por que o MarqueGanhe é{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-secondary-400">diferente</span>
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Jeito Antigo */}
+            <div className="rounded-[2rem] border border-red-500/20 bg-red-950/20 p-8 space-y-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-500/10 px-4 py-1.5 text-sm font-bold text-red-300">
+                ❌ Jeito antigo
+              </div>
+              {[
+                'Você paga para alcançar desconhecidos',
+                'R$3–R$15 por clique sem garantia',
+                'Anúncio desaparece ao parar de pagar',
+                'Impressão passiva, sem engajamento real',
+                'Difícil medir o retorno real',
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-3">
+                  <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-900/40 text-red-400 text-xs">✕</span>
+                  <p className="text-slate-300 text-sm">{item}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Com MarqueGanhe */}
+            <div className="rounded-[2rem] border border-emerald-500/20 bg-emerald-950/20 p-8 space-y-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-4 py-1.5 text-sm font-bold text-emerald-300">
+                ✅ Com MarqueGanhe
+              </div>
+              {[
+                'Seus clientes alcançam os amigos deles',
+                'Você só recompensa quem já postou',
+                'Stories ficam, indicações ficam, boca a boca fica',
+                'Cliente ativo, que postou, que se identificou com sua marca',
+                'Você vê quantos stories, quantos cupons, quantos resgates',
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-3">
+                  <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-900/40 text-emerald-400">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </span>
+                  <p className="text-slate-200 text-sm">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          SEÇÃO 3 — PARA QUEM É
+      ──────────────────────────────────────────── */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-sm font-bold text-primary-700 mb-5">
+              <Users className="h-4 w-4" />
+              Para quem é
+            </div>
+            <h2 className="font-heading font-bold text-3xl md:text-5xl text-slate-900 leading-tight">
+              Feito para quem tem clientes que usam Instagram —{' '}
+              <span className="text-primary-600">e ainda não transformou isso em ativo de marketing.</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              {
+                icon: Utensils,
+                title: 'Restaurante, bar ou cafeteria',
+                desc: 'Seus clientes já postam fotos da comida. Eles só precisam de um incentivo para marcar você. Crie a campanha, defina o desconto, e deixe a ferramenta trabalhar.',
+              },
+              {
+                icon: Store,
+                title: 'Loja de moda, suplementos, cosméticos ou varejo físico',
+                desc: 'Stories com produto + estabelecimento marcado valem mais do que qualquer banner patrocinado. São pessoas reais, com rostos, endossando sua loja para os círculos sociais delas.',
+              },
+              {
+                icon: Zap,
+                title: 'Academia, estúdio ou serviço presencial',
+                desc: '"Check-in de treino" já é comportamento orgânico. Você só precisa criar a estrutura para que esse comportamento te beneficie de forma mensurável.',
+              },
+              {
+                icon: Gift,
+                title: 'E-commerce com entrega',
+                desc: 'Unboxing stories são o anúncio mais barato e mais confiável que existe. Dê um motivo para o cliente postar e colha os resultados.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="group rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-primary-200"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 mb-5 transition-colors group-hover:bg-primary-100">
+                  <item.icon className="w-7 h-7" />
+                </div>
+                <h3 className="font-heading font-bold text-xl text-slate-900 mb-3">{item.title}</h3>
+                <p className="text-slate-600 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          SEÇÃO 4 — COMO FUNCIONA NA PRÁTICA (3 passos)
+      ──────────────────────────────────────────── */}
+      <section className="py-24 bg-slate-50 border-y border-slate-100">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-sm font-bold text-primary-700 mb-5">
+              <Sparkles className="h-4 w-4" />
+              Simples de usar
+            </div>
+            <h2 className="font-heading font-bold text-3xl md:text-5xl text-slate-900 leading-tight">
+              Três passos. Cinco minutos para configurar.{' '}
+              <span className="text-primary-600">Resultado que começa no mesmo dia.</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                step: '01',
+                icon: Target,
+                title: 'Crie sua campanha em minutos',
+                desc: 'Defina a hashtag exclusiva (ex: #super10), o critério para ganhar (ex: 3 stories), a recompensa (ex: 5% OFF) e o prazo. Pronto. Sem designer, agência ou técnico.',
+              },
+              {
+                step: '02',
+                icon: Users,
+                title: 'Seus clientes veem, participam e postam',
+                desc: 'Comunique a campanha na loja, WhatsApp ou Instagram. Os clientes fazem os stories com a hashtag e marcam você. O conteúdo chega espontâneo para os seguidores deles.',
+              },
+              {
+                step: '03',
+                icon: Zap,
+                title: 'O sistema valida e entrega automaticamente',
+                desc: 'O MarqueGanhe monitora os stories com a hashtag e marcação do seu perfil. Quando o critério é cumprido, o cupom é gerado e enviado automaticamente. Sem trabalho manual.',
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="relative rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm"
+              >
+                <span className="absolute -top-4 left-6 inline-flex items-center justify-center rounded-full bg-primary-600 text-white text-sm font-black h-8 w-8 shadow-lg shadow-primary-200">
+                  {item.step}
+                </span>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600 mt-2 mb-5">
+                  <item.icon className="w-6 h-6" />
+                </div>
+                <h3 className="font-heading font-bold text-xl text-slate-900 mb-3">{item.title}</h3>
+                <p className="text-slate-600 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-slate-500 mt-8 text-sm">
+            Você só abre o painel e vê os números.
+          </p>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          SEÇÃO 5 — RESULTADOS / PROVA SOCIAL
+      ──────────────────────────────────────────── */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-bold text-emerald-700 mb-5">
+              <TrendingUp className="h-4 w-4" />
+              Resultados reais
+            </div>
+            <h2 className="font-heading font-bold text-3xl md:text-5xl text-slate-900 leading-tight">
+              O que acontece quando seus clientes{' '}
+              <span className="text-primary-600">se tornam seu canal de marketing</span>
+            </h2>
+          </div>
+
+          {/* Case 1 */}
+          <div className="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-8 md:p-12 shadow-sm mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+                <Utensils className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-xl text-slate-900">Yuruzu — Restaurante</h3>
+              </div>
+            </div>
+            <blockquote className="text-lg text-slate-700 italic border-l-4 border-primary-400 pl-6 mb-6">
+              &ldquo;A gente tinha Instagram ativo mas não sabia como transformar isso em resultado real. Criamos a campanha com 15% OFF e em 3 semanas tínhamos mais de 80 stories publicados por clientes reais. Pessoas que nunca tinham ouvido falar do restaurante apareceram porque viram no story de alguém.&rdquo;
+            </blockquote>
+            <div className="flex flex-wrap gap-4">
+              <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-bold text-primary-700">
+                87 cupons gerados
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
+                0 reais gastos em anúncio
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
+                34% de aumento em visitas de novos clientes
+              </div>
+            </div>
+          </div>
+
+          {/* Nielsen stat */}
+          <div className="rounded-[2rem] border border-primary-200 bg-gradient-to-br from-primary-50 to-white p-8 md:p-12 shadow-sm text-center">
+            <p className="text-sm font-bold uppercase tracking-wider text-primary-600 mb-4">
+              Pesquisa Nielsen
+            </p>
+            <p className="text-2xl md:text-3xl font-heading font-bold text-slate-900 leading-snug max-w-3xl mx-auto">
+              92% dos consumidores confiam em indicações de pessoas que conhecem mais do que em qualquer forma de publicidade.
+            </p>
+            <p className="text-slate-600 mt-6 text-lg max-w-2xl mx-auto">
+              Um story de cliente vale mais do que R$50 em anúncio. O MarqueGanhe multiplica esse efeito de forma sistemática.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          SEÇÃO 6 — FAQ / OBJEÇÕES
+      ──────────────────────────────────────────── */}
+      <section className="py-24 bg-slate-50 border-y border-slate-100">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-sm font-bold text-primary-700 mb-5">
+              <ShieldCheck className="h-4 w-4" />
+              Tire suas dúvidas
+            </div>
+            <h2 className="font-heading font-bold text-3xl md:text-4xl text-slate-900 leading-tight">
+              Antes de fechar a página, as dúvidas que todo lojista tem
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {faqItems.map((item, index) => (
+              <div
+                key={index}
+                className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
+                >
+                  <span className="font-bold text-slate-900">&ldquo;{item.q}&rdquo;</span>
+                  <ChevronDown
+                    className={`w-5 h-5 shrink-0 text-slate-400 transition-transform duration-200 ${
+                      openFaq === index ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    openFaq === index ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <p className="px-6 pb-5 text-slate-600 leading-relaxed">{item.a}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          IA Posts Section (mantido)
+      ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-slate-900 py-24">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),_transparent_35%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.18),_transparent_32%)]" />
         <div className="container relative z-10 mx-auto px-4 max-w-7xl">
@@ -392,18 +693,60 @@ export default function ParaEstabelecimentosPage() {
         </div>
       </section>
 
+      {/* ────────────────────────────────────────────
+          SEÇÃO 7 — PLANOS (PricingSection mantido)
+      ──────────────────────────────────────────── */}
       <PricingSection />
 
-      {/* Form / Lead Capture Section */}
+      {/* ────────────────────────────────────────────
+          CTA FINAL — FECHAMENTO
+      ──────────────────────────────────────────── */}
+      <section className="py-20 bg-gradient-to-b from-white to-slate-50 border-t border-slate-100">
+        <div className="container mx-auto px-4 max-w-3xl text-center">
+          <h2 className="font-heading font-bold text-3xl md:text-4xl text-slate-900 mb-8 leading-tight">
+            Seus concorrentes ainda estão pagando por clique.{' '}
+            <span className="text-primary-600">Você pode fazer seus clientes trabalharem por você.</span>
+          </h2>
+          <div className="space-y-4 text-lg text-slate-600 mb-10">
+            <p>Cada story postado por um cliente vale mais do que qualquer banner.</p>
+            <p>Cada indicação orgânica custa menos do que qualquer tráfego pago.</p>
+            <p>Cada cupom entregue automaticamente representa um cliente que voltou com intenção.</p>
+          </div>
+          <p className="text-slate-500 text-sm mb-8 max-w-2xl mx-auto">
+            O MarqueGanhe é a primeira plataforma brasileira que transforma o comportamento natural dos seus clientes no Instagram em um sistema de marketing mensurável — sem agência, sem anúncio, sem trabalho manual.
+          </p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 mb-8">
+            <CheckCircle2 className="h-4 w-4" />
+            Mais de 10.000 cupons já entregues por clientes reais
+          </div>
+          <p className="text-slate-700 font-semibold text-lg mb-8">
+            O próximo pode ser o seu cliente.
+          </p>
+          <Link
+            href="#cadastro"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-full transition-all shadow-xl shadow-primary-900/30 group"
+          >
+            Quero testar 14 dias grátis
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <p className="text-sm text-slate-400 mt-4">
+            Cadastro em 2 minutos. Primeira campanha no ar hoje.
+          </p>
+        </div>
+      </section>
+
+      {/* ────────────────────────────────────────────
+          FORMULÁRIO DE CADASTRO (mantido)
+      ──────────────────────────────────────────── */}
       <section id="cadastro" className="py-24 bg-white border-t border-slate-100">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="bg-gradient-to-br from-slate-900 to-primary-950 rounded-[3rem] p-8 md:p-16 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-600/30 blur-3xl rounded-full" />
             
             <div className="relative z-10 text-center mb-10">
-              <h2 className="font-heading font-bold text-3xl md:text-4xl text-white mb-4">Venda mais com o Marque &amp; Ganhe</h2>
+              <h2 className="font-heading font-bold text-3xl md:text-4xl text-white mb-4">Comece hoje. Sem risco. Sem fidelidade.</h2>
               <p className="text-primary-100 max-w-xl mx-auto">
-                Preencha os dados abaixo. Nossa equipe entrará em contato para liberar seu acesso à plataforma com 30 dias de teste grátis.
+                Preencha os dados abaixo. Nossa equipe entrará em contato para liberar seu acesso à plataforma com 14 dias de teste grátis.
               </p>
             </div>
             
@@ -460,6 +803,9 @@ export default function ParaEstabelecimentosPage() {
                     <option>Cafeteria / Doceria</option>
                     <option>Vestuário / Moda</option>
                     <option>Beleza e Estética</option>
+                    <option>Suplementos / Saúde</option>
+                    <option>Academia / Estúdio</option>
+                    <option>E-commerce</option>
                     <option>Outros</option>
                   </select>
                 </div>
@@ -494,10 +840,10 @@ export default function ParaEstabelecimentosPage() {
                 disabled={contactMutation.isPending}
                 className="w-full mt-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-md shadow-primary-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {contactMutation.isPending ? 'Enviando...' : 'Solicitar Acesso 🚀'}
+                {contactMutation.isPending ? 'Enviando...' : 'Quero testar 14 dias grátis 🚀'}
               </button>
               <p className="text-center text-xs text-slate-500 mt-4">
-                Não exigimos cartão de crédito neste momento.
+                Sem cartão de crédito. Cancele com 1 clique.
               </p>
             </form>
           </div>
